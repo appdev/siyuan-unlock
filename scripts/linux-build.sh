@@ -2,7 +2,8 @@
 
 echo 'Building UI'
 cd app
-pnpm install && pnpm run build
+rm -rf app/stage/build
+npm install && npm run build
 cd ..
 
 echo 'Cleaning Builds'
@@ -24,5 +25,7 @@ cd ..
 
 echo 'Building Electron'
 cd app
-pnpm run dist-linux
+npm run build:export
+echo "build export assets"
+npm run dist-linux
 cd ..

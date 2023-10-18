@@ -1,22 +1,22 @@
-import {popSearch} from "./search";
-import {initAppearance} from "../settings/appearance";
-import {closePanel} from "../util/closePanel";
-import {mountHelp, newDailyNote, newNotebook} from "../../util/mount";
-import {repos} from "../../config/repos";
-import {exitSiYuan, lockScreen, processSync} from "../../dialog/processSystem";
-import {openHistory} from "../../history/history";
-import {syncGuide} from "../../sync/syncGuide";
-import {openCard} from "../../card/openCard";
-import {activeBlur, hideKeyboardToolbar} from "../util/keyboardToolbar";
-import {initAI} from "../settings/ai";
-import {initRiffCard} from "../settings/riffCard";
-import {login, showAccountInfo} from "../settings/account";
-import {openModel} from "./model";
-import {initAbout} from "../settings/about";
-import {getRecentDocs} from "./getRecentDocs";
-import {initEditor} from "../settings/editor";
-import {App} from "../../index";
-import {isHuawei, isInAndroid, isInIOS} from "../../protyle/util/compatibility";
+import { popSearch } from "./search";
+import { initAppearance } from "../settings/appearance";
+import { closePanel } from "../util/closePanel";
+import { mountHelp, newDailyNote, newNotebook } from "../../util/mount";
+import { repos } from "../../config/repos";
+import { exitSiYuan, lockScreen, processSync } from "../../dialog/processSystem";
+import { openHistory } from "../../history/history";
+import { syncGuide } from "../../sync/syncGuide";
+import { openCard } from "../../card/openCard";
+import { activeBlur, hideKeyboardToolbar } from "../util/keyboardToolbar";
+import { initAI } from "../settings/ai";
+import { initRiffCard } from "../settings/riffCard";
+import { login, showAccountInfo } from "../settings/account";
+import { openModel } from "./model";
+import { initAbout } from "../settings/about";
+import { getRecentDocs } from "./getRecentDocs";
+import { initEditor } from "../settings/editor";
+import { App } from "../../index";
+import { isHuawei, isInAndroid, isInIOS } from "../../protyle/util/compatibility";
 
 export const popMenu = () => {
     activeBlur();
@@ -51,7 +51,6 @@ export const initRightMenu = (app: App) => {
     <span class="b3-menu__label">${window.siyuan.languages.back}</span>
 </div>
 <div class="b3-menu__items">
-    ${accountHTML}
     <div id="menuRecent" class="b3-menu__item">
         <svg class="b3-menu__icon"><use xlink:href="#iconList"></use></svg><span class="b3-menu__label">${window.siyuan.languages.recentDocs}</span>
     </div>

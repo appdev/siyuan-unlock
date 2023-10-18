@@ -1,14 +1,14 @@
-import {needLogin, needSubscribe} from "../util/needSubscribe";
-import {showMessage} from "../dialog/message";
-import {fetchPost} from "../util/fetch";
-import {Dialog} from "../dialog";
-import {confirmDialog} from "../dialog/confirmDialog";
-import {isMobile} from "../util/functions";
-import {processSync} from "../dialog/processSystem";
+import { Dialog } from "../dialog";
+import { confirmDialog } from "../dialog/confirmDialog";
+import { showMessage } from "../dialog/message";
+import { processSync } from "../dialog/processSystem";
+import { fetchPost } from "../util/fetch";
+import { isMobile } from "../util/functions";
+import { needLogin, needSubscribe } from "../util/needSubscribe";
 /// #if !MOBILE
-import {openSetting} from "../config";
+import { openSetting } from "../config";
 /// #endif
-import {App} from "../index";
+import { App } from "../index";
 
 export const addCloudName = (cloudPanelElement: Element) => {
     const dialog = new Dialog({
@@ -35,7 +35,7 @@ export const addCloudName = (cloudPanelElement: Element) => {
     });
     btnsElement[1].addEventListener("click", () => {
         cloudPanelElement.innerHTML = '<img style="margin: 0 auto;display: block;width: 64px;height: 100%" src="/stage/loading-pure.svg">';
-        fetchPost("/api/sync/createCloudSyncDir", {name: inputElement.value}, () => {
+        fetchPost("/api/sync/createCloudSyncDir", { name: inputElement.value }, () => {
             dialog.destroy();
             getSyncCloudList(cloudPanelElement, true);
         });
@@ -55,7 +55,7 @@ export const bindSyncCloudListEvent = (cloudPanelElement: Element, cb?: () => vo
                     case "removeCloud":
                         confirmDialog(window.siyuan.languages.confirm, `${window.siyuan.languages.confirmDeleteCloudDir} <i>${target.parentElement.getAttribute("data-name")}</i>`, () => {
                             cloudPanelElement.innerHTML = '<img style="margin: 0 auto;display: block;width: 64px;height: 100%" src="/stage/loading-pure.svg">';
-                            fetchPost("/api/sync/removeCloudSyncDir", {name: target.parentElement.getAttribute("data-name")}, (response) => {
+                            fetchPost("/api/sync/removeCloudSyncDir", { name: target.parentElement.getAttribute("data-name") }, (response) => {
                                 window.siyuan.config.sync.cloudName = response.data;
                                 getSyncCloudList(cloudPanelElement, true, cb);
                             });
@@ -63,7 +63,7 @@ export const bindSyncCloudListEvent = (cloudPanelElement: Element, cb?: () => vo
                         break;
                     case "selectCloud":
                         cloudPanelElement.innerHTML = '<img style="margin: 0 auto;display: block;width: 64px;height: 100%" src="/stage/loading-pure.svg">';
-                        fetchPost("/api/sync/setCloudSyncDir", {name: target.getAttribute("data-name")}, () => {
+                        fetchPost("/api/sync/setCloudSyncDir", { name: target.getAttribute("data-name") }, () => {
                             window.siyuan.config.sync.cloudName = target.getAttribute("data-name");
                             getSyncCloudList(cloudPanelElement, true, cb);
                         });
@@ -146,6 +146,12 @@ export const syncGuide = (app?: App) => {
     if (window.siyuan.config.readonly) {
         return;
     }
+
+    if (!window.siyuan.config.sync.enabled) {
+        showMessage("请在 设置 - 云端 中配置同步信息");
+        return;
+    }
+
     /// #if MOBILE
     if ((0 === window.siyuan.config.sync.provider && needSubscribe()) ||
         (0 !== window.siyuan.config.sync.provider && needLogin())) {
@@ -224,7 +230,7 @@ const syncNow = () => {
             showMessage(window.siyuan.languages.plsChoose);
             return;
         }
-        fetchPost("/api/sync/performSync", {upload: uploadElement.value === "true"});
+        fetchPost("/api/sync/performSync", { upload: uploadElement.value === "true" });
         manualDialog.destroy();
     });
 };
@@ -271,7 +277,7 @@ const setSync = (key?: string, dialog?: Dialog) => {
         });
         btnElement.addEventListener("click", () => {
             dialog.destroy();
-            fetchPost("/api/sync/setSyncEnable", {enabled: true}, () => {
+            fetchPost("/api/sync/setSyncEnable", { enabled: true }, () => {
                 window.siyuan.config.sync.enabled = true;
                 processSync();
                 confirmDialog(window.siyuan.languages.syncConfGuide4, window.siyuan.languages.syncConfGuide5, () => {
@@ -341,7 +347,7 @@ export const setKey = (isSync: boolean, cb?: () => void) => {
             if (!isSync) {
                 dialog.destroy();
             }
-            fetchPost("/api/repo/initRepoKeyFromPassphrase", {pass: inputElements[0].value}, (response) => {
+            fetchPost("/api/repo/initRepoKeyFromPassphrase", { pass: inputElements[0].value }, (response) => {
                 window.siyuan.config.repo.key = response.data.key;
                 if (cb) {
                     cb();

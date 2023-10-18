@@ -728,12 +728,13 @@ func IsSubscriber() bool {
 }
 
 func IsPaidUser() bool {
-	if IsSubscriber() {
-		return true
-	}
-	return nil != Conf.User // Sign in to use S3/WebDAV data sync https://github.com/siyuan-note/siyuan/issues/8779
+	// if IsSubscriber() {
+	// 	return true
+	// }
+	// return nil != Conf.User // Sign in to use S3/WebDAV data sync https://github.com/siyuan-note/siyuan/issues/8779
 	// TODO S3/WebDAV data sync and backup are available for a fee https://github.com/siyuan-note/siyuan/issues/8780
 	// return nil != Conf.User && 1 == Conf.User.UserSiYuanOneTimePayStatus
+	return true
 }
 
 const (

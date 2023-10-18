@@ -2,7 +2,7 @@
 
 echo 'Building UI'
 cd app
-pnpm install && pnpm run build
+npm install && npm run build
 cd ..
 
 echo 'Cleaning Builds'
@@ -29,7 +29,9 @@ cd ..
 
 echo 'Building Electron'
 cd app
-pnpm run dist-darwin
+npm run build:export
+echo "build export assets"
+npm run dist-darwin
 echo 'Building Electron arm64'
-pnpm run dist-darwin-arm64
+npm run dist-darwin-arm64
 cd ..
