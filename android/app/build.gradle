@@ -1,0 +1,69 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    compileSdkVersion 34
+    buildToolsVersion "34"
+
+    defaultConfig {
+        applicationId "org.b3log.siyuan"
+        minSdkVersion 24
+        targetSdkVersion 34
+        versionCode 199
+        versionName "2.10.11"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    repositories {
+        flatDir {
+            dirs 'libs'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES',
+                         'META-INF/LICENSE',
+                         'META-INF/LICENSE.txt',
+                         'META-INF/license.txt',
+                         'META-INF/NOTICE',
+                         'META-INF/NOTICE.txt',
+                         'META-INF/notice.txt',
+                         'plugin.properties']
+        }
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+
+    lint {
+        abortOnError false
+    }
+    namespace 'org.b3log.siyuan'
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.0'
+    implementation 'com.google.android.material:material:1.8.0'
+    implementation 'androidx.lifecycle:lifecycle-process:2.5.1'
+    implementation 'androidx.work:work-runtime:2.7.1'
+
+    implementation(name: 'kernel', ext: 'aar')
+    implementation("commons-io:commons-io:2.5") // 不要升级，否则无法兼容 Android 7
+    implementation("com.squareup.okhttp3:okhttp:4.9.3") // 不要升级，否则无法兼容 Android 7
+    implementation 'com.gitee.zackratos:UltimateBarX:0.8.0'
+    implementation 'com.blankj:utilcodex:1.31.1'
+}
