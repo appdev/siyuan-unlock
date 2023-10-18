@@ -12,9 +12,9 @@ cd ..
 echo 'Building Kernel'
 
 cd kernel
-gomobile bind --tags fts5 -ldflags '-s -w' -v -o android/app/libs/kernel.aar -target='android/arm64' -androidapi 24 ./mobile/
+gomobile bind --tags fts5 -ldflags '-s -w' -v -o ../android/app/libs/kernel.aar -target='android/arm64' -androidapi 24 ./mobile/
 cd ..
-
+rm android/app/libs/kernel-sources.jar
 echo 'Building Resource'
 cd app
-zip -r android/app/src/main/assets/app.zip appearance/ guide/ stage/ changelogs/
+zip -r ../android/app/src/main/assets/app.zip appearance/ guide/ stage/ changelogs/
