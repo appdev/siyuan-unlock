@@ -1,16 +1,14 @@
 #!/bin/bash
 
+echo 'Building UI'
+cd app
+rm -rf app/stage/build
+npm install && npm run build
+cd ..
 
 echo 'Cleaning Builds'
 rm -rf app/build
 rm -rf app/kernel-linux
-rm -rf app/stage/build
-
-
-echo 'Building UI'
-cd app
-npm install && npm run build
-cd ..
 
 echo 'Building Kernel'
 

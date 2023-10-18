@@ -1,13 +1,6 @@
 @echo off
 echo 'use ".\scripts\win-build.bat" instead of "win-build.bat"'
 
-
-echo 'Cleaning Builds'
-del /S /Q /F app\build 1>nul
-del /S /Q /F app\kernel 1>nul
-del /S /Q /F app\stage\build 1>nul
-
-
 echo 'Building UI'
 cd app
 call npm install
@@ -16,6 +9,10 @@ call npm run build:export
 echo "build export assets"
 
 cd ..
+
+echo 'Cleaning Builds'
+del /S /Q /F app\build 1>nul
+del /S /Q /F app\kernel 1>nul
 
 echo 'Building Kernel'
 @REM the C compiler "gcc" is necessary https://sourceforge.net/projects/mingw-w64/files/mingw-w64/
