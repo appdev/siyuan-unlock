@@ -1,7 +1,7 @@
 ## 重要声明
 
 - 如果你是订阅、付费用户，你应该使用思源官方版本
-- 这个版本去除了所有用户相关功能。可以不登录使用同步功能 支持 Linux、Android、Docker
+- 这个版本去除了所有用户相关功能。可以不登录使用同步功能 支持 Linux、Windows、macOS、Android、Docker
 
 运行容器
 ```shell
