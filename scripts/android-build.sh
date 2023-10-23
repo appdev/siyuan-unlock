@@ -1,11 +1,13 @@
 #!/bin/bash
 
-echo 'Building UI'
-cd app
+
 echo 'Cleaning Builds'
 rm -rf app/build
 rm -rf app/kernel-linux
 rm -rf app/stage/build
+
+echo 'Building UI'
+cd app
 npm install && npm run build:mobile
 cd ..
 
