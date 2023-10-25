@@ -849,6 +849,23 @@ func (parser *PdfAssetParser) Parse(absPath string) (ret *AssetParseResult) {
 		return
 	}
 
+	if maxSizeVal := os.Getenv("SIYUAN_PDF_ASSET_CONTENT_INDEX_MAX_SIZE"); "" != maxSizeVal {
+		if maxSize, parseErr := strconv.ParseUint(maxSizeVal, 10, 64); nil == parseErr {
+			if maxSize != PDFAssetContentMaxSize {
+				PDFAssetContentMaxSize = maxSize
+				logging.LogInfof("set PDF asset content index max size to [%s]", humanize.Bytes(maxSize))
+			}
+		} else {
+			logging.LogWarnf("invalid env [SIYUAN_PDF_ASSET_CONTENT_INDEX_MAX_SIZE]: [%s], parsing failed: ", maxSizeVal, parseErr)
+		}
+	}
+
+	if PDFAssetContentMaxSize < uint64(len(pdfData)) {
+		// PDF files larger than 128MB are not included in asset file content searching https://github.com/siyuan-note/siyuan/issues/9500
+		logging.LogWarnf("ignore large PDF asset [%s] with [%s]", absPath, humanize.Bytes(uint64(len(pdfData))))
+		return
+	}
+
 	// next setup worker pool for processing PDF pages
 	pages := make(chan *pdfPage, pc.PageCount)
 	results := make(chan *pdfTextResult, pc.PageCount)
