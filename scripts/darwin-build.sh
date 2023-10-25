@@ -1,17 +1,17 @@
 #!/bin/bash
 
 
+echo 'Cleaning Builds'
+rm -rf app/build
+rm -rf app/kernel-darwin
+rm -rf app/kernel-darwin-arm64
+rm -rf app/stage/build
 
 echo 'Building UI'
 cd app
 npm install && npm run build
 cd ..
 
-echo 'Cleaning Builds'
-rm -rf app/build
-rm -rf app/kernel-darwin
-rm -rf app/kernel-darwin-arm64
-rm -rf app/stage/build
 
 echo 'Building Kernel'
 
