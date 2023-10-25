@@ -1,17 +1,41 @@
+import groovy.json.JsonSlurper
+
 plugins {
     id 'com.android.application'
 }
 
-android {
-    compileSdkVersion 34
-    buildToolsVersion "34"
+def getVersionCode() {
+    def versionFile = file('../version.properties')
+    if (versionFile.canRead()) {
+        def Properties versionProps = new Properties()
+        versionProps.load(new FileInputStream(versionFile))
+        def versionCode = versionProps['VERSION_CODE'].toInteger()
+        def runTasks = gradle.startParameter.taskNames
+        for (final def taskItem in runTasks) {
+            println(taskItem)
+        }
+        if (':app:assembleRelease' in runTasks) {
+            versionProps['VERSION_CODE'] = (++versionCode).toString()
+            versionProps.store(versionFile.newWriter(), null)
+        }
+        return versionCode
+    } else {
+        throw new GradleException("Could not find version.properties!")
+    }
+}
 
+android {
+    compileSdk 34
+    buildToolsVersion "34"
+    def jsonFile = file('../../app/package.json')
+    def jsonContent = new JsonSlurper().parseText(jsonFile.text)
+    def currentVersionCode = getVersionCode()
     defaultConfig {
         applicationId "org.b3log.siyuan"
         minSdkVersion 24
         targetSdkVersion 34
-        versionCode 199
-        versionName "2.10.11"
+        versionCode currentVersionCode
+        versionName jsonContent.version
     }
 
     buildTypes {

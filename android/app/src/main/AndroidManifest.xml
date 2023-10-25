@@ -1,66 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 
     <!--
     Fix the problem that notifications cannot be allowed on Android 13 https://github.com/siyuan-note/siyuan/issues/7960
     https://developer.android.google.cn/guide/topics/ui/notifiers/notification-permission?hl=zh-cn
     -->
     <uses-permission
-        android:name="android.permission.POST_NOTIFICATIONS"
-        android:minSdkVersion="33" />
+            android:name="android.permission.POST_NOTIFICATIONS"
+            android:minSdkVersion="33"/>
     <!-- Foreground KeepLiveService Crash on Android 14 https://github.com/siyuan-note/siyuan/issues/9212 -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
 
     <application
-        android:name=".App"
-        android:icon="@drawable/icon"
-        android:label="@string/app_name"
-        android:roundIcon="@drawable/icon"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.SiYuan"
-        android:usesCleartextTraffic="true">
+            android:name=".App"
+            android:icon="@drawable/icon"
+            android:label="@string/app_name"
+            android:roundIcon="@drawable/icon"
+            android:supportsRtl="true"
+            android:theme="@style/Theme.SiYuan"
+            android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".BootActivity"
-            android:autoRemoveFromRecents="true"
-            android:configChanges="orientation|screenSize"
-            android:exported="true"
-            android:hardwareAccelerated="true"
-            android:launchMode="singleInstance"
-            android:noHistory="true"
-            android:theme="@style/Theme.SiYuan.Boot">
+                android:name=".BootActivity"
+                android:autoRemoveFromRecents="true"
+                android:configChanges="orientation|screenSize"
+                android:exported="true"
+                android:hardwareAccelerated="true"
+                android:noHistory="true"
+                android:theme="@style/Theme.SiYuan.Boot">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
             <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.VIEW"/>
 
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
 
-                <data android:scheme="siyuan" />
+                <data android:scheme="siyuan"/>
             </intent-filter>
         </activity>
 
         <activity
-            android:name=".MainActivity"
-            android:autoRemoveFromRecents="true"
-            android:configChanges="keyboard|keyboardHidden|screenLayout|uiMode|orientation|screenSize|smallestScreenSize"
-            android:hardwareAccelerated="true"
-            android:launchMode="singleInstance"
-            android:theme="@style/Theme.SiYuan"></activity>
+                android:name=".MainActivity"
+                android:autoRemoveFromRecents="true"
+                android:configChanges="keyboard|keyboardHidden|screenLayout|uiMode|orientation|screenSize|smallestScreenSize"
+                android:hardwareAccelerated="true"
+                android:theme="@style/Theme.SiYuan">
+            <!--
+            不要添加 android:launchMode="singleInstance" 否则无法从相册中选择上传
+            Supports inserting pictures from photo gallery on the Android https://github.com/siyuan-note/siyuan/issues/9455
+            -->
+        </activity>
 
         <service
-            android:name=".KeepLiveService"
-            android:foregroundServiceType="specialUse">
+                android:name=".KeepLiveService"
+                android:foregroundServiceType="specialUse">
             <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="hosting" />
+                    android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                    android:value="hosting"/>
         </service>
     </application>
 

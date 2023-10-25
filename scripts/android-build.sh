@@ -19,4 +19,4 @@ cd ..
 rm android/app/libs/kernel-sources.jar
 echo 'Building Resource'
 cd app
-zip -r ../android/app/src/main/assets/app.zip appearance/ guide/ stage/ changelogs/
+zip -rf ../android/app/src/main/assets/app.zip appearance/ guide/ stage/ changelogs/
