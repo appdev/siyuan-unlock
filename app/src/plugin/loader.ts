@@ -29,10 +29,12 @@ export const loadPlugins = async (app: App) => {
         loadPluginJS(app, item);
         css += item.css || "" + "\n";
     });
-    const styleElement = document.createElement("style");
-    styleElement.id = "pluginsStyle";
-    styleElement.textContent = css;
-    document.head.append(styleElement);
+    const pluginsStyle = document.getElementById("pluginsStyle");
+    if (pluginsStyle) {
+        pluginsStyle.innerHTML = css;
+    } else {
+        document.head.insertAdjacentHTML("beforeend", `<style id="pluginsStyle">${css}</style>`);
+    }
 };
 
 const loadPluginJS = async (app: App, item: IPluginData) => {
@@ -108,7 +110,8 @@ const mergePluginHotkey = (plugin: Plugin) => {
     if (!window.siyuan.config.keymap.plugin) {
         window.siyuan.config.keymap.plugin = {};
     }
-    plugin.commands.forEach(command => {
+    for (let i = 0; i < plugin.commands.length; i++) {
+        const command = plugin.commands[i];
         if (!window.siyuan.config.keymap.plugin[plugin.name]) {
             command.customHotkey = command.hotkey;
             window.siyuan.config.keymap.plugin[plugin.name] = {
@@ -117,21 +120,26 @@ const mergePluginHotkey = (plugin: Plugin) => {
                     custom: command.hotkey,
                 }
             };
-            return;
-        }
-        if (!window.siyuan.config.keymap.plugin[plugin.name][command.langKey]) {
+        } else if (!window.siyuan.config.keymap.plugin[plugin.name][command.langKey]) {
             command.customHotkey = command.hotkey;
             window.siyuan.config.keymap.plugin[plugin.name][command.langKey] = {
                 default: command.hotkey,
                 custom: command.hotkey,
             };
-            return;
-        }
-        if (window.siyuan.config.keymap.plugin[plugin.name][command.langKey]) {
-            command.customHotkey = window.siyuan.config.keymap.plugin[plugin.name][command.langKey].custom || command.hotkey;
+        } else if (window.siyuan.config.keymap.plugin[plugin.name][command.langKey]) {
+            if (typeof window.siyuan.config.keymap.plugin[plugin.name][command.langKey].custom === "string") {
+                command.customHotkey = window.siyuan.config.keymap.plugin[plugin.name][command.langKey].custom;
+            } else {
+                command.customHotkey = command.hotkey;
+            }
             window.siyuan.config.keymap.plugin[plugin.name][command.langKey]["default"] = command.hotkey;
         }
-    });
+        if (typeof command.customHotkey !== "string") {
+            console.error(`${plugin.name} - commands data is error and has been removed.`);
+            plugin.commands.splice(i, 1);
+            i--;
+        }
+    }
 };
 
 export const afterLoadPlugin = (plugin: Plugin) => {

@@ -431,7 +431,7 @@ export const copySubMenu = (id: string, accelerator = true, focusElement?: Eleme
     }];
 };
 
-export const exportMd = (id: string) => {
+export const exportMd = (id: string, fileType = "NodeDocument") => {
     return new MenuItem({
         label: window.siyuan.languages.export,
         type: "submenu",
@@ -532,7 +532,7 @@ export const exportMd = (id: string) => {
             label: window.siyuan.languages.image,
             icon: "iconImage",
             click: () => {
-                exportImage(id);
+                exportImage(id, fileType);
             }
         },
             /// #if !BROWSER
@@ -540,26 +540,26 @@ export const exportMd = (id: string) => {
                 label: "PDF",
                 icon: "iconPDF",
                 click: () => {
-                    saveExport({type: "pdf", id});
+                    saveExport({type: "pdf", id, fileType});
                 }
             }, {
                 label: "HTML (SiYuan)",
                 iconClass: "ft__error",
                 icon: "iconHTML5",
                 click: () => {
-                    saveExport({type: "html", id});
+                    saveExport({type: "html", id, fileType});
                 }
             }, {
                 label: "HTML (Markdown)",
                 icon: "iconHTML5",
                 click: () => {
-                    saveExport({type: "htmlmd", id});
+                    saveExport({type: "htmlmd", id, fileType});
                 }
             }, {
                 label: "Word .docx",
                 icon: "iconExact",
                 click: () => {
-                    saveExport({type: "word", id});
+                    saveExport({type: "word", id, fileType});
                 }
             }, {
                 label: window.siyuan.languages.more,
@@ -746,6 +746,7 @@ export const openMenu = (app: App, src: string, onlyMenu: boolean, showAccelerat
     }
     window.siyuan.menus.menu.append(new MenuItem({
         label: window.siyuan.languages.openBy,
+        icon: "iconOpen",
         submenu
     }).element);
 };
@@ -758,6 +759,7 @@ export const renameMenu = (options: {
 }) => {
     return new MenuItem({
         accelerator: window.siyuan.config.keymap.editor.general.rename.custom,
+        icon: "iconEdit",
         label: window.siyuan.languages.rename,
         click: () => {
             rename(options);

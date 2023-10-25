@@ -113,6 +113,7 @@ export const openEditorTab = (app: App, id: string, notebookId?: string, pathStr
     /// #if !BROWSER
     openSubmenus.push({type: "separator"});
     openSubmenus.push({
+        icon: "iconFolder",
         label: window.siyuan.languages.showInFolder,
         click: () => {
             if (notebookId) {
@@ -127,6 +128,7 @@ export const openEditorTab = (app: App, id: string, notebookId?: string, pathStr
     /// #endif
     window.siyuan.menus.menu.append(new MenuItem({
         label: window.siyuan.languages.openBy,
+        icon: "iconOpen",
         submenu: openSubmenus,
     }).element);
     /// #endif
