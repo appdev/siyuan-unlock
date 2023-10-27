@@ -77,6 +77,7 @@ export const bindDateEvent = (options: {
                 isNotTime: !inputElements[3].checked
             }
         });
+        inputElements[0].dataset.value = inputElements[0].value;
     });
     inputElements[1].addEventListener("change", () => {
         inputElements[1].dataset.value = inputElements[1].value.length > 10 ? inputElements[1].value : inputElements[1].value + " 00:00";
@@ -90,6 +91,7 @@ export const bindDateEvent = (options: {
                 isNotTime: !inputElements[3].checked
             }
         });
+        inputElements[1].dataset.value = inputElements[1].value;
     });
     inputElements[2].addEventListener("change", () => {
         if (inputElements[2].checked) {
