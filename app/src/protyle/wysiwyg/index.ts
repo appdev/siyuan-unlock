@@ -453,6 +453,8 @@ export class WYSIWYG {
                         }
                     } else {
                         dragElement.parentElement.parentElement.style.width = (parseInt(dragElement.style.width) + 10) + "px";
+                        // 历史兼容
+                        dragElement.parentElement.parentElement.style.maxWidth = "";
                     }
                 };
 
