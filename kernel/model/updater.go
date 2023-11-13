@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/88250/gulu"
-	"github.com/imroc/req/v3"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
@@ -76,6 +75,7 @@ func getNewVerInstallPkgPath() string {
 var checkDownloadInstallPkgLock = sync.Mutex{}
 
 func checkDownloadInstallPkg() {
+	return
 	defer logging.Recover()
 
 	if skipNewVerInstallPkg() {
@@ -242,9 +242,7 @@ func GetAnnouncements() (ret []*Announcement) {
 }
 
 func CheckUpdate(showMsg bool) {
-	if !showMsg {
-		return
-	}
+	return
 
 	result, err := util.GetRhyResult(showMsg)
 	if nil != err {

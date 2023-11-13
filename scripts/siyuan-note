@@ -1,0 +1,3 @@
+#!/usr/bin/bash
+exec /usr/lib/siyuan-note/siyuan "$@"
+
