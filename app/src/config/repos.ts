@@ -1,42 +1,14 @@
-import {needLogin, needSubscribe} from "../util/needSubscribe";
+import {needLogin} from "../util/needSubscribe";
 import {fetchPost} from "../util/fetch";
 import {showMessage} from "../dialog/message";
 import {bindSyncCloudListEvent, getSyncCloudList} from "../sync/syncGuide";
 import {processSync} from "../dialog/processSystem";
-import {getCloudURL} from "./util/about";
 import {openByMobile} from "../protyle/util/compatibility";
 
 const renderProvider = (provider: number) => {
     if (provider === 0) {
-        if (needSubscribe("")) {
-            return `<div class="b3-label b3-label--inner">${window.siyuan.config.system.container === "ios" ? window.siyuan.languages._kernel[122] : window.siyuan.languages._kernel[29].replace("${url}", getCloudURL("subscribe/siyuan"))}</div>
-<div class="b3-label b3-label--noborder">
-    ${window.siyuan.languages.cloudIntro1}
-    <div class="b3-label__text">
-        <ul class="fn__list">
-            <li>${window.siyuan.languages.cloudIntro2}</li>
-            <li>${window.siyuan.languages.cloudIntro3}</li>
-            <li>${window.siyuan.languages.cloudIntro4}</li>
-            <li>${window.siyuan.languages.cloudIntro5}</li>
-            <li>${window.siyuan.languages.cloudIntro6}</li>
-            <li>${window.siyuan.languages.cloudIntro7}</li>
-            <li>${window.siyuan.languages.cloudIntro8}</li>
-        </ul>
-    </div>
-</div>
-<div class="b3-label b3-label--noborder">
-    ${window.siyuan.languages.cloudIntro9}
-    <div class="b3-label__text">
-        <ul style="padding-left: 2em">
-            <li>${window.siyuan.languages.cloudIntro10}</li>
-            <li>${window.siyuan.languages.cloudIntro11}</li>
-        </ul>
-    </div>
-</div>`;
-        }
-        return `<div class="b3-label b3-label--inner">
-    ${window.siyuan.languages.syncOfficialProviderIntro}
-</div>`;
+        window.siyuan.config.sync.provider = 2;
+        provider = 2;
     }
     if (needLogin("")) {
         return `<div class="b3-label b3-label--inner">${window.siyuan.languages.needLogin}</div>`;
@@ -186,51 +158,51 @@ const bindProviderEvent = () => {
 
     const reposDataElement = repos.element.querySelector("#reposData");
     const loadingElement = repos.element.querySelector("#reposLoading");
-    if (window.siyuan.config.sync.provider === 0) {
-        if (needSubscribe("")) {
-            loadingElement.classList.add("fn__none");
-            let nextElement = reposDataElement;
-            while (nextElement) {
-                nextElement.classList.add("fn__none");
-                nextElement = nextElement.nextElementSibling;
-            }
-            return;
-        }
-        fetchPost("/api/cloud/getCloudSpace", {}, (response) => {
-            loadingElement.classList.add("fn__none");
-            if (response.code === 1) {
-                reposDataElement.innerHTML = response.msg;
-                return;
-            } else {
-                reposDataElement.innerHTML = `<div class="fn__flex">
-    <div class="fn__flex-1">
-        ${window.siyuan.languages.cloudStorage}
-        <div class="fn__hr"></div>
-        <ul class="b3-list" style="margin-left: 12px">
-            <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.sync}<span class="b3-list-item__meta">${response.data.sync ? response.data.sync.hSize : "0B"}</span></li>
-            <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.backup}<span class="b3-list-item__meta">${response.data.backup ? response.data.backup.hSize : "0B"}</span></li>
-            <li class="b3-list-item" style="cursor: auto;"><a href="${getCloudURL("settings/file?type=3")}" target="_blank">${window.siyuan.languages.cdn}</a><span class="b3-list-item__meta">${response.data.hAssetSize}</span></li>
-            <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.total}<span class="b3-list-item__meta">${response.data.hSize}</span></li>
-            <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.sizeLimit}<span class="b3-list-item__meta">${response.data.hTotalSize}</span></li>
-            <li class="b3-list-item" style="cursor: auto;"><a href="${getCloudURL("settings/point")}" target="_blank">${window.siyuan.languages.pointExchangeSize}</a><span class="b3-list-item__meta">${response.data.hExchangeSize}</span></li>
-        </ul>
-    </div>
-    <div class="fn__flex-1">
-        ${window.siyuan.languages.trafficStat}
-        <div class="fn__hr"></div>
-        <ul class="b3-list" style="margin-left: 12px">
-            <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.upload}<span class="fn__space"></span><span class="ft__on-surface">${response.data.hTrafficUploadSize}</span></li>
-            <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.download}<span class="fn__space"></span><span class="ft__on-surface">${response.data.hTrafficDownloadSize}</span></li>
-            <li class="b3-list-item" style="cursor: auto;">API GET<span class="fn__space"></span><span class="ft__on-surface">${response.data.hTrafficAPIGet}</span></li>
-            <li class="b3-list-item" style="cursor: auto;">API PUT<span class="fn__space"></span><span class="ft__on-surface">${response.data.hTrafficAPIPut}</span></li>
-        </ul>
-    </div>
-</div>`;
-            }
-        });
-        reposDataElement.classList.remove("fn__none");
-        return;
-    }
+//     if (window.siyuan.config.sync.provider === 0) {
+//         if (needSubscribe("")) {
+//             loadingElement.classList.add("fn__none");
+//             let nextElement = reposDataElement;
+//             while (nextElement) {
+//                 nextElement.classList.add("fn__none");
+//                 nextElement = nextElement.nextElementSibling;
+//             }
+//             return;
+//         }
+//         fetchPost("/api/cloud/getCloudSpace", {}, (response) => {
+//             loadingElement.classList.add("fn__none");
+//             if (response.code === 1) {
+//                 reposDataElement.innerHTML = response.msg;
+//                 return;
+//             } else {
+//                 reposDataElement.innerHTML = `<div class="fn__flex">
+//     <div class="fn__flex-1">
+//         ${window.siyuan.languages.cloudStorage}
+//         <div class="fn__hr"></div>
+//         <ul class="b3-list" style="margin-left: 12px">
+//             <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.sync}<span class="b3-list-item__meta">${response.data.sync ? response.data.sync.hSize : "0B"}</span></li>
+//             <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.backup}<span class="b3-list-item__meta">${response.data.backup ? response.data.backup.hSize : "0B"}</span></li>
+//             <li class="b3-list-item" style="cursor: auto;"><a href="${getCloudURL("settings/file?type=3")}" target="_blank">${window.siyuan.languages.cdn}</a><span class="b3-list-item__meta">${response.data.hAssetSize}</span></li>
+//             <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.total}<span class="b3-list-item__meta">${response.data.hSize}</span></li>
+//             <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.sizeLimit}<span class="b3-list-item__meta">${response.data.hTotalSize}</span></li>
+//             <li class="b3-list-item" style="cursor: auto;"><a href="${getCloudURL("settings/point")}" target="_blank">${window.siyuan.languages.pointExchangeSize}</a><span class="b3-list-item__meta">${response.data.hExchangeSize}</span></li>
+//         </ul>
+//     </div>
+//     <div class="fn__flex-1">
+//         ${window.siyuan.languages.trafficStat}
+//         <div class="fn__hr"></div>
+//         <ul class="b3-list" style="margin-left: 12px">
+//             <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.upload}<span class="fn__space"></span><span class="ft__on-surface">${response.data.hTrafficUploadSize}</span></li>
+//             <li class="b3-list-item" style="cursor: auto;">${window.siyuan.languages.download}<span class="fn__space"></span><span class="ft__on-surface">${response.data.hTrafficDownloadSize}</span></li>
+//             <li class="b3-list-item" style="cursor: auto;">API GET<span class="fn__space"></span><span class="ft__on-surface">${response.data.hTrafficAPIGet}</span></li>
+//             <li class="b3-list-item" style="cursor: auto;">API PUT<span class="fn__space"></span><span class="ft__on-surface">${response.data.hTrafficAPIPut}</span></li>
+//         </ul>
+//     </div>
+// </div>`;
+//             }
+//         });
+//         reposDataElement.classList.remove("fn__none");
+//         return;
+//     }
 
     loadingElement.classList.add("fn__none");
     let nextElement = reposDataElement.nextElementSibling;
@@ -426,8 +398,8 @@ export const repos = {
             fetchPost("/api/sync/setSyncProvider", {provider: parseInt(syncProviderElement.value, 10)}, (response) => {
                 if (response.code === 1) {
                     showMessage(response.msg);
-                    syncProviderElement.value = "0";
-                    window.siyuan.config.sync.provider = 0;
+                    syncProviderElement.value = "2";
+                    window.siyuan.config.sync.provider = 2;
                 } else {
                     window.siyuan.config.sync.provider = parseInt(syncProviderElement.value, 10);
                 }

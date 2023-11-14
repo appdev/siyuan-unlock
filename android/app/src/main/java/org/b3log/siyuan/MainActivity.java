@@ -132,6 +132,7 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
         bootProgressBar = findViewById(R.id.progressBar);
         bootDetailsText = findViewById(R.id.bootDetails);
         webView = findViewById(R.id.webView);
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         webView.setBackgroundColor(Color.parseColor("#1e1e1e"));
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
