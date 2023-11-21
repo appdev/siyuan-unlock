@@ -9,7 +9,7 @@ import * as dayjs from "dayjs";
 import {unicode2Emoji} from "../../../emoji";
 
 export const getDefaultOperatorByType = (type: TAVCol) => {
-    if (type === "number" || type === "select") {
+    if (["select", "number"].includes(type)) {
         return "=";
     }
     if (["text", "mSelect", "url", "block", "email", "phone", "template"].includes(type)) {
@@ -67,15 +67,18 @@ export const setFilter = (options: {
                 cellValue = genCellValue(colData.type, {
                     isNotEmpty2: textElements[1].value !== "",
                     isNotEmpty: textElements[0].value !== "",
-                    content: new Date(textElements[0].value).getTime(),
-                    content2: new Date(textElements[1].value).getTime(),
+                    content: new Date(textElements[0].value + " 00:00").getTime(),
+                    content2: new Date(textElements[1].value + " 00:00").getTime(),
                     hasEndDate: operator === "Is between"
                 });
             } else {
                 cellValue = genCellValue(colData.type, textElements[0].value);
             }
         } else {
-            const mSelect: { color: string, content: string }[] = [];
+            const mSelect: {
+                color: string,
+                content: string
+            }[] = [];
             window.siyuan.menus.menu.element.querySelectorAll("svg").forEach(item => {
                 if (item.firstElementChild.getAttribute("xlink:href") === "#iconCheck") {
                     const chipElement = item.nextElementSibling.firstElementChild as HTMLElement;
@@ -137,6 +140,10 @@ export const setFilter = (options: {
         }
     });
     switch (colData.type) {
+        case "checkbox":
+            selectHTML = `<option ${"Is true" === options.filter.operator ? "selected" : ""} value="Is true">${window.siyuan.languages.checked}</option>
+<option ${"Is false" === options.filter.operator ? "selected" : ""} value="Is false">${window.siyuan.languages.unchecked}</option>`;
+            break;
         case "block":
         case "text":
         case "url":
@@ -245,11 +252,11 @@ export const setFilter = (options: {
         const dateValue = options.filter.value ? options.filter.value[colData.type as "date"] : null;
         menu.addItem({
             iconHTML: "",
-            label: `<input style="margin: 4px 0" value="${(dateValue.isNotEmpty || colData.type !== "date") ? dayjs(dateValue.content).format("YYYY-MM-DD") : ""}" type="date" class="b3-text-field fn__size200">`
+            label: `<input style="margin: 4px 0" value="${(dateValue.isNotEmpty || colData.type !== "date") ? dayjs(dateValue.content).format("YYYY-MM-DD") : ""}" type="date" max="9999-12-31" class="b3-text-field fn__size200">`
         });
         menu.addItem({
             iconHTML: "",
-            label: `<input style="margin: 4px 0" value="${dateValue.isNotEmpty2 ? dayjs(dateValue.content2).format("YYYY-MM-DD") : ""}" type="date" class="b3-text-field fn__size200">`
+            label: `<input style="margin: 4px 0" value="${dateValue.isNotEmpty2 ? dayjs(dateValue.content2).format("YYYY-MM-DD") : ""}" type="date" max="9999-12-31" class="b3-text-field fn__size200">`
         });
     }
     menu.addItem({
@@ -375,6 +382,10 @@ export const getFiltersHTML = (data: IAVTable) => {
                     filterValue = ": " + window.siyuan.languages.filterOperatorIsEmpty;
                 } else if (filter.operator === "Is not empty") {
                     filterValue = ": " + window.siyuan.languages.filterOperatorIsNotEmpty;
+                } else if (filter.operator === "Is false") {
+                    filterValue = ": " + window.siyuan.languages.unchecked;
+                } else if (filter.operator === "Is true") {
+                    filterValue = ": " + window.siyuan.languages.checked;
                 } else if (filter.value?.date?.content) {
                     if (filter.value?.date?.content2 && filter.operator === "Is between") {
                         filterValue = ` ${window.siyuan.languages.filterOperatorIsBetween} ${dayjs(filter.value.date.content).format("YYYY-MM-DD")} ${dayjs(filter.value.date.content2).format("YYYY-MM-DD")}`;

@@ -590,13 +590,30 @@ const initKernel = (workspace, port, lang) => {
 };
 
 app.setAsDefaultProtocolClient("siyuan");
+app.setPath("userData", app.getPath("userData") + "-Electron"); // `~/.config` 下 Electron 相关文件夹名称改为 `SiYuan-Electron` https://github.com/siyuan-note/siyuan/issues/3349
 
 app.commandLine.appendSwitch("disable-web-security");
 app.commandLine.appendSwitch("auto-detect", "false");
 app.commandLine.appendSwitch("no-proxy-server");
 app.commandLine.appendSwitch("enable-features", "PlatformHEVCDecoderSupport");
+app.commandLine.appendSwitch("force_high_performance_gpu"); // Force using discrete GPU when there are multiple GPUs available on the desktop https://github.com/siyuan-note/siyuan/issues/9694
 
-app.setPath("userData", app.getPath("userData") + "-Electron"); // `~/.config` 下 Electron 相关文件夹名称改为 `SiYuan-Electron` https://github.com/siyuan-note/siyuan/issues/3349
+// Support set Chromium command line arguments on the desktop https://github.com/siyuan-note/siyuan/issues/9696
+writeLog("app is packaged [" + app.isPackaged + "], command line args [" + process.argv.join(", ") + "]");
+let argStart = 1;
+if (!app.isPackaged) {
+    argStart = 2;
+}
+for (let i = argStart; i < process.argv.length; i++) {
+    let arg = process.argv[i];
+    if (arg.startsWith("--workspace=") || arg.startsWith("--port=") || arg.startsWith("siyuan://")) {
+        // 跳过内置参数
+        continue;
+    }
+
+    app.commandLine.appendSwitch(arg);
+    writeLog("command line switch [" + arg + "]");
+}
 
 app.whenReady().then(() => {
     const resetTrayMenu = (tray, lang, mainWindow) => {
@@ -698,7 +715,13 @@ app.whenReady().then(() => {
             return hasMatch;
         }
     });
-    ipcMain.once("siyuan-event", (event) => {
+
+    const initEventId = [];
+    ipcMain.on("siyuan-event", (event) => {
+        if (initEventId.includes(event.sender.id)) {
+            return;
+        }
+        initEventId.push(event.sender.id);
         const currentWindow = getWindowByContentId(event.sender.id);
         currentWindow.on("focus", () => {
             event.sender.send("siyuan-event", "focus");

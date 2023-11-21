@@ -1,4 +1,16 @@
 {
+  "checked": "Checked",
+  "unchecked": "Unchecked",
+  "percentChecked": "Percent checked",
+  "percentUnchecked": "Percent unchecked",
+  "checkbox": "Checkbox",
+  "copyInline": "Copy inline element",
+  "unsplit": "Unsplit",
+  "unsplitAll": "Unsplit All",
+  "resetCardTip": "Are you sure reset ${x} flashcards?",
+  "freezeCol": "Freeze column",
+  "unfreezeCol": "Unfreeze column",
+  "snippetsTip": "The code snippet has been updated, do you want to save it?",
   "addBelowAbove": "Click to add below<br>⌥Click to add above",
   "imported": "Import completed",
   "mirrorTip": "Mirror database, all data updates will be synchronized to all other mirrors",
@@ -16,6 +28,8 @@
   "goToTab9": "Go to last tab",
   "goToTabNext": "Go to next tab",
   "goToTabPrev": "Go to previous tab",
+  "goToEditTabNext": "Go to next edited tab",
+  "goToEditTabPrev": "Go to previous edited tab",
   "createdTime": "Created time",
   "updatedTime": "Updated time",
   "removeBookmark": "Remove bookmark from ${x}?",
@@ -174,6 +188,7 @@
   "searchTip5": "to dismiss",
   "showRecentUpdatedBlocks": "The most recently updated blocks will be shown when the input is empty",
   "revisionCount": "Number of revisions",
+  "nextDue": "Next Due",
   "flashcardNewCardLimit": "New Card Limit",
   "flashcardNewCardLimitTip": "If there are many new cards, you can set the number of new cards to review through this item",
   "flashcardReviewCardLimit": "Review Card Limit",
@@ -1239,7 +1254,7 @@
     "139": "Data snapshot is being generated, [%s] data files have been processed, [%s] remaining...",
     "140": "Failed to create data snapshot: %s",
     "141": "Failed to rollback data snapshot",
-    "142": "Snapshot memo cannot be empty",
+    "142": "Input can not be empty",
     "143": "Creating data snapshot...",
     "144": "Resetting data repository...",
     "145": "The data repo has been reset, and the interface will be automatically refreshed later...",
@@ -1314,6 +1329,8 @@
     "214": "This function needs to be signed in to use",
     "215": "Save failed: The target file is being used by another program",
     "216": "Rebuilding asset content data index, please wait...",
-    "217": "[%d/%d] Created asset content data index"
+    "217": "[%d/%d] Created asset content data index",
+    "218": "Too many snapshots of the data repo have been detected, which slows down program startup and data sync. Please consider executing [Settings - About - Data repo purge]",
+    "219": "The cloud storage service is unavailable, please try again later"
   }
 }

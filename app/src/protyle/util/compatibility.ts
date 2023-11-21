@@ -73,8 +73,7 @@ export const getEventName = () => {
     }
 };
 
-// 区别 mac 上的 ctrl 和 meta
-export const isCtrl = (event: KeyboardEvent | MouseEvent) => {
+export const isOnlyMeta = (event: KeyboardEvent | MouseEvent) => {
     if (isMac()) {
         // mac
         if (event.metaKey && !event.ctrlKey) {
@@ -87,6 +86,13 @@ export const isCtrl = (event: KeyboardEvent | MouseEvent) => {
         }
         return false;
     }
+};
+
+export const isNotCtrl = (event: KeyboardEvent | MouseEvent) => {
+    if (!event.metaKey && !event.ctrlKey) {
+        return true;
+    }
+    return false;
 };
 
 export const isHuawei = () => {
@@ -132,12 +138,12 @@ export const updateHotkeyTip = (hotkey: string) => {
 
     const keys = [];
 
-    if (hotkey.indexOf("⌘") > -1) keys.push(KEY_MAP.get("⌘"));
+    if ((hotkey.indexOf("⌘") > -1 || hotkey.indexOf("⌃") > -1)) keys.push(KEY_MAP.get("⌘"));
     if (hotkey.indexOf("⇧") > -1) keys.push(KEY_MAP.get("⇧"));
     if (hotkey.indexOf("⌥") > -1) keys.push(KEY_MAP.get("⌥"));
 
     // 不能去最后一个，需匹配 F2
-    const lastKey = hotkey.replace(/⌘|⇧|⌥/g, "");
+    const lastKey = hotkey.replace(/⌘|⇧|⌥|⌃/g, "");
     if (lastKey) {
         keys.push(KEY_MAP.get(lastKey) || lastKey);
     }

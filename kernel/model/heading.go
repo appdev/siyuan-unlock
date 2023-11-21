@@ -54,7 +54,6 @@ func (tx *Transaction) doFoldHeading(operation *Operation) (ret *TxErr) {
 				return ast.WalkContinue
 			}
 
-			n.SetIALAttr("fold", "1")
 			n.SetIALAttr("heading-fold", "1")
 			return ast.WalkContinue
 		})
@@ -363,6 +362,7 @@ func Heading2Doc(srcHeadingID, targetBoxID, targetPath string) (srcRootBlockID, 
 	newTree.Box, newTree.Path = targetBoxID, newTargetPath
 	newTree.Root.SetIALAttr("updated", util.CurrentTimeSecondsStr())
 	newTree.Root.Spec = "1"
+	box.addMinSort(path.Dir(newTargetPath), newTree.ID)
 	if err = indexWriteJSONQueue(newTree); nil != err {
 		return "", "", err
 	}

@@ -39,6 +39,99 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
+func ResetFlashcards(typ, id, deckID string, blockIDs []string) {
+	// Support resetting the learning progress of flashcards https://github.com/siyuan-note/siyuan/issues/9564
+
+	if 0 < len(blockIDs) {
+		if "" == deckID {
+			// 从全局管理进入时不会指定卡包 ID，这时需要遍历所有卡包
+			for _, deck := range Decks {
+				allBlockIDs := deck.GetBlockIDs()
+				for _, blockID := range blockIDs {
+					if gulu.Str.Contains(blockID, allBlockIDs) {
+						deckID = deck.ID
+						break
+					}
+				}
+				if "" == deckID {
+					logging.LogWarnf("deck not found for blocks [%s]", strings.Join(blockIDs, ","))
+					continue
+				}
+				resetFlashcards(deckID, blockIDs)
+			}
+			return
+		}
+
+		resetFlashcards(deckID, blockIDs)
+		return
+	}
+
+	var blocks []*Block
+	switch typ {
+	case "notebook":
+		for i := 1; ; i++ {
+			pagedBlocks, _, _ := GetNotebookFlashcards(id, i)
+			if 1 > len(pagedBlocks) {
+				break
+			}
+			blocks = append(blocks, pagedBlocks...)
+		}
+		for _, block := range blocks {
+			blockIDs = append(blockIDs, block.ID)
+		}
+	case "tree":
+		for i := 1; ; i++ {
+			pagedBlocks, _, _ := GetTreeFlashcards(id, i)
+			if 1 > len(pagedBlocks) {
+				break
+			}
+			blocks = append(blocks, pagedBlocks...)
+		}
+		for _, block := range blocks {
+			blockIDs = append(blockIDs, block.ID)
+		}
+	case "deck":
+		for i := 1; ; i++ {
+			pagedBlocks, _, _ := GetDeckFlashcards(id, i)
+			if 1 > len(pagedBlocks) {
+				break
+			}
+			blocks = append(blocks, pagedBlocks...)
+		}
+	default:
+		logging.LogErrorf("invalid type [%s]", typ)
+	}
+
+	blockIDs = gulu.Str.RemoveDuplicatedElem(blockIDs)
+	resetFlashcards(deckID, blockIDs)
+}
+
+func resetFlashcards(deckID string, blockIDs []string) {
+	transactions := []*Transaction{
+		{
+			DoOperations: []*Operation{
+				{
+					Action:   "removeFlashcards",
+					DeckID:   deckID,
+					BlockIDs: blockIDs,
+				},
+			},
+		},
+		{
+			DoOperations: []*Operation{
+				{
+					Action:   "addFlashcards",
+					DeckID:   deckID,
+					BlockIDs: blockIDs,
+				},
+			},
+		},
+	}
+
+	PerformTransactions(&transactions)
+	WaitForWritingFiles()
+}
+
 func GetFlashcardNotebooks() (ret []*Box) {
 	deck := Decks[builtinDeckID]
 	if nil == deck {
@@ -193,7 +286,7 @@ func getTreeFlashcards(rootID string) (ret []riff.Card) {
 	return
 }
 
-func GetFlashcards(deckID string, page int) (blocks []*Block, total, pageCount int) {
+func GetDeckFlashcards(deckID string, page int) (blocks []*Block, total, pageCount int) {
 	blocks = []*Block{}
 	var cards []riff.Card
 	if "" == deckID {
@@ -236,11 +329,17 @@ func getCardsBlocks(cards []riff.Card, page int) (blocks []*Block, total, pageCo
 		return
 	}
 
+	// sort by due date asc https://github.com/siyuan-note/siyuan/pull/9673
+	sort.Slice(cards, func(i, j int) bool {
+		due1 := cards[i].(*riff.FSRSCard).C.Due
+		due2 := cards[j].(*riff.FSRSCard).C.Due
+		return due1.Before(due2)
+	})
+
 	var blockIDs []string
 	for _, card := range cards {
 		blockIDs = append(blockIDs, card.BlockID())
 	}
-	sort.Strings(blockIDs)
 
 	sqlBlocks := sql.GetBlocks(blockIDs)
 	blocks = fromSQLBlocks(&sqlBlocks, "", 36)
@@ -260,7 +359,7 @@ func getCardsBlocks(cards []riff.Card, page int) (blocks []*Block, total, pageCo
 		}
 
 		b.RiffCardID = cards[i].ID()
-		b.RiffCardReps = cards[i].(*riff.FSRSCard).C.Reps
+		b.RiffCard = getRiffCard(cards[i].(*riff.FSRSCard).C)
 	}
 	return
 }

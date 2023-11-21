@@ -1,4 +1,16 @@
 {
+  "checked": "已完成",
+  "unchecked": "未完成",
+  "percentChecked": "已完成占比",
+  "percentUnchecked": "未完成占比",
+  "checkbox": "勾选框",
+  "copyInline": "复制行级元素",
+  "unsplit": "取消分屏",
+  "unsplitAll": "取消全部分屏",
+  "resetCardTip": "确定重置 ${x} 张闪卡？",
+  "freezeCol": "固定列",
+  "unfreezeCol": "取消列固定",
+  "snippetsTip": "代码片段已更新，是否保存？",
   "addBelowAbove": "Click 在下方添加<br>⌥Click 在上方添加",
   "imported": "导入完成",
   "mirrorTip": "镜像数据库，所有数据更新会同步到其他所有镜像中",
@@ -16,6 +28,8 @@
   "goToTab9": "跳转到最后一个页签",
   "goToTabNext": "跳转到下一个页签",
   "goToTabPrev": "跳转到上一个页签",
+  "goToEditTabNext": "跳转到下一个编辑页签",
+  "goToEditTabPrev": "跳转到上一个编辑页签",
   "createdTime": "创建时间",
   "updatedTime": "更新时间",
   "removeBookmark": "移除 ${x} 中的书签？",
@@ -174,6 +188,7 @@
   "searchTip5": "退出搜索",
   "showRecentUpdatedBlocks": "输入为空时将显示最近更新的块",
   "revisionCount": "复习次数",
+  "nextDue": "下次复习",
   "flashcardNewCardLimit": "新卡上限",
   "flashcardNewCardLimitTip": "如果新卡较多，可以通过该项设置新卡复习的数量",
   "flashcardReviewCardLimit": "复习卡上限",
@@ -1314,6 +1329,8 @@
     "214": "该功能需要登录账号后才能使用",
     "215": "保存失败：目标文件并且正在被其他程序占用",
     "216": "正在重建资源文件内容数据索引，请稍等...",
-    "217": "[%d/%d] 已经创建资源文件内容数据索引"
+    "217": "[%d/%d] 已经创建资源文件内容数据索引",
+    "218": "检测到数据仓库快照过多，降低了程序启动和数据同步速度，请考虑执行 [设置 - 关于 - 数据仓库清理]",
+    "219": "云端存储服务不可用，请稍后再试"
   }
 }

@@ -582,6 +582,7 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 			Wrap:         col.Wrap,
 			Hidden:       col.Hidden,
 			Width:        col.Width,
+			Pin:          col.Pin,
 			Calc:         col.Calc,
 		})
 	}
@@ -777,6 +778,10 @@ func FillAttributeViewTableCellNilValue(tableCell *av.TableCell, rowID, colID st
 	case av.KeyTypeUpdated:
 		if nil == tableCell.Value.Updated {
 			tableCell.Value.Updated = &av.ValueUpdated{}
+		}
+	case av.KeyTypeCheckbox:
+		if nil == tableCell.Value.Checkbox {
+			tableCell.Value.Checkbox = &av.ValueCheckbox{}
 		}
 	}
 }

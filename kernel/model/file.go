@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -722,8 +723,12 @@ func GetDoc(startID, endID, id string, index int, query string, queryTypes map[s
 			}
 
 			if "1" == n.IALAttr("heading-fold") {
-				unlinks = append(unlinks, n)
-				return ast.WalkContinue
+				// 折叠标题下被引用的块无法悬浮查看
+				// The referenced block under the folded heading cannot be hovered to view https://github.com/siyuan-note/siyuan/issues/9582
+				if 0 != mode && id != n.ID {
+					unlinks = append(unlinks, n)
+					return ast.WalkContinue
+				}
 			}
 
 			if "" != n.ID {
@@ -1004,7 +1009,12 @@ func createTreeTx(tree *parse.Tree) {
 	PerformTransactions(&[]*Transaction{transaction})
 }
 
+var createDocLock = sync.Mutex{}
+
 func CreateDocByMd(boxID, p, title, md string, sorts []string) (tree *parse.Tree, err error) {
+	createDocLock.Lock()
+	defer createDocLock.Unlock()
+
 	box := Conf.Box(boxID)
 	if nil == box {
 		err = errors.New(Conf.Language(0))
@@ -1023,6 +1033,9 @@ func CreateDocByMd(boxID, p, title, md string, sorts []string) (tree *parse.Tree
 }
 
 func CreateWithMarkdown(boxID, hPath, md, parentID, id string) (retID string, err error) {
+	createDocLock.Lock()
+	defer createDocLock.Unlock()
+
 	box := Conf.Box(boxID)
 	if nil == box {
 		err = errors.New(Conf.Language(0))
@@ -1033,6 +1046,81 @@ func CreateWithMarkdown(boxID, hPath, md, parentID, id string) (retID string, er
 	luteEngine := util.NewLute()
 	dom := luteEngine.Md2BlockDOM(md, false)
 	retID, err = createDocsByHPath(box.ID, hPath, dom, parentID, id)
+	return
+}
+
+func CreateDailyNote(boxID string) (p string, existed bool, err error) {
+	createDocLock.Lock()
+	defer createDocLock.Unlock()
+
+	box := Conf.Box(boxID)
+	if nil == box {
+		err = ErrBoxNotFound
+		return
+	}
+
+	boxConf := box.GetConf()
+	if "" == boxConf.DailyNoteSavePath || "/" == boxConf.DailyNoteSavePath {
+		err = errors.New(Conf.Language(49))
+		return
+	}
+
+	hPath, err := RenderGoTemplate(boxConf.DailyNoteSavePath)
+	if nil != err {
+		return
+	}
+
+	WaitForWritingFiles()
+
+	existRoot := treenode.GetBlockTreeRootByHPath(box.ID, hPath)
+	if nil != existRoot {
+		existed = true
+		p = existRoot.Path
+		return
+	}
+
+	id, err := createDocsByHPath(box.ID, hPath, "", "", "")
+	if nil != err {
+		return
+	}
+
+	var dom string
+	if "" != boxConf.DailyNoteTemplatePath {
+		tplPath := filepath.Join(util.DataDir, "templates", boxConf.DailyNoteTemplatePath)
+		if !filelock.IsExist(tplPath) {
+			logging.LogWarnf("not found daily note template [%s]", tplPath)
+		} else {
+			dom, err = renderTemplate(tplPath, id, false)
+			if nil != err {
+				logging.LogWarnf("render daily note template [%s] failed: %s", boxConf.DailyNoteTemplatePath, err)
+			}
+		}
+	}
+	if "" != dom {
+		var tree *parse.Tree
+		tree, err = loadTreeByBlockID(id)
+		if nil == err {
+			tree.Root.FirstChild.Unlink()
+
+			luteEngine := util.NewLute()
+			newTree := luteEngine.BlockDOM2Tree(dom)
+			var children []*ast.Node
+			for c := newTree.Root.FirstChild; nil != c; c = c.Next {
+				children = append(children, c)
+			}
+			for _, c := range children {
+				tree.Root.AppendChild(c)
+			}
+			tree.Root.SetIALAttr("updated", util.CurrentTimeSecondsStr())
+			if err = indexWriteJSONQueue(tree); nil != err {
+				return
+			}
+		}
+	}
+	IncSync()
+
+	b := treenode.GetBlockTree(id)
+	p = b.Path
 	return
 }
 
@@ -1092,6 +1180,19 @@ func GetFullHPathByID(id string) (hPath string, err error) {
 		boxName = box.Name
 	}
 	hPath = boxName + tree.HPath
+	return
+}
+
+func GetIDsByHPath(hpath, boxID string) (ret []string, err error) {
+	roots := treenode.GetBlockTreeRootsByHPath(boxID, hpath)
+	if 1 > len(roots) {
+		return
+	}
+
+	for _, root := range roots {
+		ret = append(ret, root.ID)
+	}
+	ret = gulu.Str.RemoveDuplicatedElem(ret)
 	return
 }
 
@@ -1410,78 +1511,6 @@ func RenameDoc(boxID, p, title string) (err error) {
 	return
 }
 
-func CreateDailyNote(boxID string) (p string, existed bool, err error) {
-	box := Conf.Box(boxID)
-	if nil == box {
-		err = ErrBoxNotFound
-		return
-	}
-
-	boxConf := box.GetConf()
-	if "" == boxConf.DailyNoteSavePath || "/" == boxConf.DailyNoteSavePath {
-		err = errors.New(Conf.Language(49))
-		return
-	}
-
-	hPath, err := RenderGoTemplate(boxConf.DailyNoteSavePath)
-	if nil != err {
-		return
-	}
-
-	WaitForWritingFiles()
-
-	existRoot := treenode.GetBlockTreeRootByHPath(box.ID, hPath)
-	if nil != existRoot {
-		existed = true
-		p = existRoot.Path
-		return
-	}
-
-	id, err := createDocsByHPath(box.ID, hPath, "", "", "")
-	if nil != err {
-		return
-	}
-
-	var dom string
-	if "" != boxConf.DailyNoteTemplatePath {
-		tplPath := filepath.Join(util.DataDir, "templates", boxConf.DailyNoteTemplatePath)
-		if !filelock.IsExist(tplPath) {
-			logging.LogWarnf("not found daily note template [%s]", tplPath)
-		} else {
-			dom, err = renderTemplate(tplPath, id, false)
-			if nil != err {
-				logging.LogWarnf("render daily note template [%s] failed: %s", boxConf.DailyNoteTemplatePath, err)
-			}
-		}
-	}
-	if "" != dom {
-		var tree *parse.Tree
-		tree, err = loadTreeByBlockID(id)
-		if nil == err {
-			tree.Root.FirstChild.Unlink()
-
-			luteEngine := util.NewLute()
-			newTree := luteEngine.BlockDOM2Tree(dom)
-			var children []*ast.Node
-			for c := newTree.Root.FirstChild; nil != c; c = c.Next {
-				children = append(children, c)
-			}
-			for _, c := range children {
-				tree.Root.AppendChild(c)
-			}
-			tree.Root.SetIALAttr("updated", util.CurrentTimeSecondsStr())
-			if err = indexWriteJSONQueue(tree); nil != err {
-				return
-			}
-		}
-	}
-	IncSync()
-
-	b := treenode.GetBlockTree(id)
-	p = b.Path
-	return
-}
-
 func createDoc(boxID, p, title, dom string) (tree *parse.Tree, err error) {
 	title = gulu.Str.RemoveInvisible(title)
 	if 512 < utf8.RuneCountInString(title) {
@@ -1737,6 +1766,51 @@ func (box *Box) removeSort(ids []string) {
 	for _, toRemove := range ids {
 		delete(fullSortIDs, toRemove)
 	}
+
+	data, err = gulu.JSON.MarshalJSON(fullSortIDs)
+	if nil != err {
+		logging.LogErrorf("marshal sort conf failed: %s", err)
+		return
+	}
+	if err = filelock.WriteFile(confPath, data); nil != err {
+		logging.LogErrorf("write sort conf failed: %s", err)
+		return
+	}
+}
+
+func (box *Box) addMinSort(parentPath, id string) {
+	docs, _, err := ListDocTree(box.ID, parentPath, util.SortModeUnassigned, false, false, 1)
+	if nil != err {
+		logging.LogErrorf("list doc tree failed: %s", err)
+		return
+	}
+
+	sortVal := 0
+	if 0 < len(docs) {
+		sortVal = docs[0].Sort - 1
+	}
+
+	confDir := filepath.Join(util.DataDir, box.ID, ".siyuan")
+	if err = os.MkdirAll(confDir, 0755); nil != err {
+		logging.LogErrorf("create conf dir failed: %s", err)
+		return
+	}
+	confPath := filepath.Join(confDir, "sort.json")
+	fullSortIDs := map[string]int{}
+	var data []byte
+	if filelock.IsExist(confPath) {
+		data, err = filelock.ReadFile(confPath)
+		if nil != err {
+			logging.LogErrorf("read sort conf failed: %s", err)
+			return
+		}
+
+		if err = gulu.JSON.UnmarshalJSON(data, &fullSortIDs); nil != err {
+			logging.LogErrorf("unmarshal sort conf failed: %s", err)
+		}
+	}
+
+	fullSortIDs[id] = sortVal
 
 	data, err = gulu.JSON.MarshalJSON(fullSortIDs)
 	if nil != err {

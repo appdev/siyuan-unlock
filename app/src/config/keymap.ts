@@ -1,4 +1,4 @@
-import {isCtrl, isMac, updateHotkeyTip} from "../protyle/util/compatibility";
+import {isMac, updateHotkeyTip} from "../protyle/util/compatibility";
 import {Constants} from "../constants";
 import {hideMessage, showMessage} from "../dialog/message";
 import {fetchPost} from "../util/fetch";
@@ -382,7 +382,10 @@ export const keymap = {
                     }
                     let hasConflict = false;
                     if (["⌘", "⇧", "⌥", "⌃"].includes(keymapStr.substr(keymapStr.length - 1, 1)) ||
-                        ["⌘A", "⌘X", "⌘C", "⌘V", "⌘-", "⌘=", "⌘0", "⇧⌘V", "⌘/", "⇧↑", "⇧↓", "⇧→", "⇧←", "⇧⇥", "⌃⇧⇥", "⌃⇥", "⌘⇥", "⇧⌘⇥", "⇧⌘→", "⇧⌘←", "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦"].includes(keymapStr)) {
+                        ["⌘A", "⌘X", "⌘C", "⌘V", "⌘-", "⌘=", "⌘0", "⇧⌘V", "⌘/", "⇧↑", "⇧↓", "⇧→", "⇧←", "⇧⇥", "⌃D", "⇧⌘→", "⇧⌘←", "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦"].includes(keymapStr) ||
+                        // 跳转到下/上一个编辑页签不能包含 ctrl， 否则不能监听到 keyup
+                        (isMac() && keys[0] === "general" && ["goToEditTabNext", "goToEditTabPrev"].includes(keys[1]) && keymapStr.includes("⌘"))
+                    ) {
                         showMessage(`${window.siyuan.languages.invalid} [${adoptKeymapStr}]`);
                         hasConflict = true;
                     }
@@ -429,7 +432,7 @@ export const keymap = {
     },
     _getKeymapString(event: KeyboardEvent) {
         let keymapStr = "";
-        if (event.ctrlKey && !event.metaKey && isMac()) {
+        if (event.ctrlKey && isMac()) {
             keymapStr += "⌃";
         }
         if (event.altKey) {
@@ -438,7 +441,7 @@ export const keymap = {
         if (event.shiftKey) {
             keymapStr += "⇧";
         }
-        if (isCtrl(event)) {
+        if (event.metaKey || (!isMac() && event.ctrlKey)) {
             keymapStr += "⌘";
         }
         if (event.key !== "Shift" && event.key !== "Alt" && event.key !== "Meta" && event.key !== "Control" && event.key !== "Unidentified") {

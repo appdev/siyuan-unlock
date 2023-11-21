@@ -366,6 +366,7 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 			Wrap:         col.Wrap,
 			Hidden:       col.Hidden,
 			Width:        col.Width,
+			Pin:          col.Pin,
 			Calc:         col.Calc,
 		})
 	}
@@ -711,7 +712,10 @@ func addAttributeViewBlock(blockID string, operation *Operation, tree *parse.Tre
 			return
 		}
 	} else {
-		blockID = ast.NewNodeID()
+		if "" == blockID {
+			blockID = ast.NewNodeID()
+			logging.LogWarnf("detached block id is empty, generate a new one [%s]", blockID)
+		}
 	}
 
 	attrView, err := av.ParseAttributeView(operation.AvID)
@@ -947,6 +951,39 @@ func setAttributeViewColHidden(operation *Operation) (err error) {
 	return
 }
 
+func (tx *Transaction) doSetAttrViewColumnPin(operation *Operation) (ret *TxErr) {
+	err := setAttributeViewColPin(operation)
+	if nil != err {
+		return &TxErr{code: TxErrWriteAttributeView, id: operation.AvID, msg: err.Error()}
+	}
+	return
+}
+
+func setAttributeViewColPin(operation *Operation) (err error) {
+	attrView, err := av.ParseAttributeView(operation.AvID)
+	if nil != err {
+		return
+	}
+
+	view, err := attrView.GetView()
+	if nil != err {
+		return
+	}
+
+	switch view.LayoutType {
+	case av.LayoutTypeTable:
+		for _, column := range view.Table.Columns {
+			if column.ID == operation.ID {
+				column.Pin = operation.Data.(bool)
+				break
+			}
+		}
+	}
+
+	err = av.SaveAttributeView(attrView)
+	return
+}
+
 func (tx *Transaction) doSetAttrViewColumnIcon(operation *Operation) (ret *TxErr) {
 	err := setAttributeViewColIcon(operation)
 	if nil != err {
@@ -1089,7 +1126,7 @@ func addAttributeViewColumn(operation *Operation) (err error) {
 
 	keyType := av.KeyType(operation.Typ)
 	switch keyType {
-	case av.KeyTypeText, av.KeyTypeNumber, av.KeyTypeDate, av.KeyTypeSelect, av.KeyTypeMSelect, av.KeyTypeURL, av.KeyTypeEmail, av.KeyTypePhone, av.KeyTypeMAsset, av.KeyTypeTemplate, av.KeyTypeCreated, av.KeyTypeUpdated:
+	case av.KeyTypeText, av.KeyTypeNumber, av.KeyTypeDate, av.KeyTypeSelect, av.KeyTypeMSelect, av.KeyTypeURL, av.KeyTypeEmail, av.KeyTypePhone, av.KeyTypeMAsset, av.KeyTypeTemplate, av.KeyTypeCreated, av.KeyTypeUpdated, av.KeyTypeCheckbox:
 		var icon string
 		if nil != operation.Data {
 			icon = operation.Data.(string)
@@ -1181,7 +1218,7 @@ func updateAttributeViewColumn(operation *Operation) (err error) {
 
 	colType := av.KeyType(operation.Typ)
 	switch colType {
-	case av.KeyTypeBlock, av.KeyTypeText, av.KeyTypeNumber, av.KeyTypeDate, av.KeyTypeSelect, av.KeyTypeMSelect, av.KeyTypeURL, av.KeyTypeEmail, av.KeyTypePhone, av.KeyTypeMAsset, av.KeyTypeTemplate, av.KeyTypeCreated, av.KeyTypeUpdated:
+	case av.KeyTypeBlock, av.KeyTypeText, av.KeyTypeNumber, av.KeyTypeDate, av.KeyTypeSelect, av.KeyTypeMSelect, av.KeyTypeURL, av.KeyTypeEmail, av.KeyTypePhone, av.KeyTypeMAsset, av.KeyTypeTemplate, av.KeyTypeCreated, av.KeyTypeUpdated, av.KeyTypeCheckbox:
 		for _, keyValues := range attrView.KeyValues {
 			if keyValues.Key.ID == operation.ID {
 				keyValues.Key.Name = operation.Name

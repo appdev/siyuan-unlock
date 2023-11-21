@@ -84,6 +84,8 @@ html {
   & > .block__icons > .fn__flex-1 {
     -webkit-app-region: drag;
     min-width: 32px;
+    height: 100%;
+    box-sizing: border-box;
 
     &:hover {
       border-radius: var(--b3-border-radius-b);
@@ -316,7 +318,8 @@ html {
 }
 
 .file-tree {
-  &:hover .block__icons .block__icon:not([disabled]) {
+  &:hover .block__icons .block__icon:not([disabled]),
+  &.fullscreen .block__icons .block__icon:not([disabled]) {
     opacity: 1;
   }
 
@@ -388,6 +391,10 @@ html {
   max-height: 70vh;
   max-width: 100%;
   min-width: 426px;
+
+  .b3-list {
+    padding: 8px 0;
+  }
 
   .b3-list:last-child {
     border-left: 1px solid var(--b3-theme-surface-lighter);

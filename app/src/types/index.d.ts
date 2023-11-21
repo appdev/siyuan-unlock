@@ -27,6 +27,7 @@ type TOperation =
     | "updateAttrViewColTemplate"
     | "sortAttrViewRow"
     | "sortAttrViewCol"
+    | "setAttrViewColPin"
     | "setAttrViewColHidden"
     | "setAttrViewColWrap"
     | "setAttrViewColWidth"
@@ -70,6 +71,7 @@ type TAVCol =
     | "template"
     | "created"
     | "updated"
+    | "checkbox"
 type THintSource = "search" | "av" | "hint";
 type TAVFilterOperator =
     "="
@@ -86,6 +88,8 @@ type TAVFilterOperator =
     | "Ends with"
     | "Is between"
     | "Is relative to today"
+    | "Is true"
+    | "Is false"
 declare module "blueimp-md5"
 
 interface Window {
@@ -903,7 +907,7 @@ interface IBlockTree {
 }
 
 interface IBlock {
-    riffCardReps?: number   // 闪卡复习次数
+    riffCard?: IRiffCard,
     depth?: number,
     box?: string;
     path?: string;
@@ -923,6 +927,11 @@ interface IBlock {
     children?: IBlock[]
     length?: number
     ial: IObject
+}
+
+interface IRiffCard {
+    due?: string;
+    reps?: number; // 闪卡复习次数
 }
 
 interface IModels {
@@ -1024,11 +1033,12 @@ interface IAVSort {
 }
 
 interface IAVColumn {
-    width: number,
+    width: string,
     icon: string,
     id: string,
     name: string,
     wrap: boolean,
+    pin: boolean,
     hidden: boolean,
     type: TAVCol,
     numberFormat: string,
@@ -1087,6 +1097,9 @@ interface IAVCellValue {
     }
     template?: {
         content: string
+    },
+    checkbox?: {
+        checked: boolean
     }
     date?: IAVCellDateValue
     created?: IAVCellDateValue

@@ -872,6 +872,9 @@ export class Wnd {
         }
         tab.parent = this;
         hideAllElements(["toolbar"]);
+        /// #if !BROWSER
+        setTabPosition();
+        /// #endif
     }
 
     public split(direction: TDirection) {

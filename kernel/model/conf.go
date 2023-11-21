@@ -192,11 +192,18 @@ func InitConf() {
 	if nil == Conf.Tag {
 		Conf.Tag = conf.NewTag()
 	}
+
 	if nil == Conf.Editor {
 		Conf.Editor = conf.NewEditor()
 	}
 	if 1 > len(Conf.Editor.Emoji) {
 		Conf.Editor.Emoji = []string{}
+	}
+	if 9 > Conf.Editor.FontSize || 72 < Conf.Editor.FontSize {
+		Conf.Editor.FontSize = 16
+	}
+	if "" == Conf.Editor.PlantUMLServePath {
+		Conf.Editor.PlantUMLServePath = "https://www.plantuml.com/plantuml/svg/~1"
 	}
 	if 1 > Conf.Editor.BlockRefDynamicAnchorTextMaxLen {
 		Conf.Editor.BlockRefDynamicAnchorTextMaxLen = 64
@@ -204,6 +211,25 @@ func InitConf() {
 	if 5120 < Conf.Editor.BlockRefDynamicAnchorTextMaxLen {
 		Conf.Editor.BlockRefDynamicAnchorTextMaxLen = 5120
 	}
+	if 1440 < Conf.Editor.GenerateHistoryInterval {
+		Conf.Editor.GenerateHistoryInterval = 1440
+	}
+	if 1 > Conf.Editor.HistoryRetentionDays {
+		Conf.Editor.HistoryRetentionDays = 30
+	}
+	if 48 > Conf.Editor.DynamicLoadBlocks {
+		Conf.Editor.DynamicLoadBlocks = 48
+	}
+	if 1024 < Conf.Editor.DynamicLoadBlocks {
+		Conf.Editor.DynamicLoadBlocks = 1024
+	}
+	if 0 > Conf.Editor.BacklinkExpandCount {
+		Conf.Editor.BacklinkExpandCount = 0
+	}
+	if 0 > Conf.Editor.BackmentionExpandCount {
+		Conf.Editor.BackmentionExpandCount = 0
+	}
+
 	if nil == Conf.Export {
 		Conf.Export = conf.NewExport()
 	}
@@ -214,16 +240,11 @@ func InitConf() {
 	if "" == Conf.Export.PandocBin {
 		Conf.Export.PandocBin = util.PandocBinPath
 	}
-	if 9 > Conf.Editor.FontSize || 72 < Conf.Editor.FontSize {
-		Conf.Editor.FontSize = 16
-	}
-	if "" == Conf.Editor.PlantUMLServePath {
-		Conf.Editor.PlantUMLServePath = "https://www.plantuml.com/plantuml/svg/~1"
-	}
 
 	if nil == Conf.Graph || nil == Conf.Graph.Local || nil == Conf.Graph.Global {
 		Conf.Graph = conf.NewGraph()
 	}
+
 	if nil == Conf.System {
 		Conf.System = conf.NewSystem()
 		Conf.OpenHelp = true
@@ -304,24 +325,14 @@ func InitConf() {
 	if nil == Conf.Repo {
 		Conf.Repo = conf.NewRepo()
 	}
-
-	if 1440 < Conf.Editor.GenerateHistoryInterval {
-		Conf.Editor.GenerateHistoryInterval = 1440
+	if timingEnv := os.Getenv("SIYUAN_SYNC_INDEX_TIMING"); "" != timingEnv {
+		val, err := strconv.Atoi(timingEnv)
+		if nil == err {
+			Conf.Repo.SyncIndexTiming = int64(val)
+		}
 	}
-	if 1 > Conf.Editor.HistoryRetentionDays {
-		Conf.Editor.HistoryRetentionDays = 7
-	}
-	if 48 > Conf.Editor.DynamicLoadBlocks {
-		Conf.Editor.DynamicLoadBlocks = 48
-	}
-	if 1024 < Conf.Editor.DynamicLoadBlocks {
-		Conf.Editor.DynamicLoadBlocks = 1024
-	}
-	if 0 > Conf.Editor.BacklinkExpandCount {
-		Conf.Editor.BacklinkExpandCount = 0
-	}
-	if 0 > Conf.Editor.BackmentionExpandCount {
-		Conf.Editor.BackmentionExpandCount = 0
+	if 7000 > Conf.Repo.SyncIndexTiming {
+		Conf.Repo.SyncIndexTiming = 7 * 1000
 	}
 
 	if nil == Conf.Search {
@@ -454,6 +465,7 @@ func initLang() {
 
 		util.TimeLangs[name] = langMap["_time"].(map[string]interface{})
 		util.TaskActionLangs[name] = langMap["_taskAction"].(map[string]interface{})
+		util.TrayMenuLangs[name] = langMap["_trayMenu"].(map[string]interface{})
 	}
 }
 
@@ -900,7 +912,12 @@ func upgradeUserGuide() {
 		boxConf := conf.NewBoxConf()
 		boxConfPath := filepath.Join(boxDirPath, ".siyuan", "conf.json")
 		if !filelock.IsExist(boxConfPath) {
-			logging.LogWarnf("found a corrupted box [%s]", boxDirPath)
+			logging.LogWarnf("found a corrupted user guide box [%s]", boxDirPath)
+			if removeErr := filelock.Remove(boxDirPath); nil != removeErr {
+				logging.LogErrorf("remove corrupted user guide box [%s] failed: %s", boxDirPath, removeErr)
+			} else {
+				logging.LogInfof("removed corrupted user guide box [%s]", boxDirPath)
+			}
 			continue
 		}
 

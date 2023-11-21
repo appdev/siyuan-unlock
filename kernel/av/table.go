@@ -39,6 +39,7 @@ type ViewTableColumn struct {
 
 	Wrap   bool        `json:"wrap"`           // 是否换行
 	Hidden bool        `json:"hidden"`         // 是否隐藏
+	Pin    bool        `json:"pin"`            // 是否固定
 	Width  string      `json:"width"`          // 列宽度
 	Calc   *ColumnCalc `json:"calc,omitempty"` // 计算
 }
@@ -71,6 +72,10 @@ const (
 	CalcOperatorRange             CalcOperator = "Range"
 	CalcOperatorEarliest          CalcOperator = "Earliest"
 	CalcOperatorLatest            CalcOperator = "Latest"
+	CalcOperatorChecked           CalcOperator = "Checked"
+	CalcOperatorUnchecked         CalcOperator = "Unchecked"
+	CalcOperatorPercentChecked    CalcOperator = "Percent checked"
+	CalcOperatorPercentUnchecked  CalcOperator = "Percent unchecked"
 )
 
 func (value *Value) Compare(other *Value) int {
@@ -169,6 +174,16 @@ func (value *Value) Compare(other *Value) int {
 	case KeyTypeTemplate:
 		if nil != value.Template && nil != other.Template {
 			return strings.Compare(value.Template.Content, other.Template.Content)
+		}
+	case KeyTypeCheckbox:
+		if nil != value.Checkbox && nil != other.Checkbox {
+			if value.Checkbox.Checked && !other.Checkbox.Checked {
+				return 1
+			}
+			if !value.Checkbox.Checked && other.Checkbox.Checked {
+				return -1
+			}
+			return 0
 		}
 	}
 	return 0
@@ -542,6 +557,15 @@ func (value *Value) CompareOperator(other *Value, operator FilterOperator) bool 
 			return "" != strings.TrimSpace(value.Template.Content)
 		}
 	}
+
+	if nil != value.Checkbox {
+		switch operator {
+		case FilterOperatorIsTrue:
+			return value.Checkbox.Checked
+		case FilterOperatorIsFalse:
+			return !value.Checkbox.Checked
+		}
+	}
 	return true
 }
 
@@ -562,6 +586,7 @@ type TableColumn struct {
 	Icon   string      `json:"icon"`   // 列图标
 	Wrap   bool        `json:"wrap"`   // 是否换行
 	Hidden bool        `json:"hidden"` // 是否隐藏
+	Pin    bool        `json:"pin"`    // 是否固定
 	Width  string      `json:"width"`  // 列宽度
 	Calc   *ColumnCalc `json:"calc"`   // 计算
 
@@ -624,11 +649,6 @@ func (table *Table) SortRows() {
 	}
 
 	sort.Slice(table.Rows, func(i, j int) bool {
-		block := table.Rows[i].GetBlockValue()
-		if !block.IsInitialized && nil != block.Block && "" == block.Block.Content && block.IsDetached {
-			return false
-		}
-
 		for _, colIndexSort := range colIndexSorts {
 			result := table.Rows[i].Cells[colIndexSort.Index].Value.Compare(table.Rows[j].Cells[colIndexSort.Index].Value)
 			if 0 == result {
@@ -734,6 +754,8 @@ func (table *Table) CalcCols() {
 			table.calcColCreated(col, i)
 		case KeyTypeUpdated:
 			table.calcColUpdated(col, i)
+		case KeyTypeCheckbox:
+			table.calcColCheckbox(col, i)
 		}
 	}
 }
@@ -1840,6 +1862,49 @@ func (table *Table) calcColUpdated(col *TableColumn, colIndex int) {
 		}
 		if 0 != earliest && 0 != latest {
 			col.Calc.Result = &Value{Updated: NewFormattedValueUpdated(earliest, latest, UpdatedFormatDuration)}
+		}
+	}
+}
+
+func (table *Table) calcColCheckbox(col *TableColumn, colIndex int) {
+	switch col.Calc.Operator {
+	case CalcOperatorCountAll:
+		col.Calc.Result = &Value{Number: NewFormattedValueNumber(float64(len(table.Rows)), NumberFormatNone)}
+	case CalcOperatorChecked:
+		countChecked := 0
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Checkbox && row.Cells[colIndex].Value.Checkbox.Checked {
+				countChecked++
+			}
+		}
+		col.Calc.Result = &Value{Number: NewFormattedValueNumber(float64(countChecked), NumberFormatNone)}
+	case CalcOperatorUnchecked:
+		countUnchecked := 0
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Checkbox && !row.Cells[colIndex].Value.Checkbox.Checked {
+				countUnchecked++
+			}
+		}
+		col.Calc.Result = &Value{Number: NewFormattedValueNumber(float64(countUnchecked), NumberFormatNone)}
+	case CalcOperatorPercentChecked:
+		countChecked := 0
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Checkbox && row.Cells[colIndex].Value.Checkbox.Checked {
+				countChecked++
+			}
+		}
+		if 0 < len(table.Rows) {
+			col.Calc.Result = &Value{Number: NewFormattedValueNumber(float64(countChecked)/float64(len(table.Rows)), NumberFormatPercent)}
+		}
+	case CalcOperatorPercentUnchecked:
+		countUnchecked := 0
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Checkbox && !row.Cells[colIndex].Value.Checkbox.Checked {
+				countUnchecked++
+			}
+		}
+		if 0 < len(table.Rows) {
+			col.Calc.Result = &Value{Number: NewFormattedValueNumber(float64(countUnchecked)/float64(len(table.Rows)), NumberFormatPercent)}
 		}
 	}
 }

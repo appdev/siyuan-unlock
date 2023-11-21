@@ -1,4 +1,16 @@
 {
+  "checked": "marcado",
+  "unchecked": "desmarcado",
+  "percentChecked": "Porcentaje comprobado",
+  "percentUnchecked": "Porcentaje no marcado",
+  "checkbox": "Casilla de verificación",
+  "copyInline": "Copiar elemento en línea",
+  "unsplit": "Desdividir",
+  "unsplitAll": "Desdividir Todo",
+  "resetCardTip": "¿Estás seguro de restablecer ${x} tarjetas?",
+  "freezeCol": "Congelar columna",
+  "unfreezeCol": "Descongelar columna",
+  "snippetsTip": "El fragmento de código ha sido actualizado, ¿quieres guardarlo?",
   "addBelowAbove": "Haga clic para agregar abajo<br>⌥Clic para agregar arriba",
   "imported": "Importación completada",
   "mirrorTip": "Base de datos espejo, todas las actualizaciones de datos se sincronizarán con todos los demás espejos",
@@ -16,6 +28,8 @@
   "goToTab9": "Ir a la última pestaña",
   "goToTabNext": "Ir a la siguiente pestaña",
   "goToTabPrev": "Ir a la pestaña anterior",
+  "goToEditTabNext": "Ir a la siguiente pestaña editada",
+  "goToEditTabPrev": "Ir a la pestaña editada anteriormente",
   "createdTime": "Hora de creación",
   "updatedTime": "Hora actualizada",
   "removeBookmark": "¿Eliminar marcador de ${x}?",
@@ -174,6 +188,7 @@
   "searchTip5": "para descartar",
   "showRecentUpdatedBlocks": "Los bloques actualizados más recientemente se mostrarán cuando la entrada esté vacía",
   "revisionCount": "Número de revisiones",
+  "nextDue": "Revisa la próxima vez",
   "flashcardNewCardLimit": "Límite de tarjeta nueva",
   "flashcardNewCardLimitTip": "Si hay muchas tarjetas nuevas, puede establecer la cantidad de tarjetas nuevas para revisar a través de este elemento",
   "flashcardReviewCardLimit": "Revisar límite de tarjeta",
@@ -1314,6 +1329,8 @@
     "214": "Esta función requiere iniciar sesión en la cuenta antes de poder usarla",
     "215": "Error al guardar: el archivo de destino está siendo utilizado por otro programa",
     "216": "Reconstruyendo el índice de datos de contenido de recursos, espere...",
-    "217": "[%d/%d] Índice de datos de contenido de activos creado"
+    "217": "[%d/%d] Índice de datos de contenido de activos creado",
+    "218": "Se han detectado demasiadas instantáneas del repositorio de datos, lo que ralentiza el inicio del programa y la sincronización de datos. Considere ejecutar [Configuración - Acerca de - Purga del repositorio de datos]",
+    "219": "El servicio de almacenamiento en la nube no está disponible, inténtalo de nuevo más tarde"
   }
 }

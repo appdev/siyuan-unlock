@@ -1,4 +1,4 @@
-import {getEventName, isCtrl, updateHotkeyTip} from "../protyle/util/compatibility";
+import {getEventName, updateHotkeyTip} from "../protyle/util/compatibility";
 import {setPosition} from "../util/setPosition";
 import {hasClosestByClassName} from "../protyle/util/hasClosest";
 import {isMobile} from "../util/functions";
@@ -248,7 +248,7 @@ const getActionMenu = (element: Element, next: boolean) => {
 
 export const bindMenuKeydown = (event: KeyboardEvent) => {
     if (window.siyuan.menus.menu.element.classList.contains("fn__none")
-        || event.altKey || event.shiftKey || isCtrl(event)) {
+        || event.altKey || event.shiftKey || event.ctrlKey || event.metaKey) {
         return false;
     }
     const target = event.target as HTMLElement;

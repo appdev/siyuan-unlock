@@ -4,7 +4,7 @@ import {ipcRenderer} from "electron";
 /// #endif
 import {openHistory} from "../history/history";
 import {getOpenNotebookCount, originalPath, pathPosix, showFileInFolder} from "../util/pathName";
-import {mountHelp, newDailyNote} from "../util/mount";
+import {fetchNewDailyNote, mountHelp, newDailyNote} from "../util/mount";
 import {fetchPost} from "../util/fetch";
 import {Constants} from "../constants";
 import {isInAndroid, isInIOS, setStorageVal, writeText} from "../protyle/util/compatibility";
@@ -25,6 +25,7 @@ import {confirmDialog} from "../dialog/confirmDialog";
 import {App} from "../index";
 import {isBrowser} from "../util/functions";
 import {unbindSaveUI} from "../boot/onGetConfig";
+import {openRecentDocs} from "../business/openRecentDocs";
 
 const togglePinDock = (dock: Dock, icon: string) => {
     return {
@@ -323,7 +324,7 @@ export const workspaceMenu = (app: App, rect: DOMRect) => {
                     icon: "iconCalendar",
                     accelerator: window.siyuan.config.keymap.general.dailyNote.custom,
                     click: () => {
-                        newDailyNote();
+                        newDailyNote(app);
                     }
                 }).element);
             } else {
@@ -335,10 +336,7 @@ export const workspaceMenu = (app: App, rect: DOMRect) => {
                             iconHTML: unicode2Emoji(item.icon || Constants.SIYUAN_IMAGE_NOTE, "b3-menu__icon", true),
                             accelerator: window.siyuan.storage[Constants.LOCAL_DAILYNOTEID] === item.id ? window.siyuan.config.keymap.general.dailyNote.custom : "",
                             click: () => {
-                                fetchPost("/api/filetree/createDailyNote", {
-                                    notebook: item.id,
-                                    app: Constants.SIYUAN_APPID,
-                                });
+                                fetchNewDailyNote(app, item.id);
                                 window.siyuan.storage[Constants.LOCAL_DAILYNOTEID] = item.id;
                                 setStorageVal(Constants.LOCAL_DAILYNOTEID, window.siyuan.storage[Constants.LOCAL_DAILYNOTEID]);
                             }
@@ -370,6 +368,14 @@ export const workspaceMenu = (app: App, rect: DOMRect) => {
                         viewCards(app, "", window.siyuan.languages.all, "");
                     }
                 }],
+            }).element);
+            window.siyuan.menus.menu.append(new MenuItem({
+                label: window.siyuan.languages.recentDocs,
+                icon: "iconFile",
+                accelerator: window.siyuan.config.keymap.general.recentDocs.custom,
+                click: () => {
+                    openRecentDocs();
+                }
             }).element);
             window.siyuan.menus.menu.append(new MenuItem({
                 label: window.siyuan.languages.lockScreen,
@@ -439,7 +445,7 @@ const openWorkspace = (workspace: string) => {
 const workspaceItem = (item: IWorkspace) => {
     /// #if !BROWSER
     return {
-        label: `<div data-type="a" aria-label="${item.path}" class="fn__ellipsis" style="max-width: 256px">
+        label: `<div aria-label="${item.path}" class="fn__ellipsis ariaLabel" style="max-width: 256px">
     ${originalPath().basename(item.path)}
 </div>`,
         current: !item.closed,
