@@ -44,7 +44,7 @@ if (!app.requestSingleInstanceLock()) {
 try {
     firstOpen = !fs.existsSync(path.join(confDir, "workspace.json"));
     if (!fs.existsSync(confDir)) {
-        fs.mkdirSync(confDir, { mode: 0o755, recursive: true });
+        fs.mkdirSync(confDir, {mode: 0o755, recursive: true});
     }
 } catch (e) {
     console.error(e);
@@ -270,7 +270,7 @@ const boot = () => {
         minHeight: 376,
         fullscreenable: true,
         fullscreen: windowState.fullscreen,
-        trafficLightPosition: { x: 8, y: 8 },
+        trafficLightPosition: {x: 8, y: 8},
         webPreferences: {
             nodeIntegration: true,
             webviewTag: true,
@@ -293,7 +293,7 @@ const boot = () => {
     currentWindow.webContents.session.webRequest.onBeforeSendHeaders((details, cb) => {
         if (-1 < details.url.indexOf("bili")) {
             // B 站不移除 Referer https://github.com/siyuan-note/siyuan/issues/94
-            cb({ requestHeaders: details.requestHeaders });
+            cb({requestHeaders: details.requestHeaders});
             return;
         }
 
@@ -302,7 +302,7 @@ const boot = () => {
                 delete details.requestHeaders[key];
             }
         }
-        cb({ requestHeaders: details.requestHeaders });
+        cb({requestHeaders: details.requestHeaders});
     });
     currentWindow.webContents.session.webRequest.onHeadersReceived((details, cb) => {
         for (let key in details.responseHeaders) {
@@ -314,7 +314,7 @@ const boot = () => {
                 delete details.responseHeaders[key];
             }
         }
-        cb({ responseHeaders: details.responseHeaders });
+        cb({responseHeaders: details.responseHeaders});
     });
 
     currentWindow.webContents.on("did-finish-load", () => {
@@ -335,7 +335,7 @@ const boot = () => {
     });
 
     if (windowState.isDevToolsOpened) {
-        currentWindow.webContents.openDevTools({ mode: "bottom" });
+        currentWindow.webContents.openDevTools({mode: "bottom"});
     }
 
     // 主界面事件监听
@@ -359,20 +359,20 @@ const boot = () => {
     const template = [{
         label: productName, submenu: [{
             label: `About ${productName}`, role: "about",
-        }, { type: "separator" }, { role: "services" }, { type: "separator" }, {
+        }, {type: "separator"}, {role: "services"}, {type: "separator"}, {
             label: `Hide ${productName}`, role: "hide",
-        }, { role: "hideOthers" }, { role: "unhide" }, { type: "separator" }, {
+        }, {role: "hideOthers"}, {role: "unhide"}, {type: "separator"}, {
             label: `Quit ${productName}`, role: "quit",
         },],
     }, {
         role: "editMenu",
-        submenu: [{ role: "cut" }, { role: "copy" }, { role: "paste" }, {
+        submenu: [{role: "cut"}, {role: "copy"}, {role: "paste"}, {
             role: "pasteAndMatchStyle",
             accelerator: "CmdOrCtrl+Shift+C"
-        }, { role: "selectAll" },],
+        }, {role: "selectAll"},],
     }, {
         role: "windowMenu",
-        submenu: [{ role: "minimize" }, { role: "zoom" }, { role: "togglefullscreen" }, { type: "separator" }, { role: "toggledevtools" }, { type: "separator" }, { role: "front" },],
+        submenu: [{role: "minimize"}, {role: "zoom"}, {role: "togglefullscreen"}, {type: "separator"}, {role: "toggledevtools"}, {type: "separator"}, {role: "front"},],
     },];
     const menu = Menu.buildFromTemplate(template);
     Menu.setApplicationMenu(menu);
@@ -422,7 +422,7 @@ const initKernel = (workspace, port, lang) => {
         if (isDevEnv) {
             bootIndex = path.join(appDir, "electron", "boot.html");
         }
-        bootWindow.loadFile(bootIndex, { query: { v: appVer } });
+        bootWindow.loadFile(bootIndex, {query: {v: appVer}});
         bootWindow.show();
 
         const kernelName = "win32" === process.platform ? "SiYuan-Kernel.exe" : "SiYuan-Kernel";
@@ -558,7 +558,7 @@ const initKernel = (workspace, port, lang) => {
             writeLog("got kernel version [" + apiData.data + "]");
             if (!isDevEnv && apiData.data !== appVer) {
                 writeLog(`kernel [${apiData.data}] is running, shutdown it now and then start kernel [${appVer}]`);
-                net.fetch(getServer() + "/api/system/exit", { method: "POST" });
+                net.fetch(getServer() + "/api/system/exit", {method: "POST"});
                 bootWindow.destroy();
                 resolve(false);
             } else {
@@ -575,7 +575,7 @@ const initKernel = (workspace, port, lang) => {
                         }
                     } catch (e) {
                         writeLog("get boot progress failed: " + e.message);
-                        net.fetch(getServer() + "/api/system/exit", { method: "POST" });
+                        net.fetch(getServer() + "/api/system/exit", {method: "POST"});
                         bootWindow.destroy();
                         resolve(false);
                         progressing = true;
@@ -756,7 +756,7 @@ app.whenReady().then(() => {
         const currentWindow = getWindowByContentId(webContentsId);
         switch (cmd) {
             case "openDevTools":
-                event.sender.openDevTools({ mode: "bottom" });
+                event.sender.openDevTools({mode: "bottom"});
                 break;
             case "unregisterAll":
                 globalShortcut.unregisterAll();
@@ -814,12 +814,12 @@ app.whenReady().then(() => {
             case "setProxy":
                 event.sender.session.closeAllConnections().then(() => {
                     if (data.proxyURL.startsWith("://")) {
-                        event.sender.session.setProxy({ mode: "system" }).then(() => {
+                        event.sender.session.setProxy({mode: "system"}).then(() => {
                             console.log("network proxy [system]");
                         });
                         return;
                     }
-                    event.sender.session.setProxy({ proxyRules: data.proxyURL }).then(() => {
+                    event.sender.session.setProxy({proxyRules: data.proxyURL}).then(() => {
                         console.log("network proxy [" + data.proxyURL + "]");
                     });
                 });
@@ -886,10 +886,10 @@ app.whenReady().then(() => {
     ipcMain.on("siyuan-open-window", (event, data) => {
         const mainWindow = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
         const mainBounds = mainWindow.getBounds();
-        const mainScreen = screen.getDisplayNearestPoint({ x: mainBounds.x, y: mainBounds.y });
+        const mainScreen = screen.getDisplayNearestPoint({x: mainBounds.x, y: mainBounds.y});
         const win = new BrowserWindow({
             show: true,
-            trafficLightPosition: { x: 8, y: 13 },
+            trafficLightPosition: {x: 8, y: 13},
             width: data.width || mainScreen.size.width * 0.7,
             height: data.height || mainScreen.size.height * 0.9,
             minWidth: 493,
@@ -973,7 +973,7 @@ app.whenReady().then(() => {
                 return true;
             }
         });
-        await net.fetch(getServer(data.port) + "/api/system/uiproc?pid=" + process.pid, { method: "POST" });
+        await net.fetch(getServer(data.port) + "/api/system/uiproc?pid=" + process.pid, {method: "POST"});
     });
     ipcMain.on("siyuan-hotkey", (event, data) => {
         globalShortcut.unregisterAll();
@@ -1030,7 +1030,7 @@ app.whenReady().then(() => {
         });
     });
     ipcMain.on("siyuan-auto-launch", (event, data) => {
-        app.setLoginItemSettings({ openAtLogin: data.openAtLogin });
+        app.setLoginItemSettings({openAtLogin: data.openAtLogin});
     });
 
     if (firstOpen) {
@@ -1124,20 +1124,20 @@ app.whenReady().then(() => {
             const currentURL = new URL(item.browserWindow.getURL());
             const server = getServer(currentURL.port);
             writeLog("sync after system resume [" + server + "/api/sync/performSync" + "]");
-            net.fetch(server + "/api/sync/performSync", { method: "POST" });
+            net.fetch(server + "/api/sync/performSync", {method: "POST"});
         });
     });
     powerMonitor.on("shutdown", () => {
         writeLog("system shutdown");
         workspaces.forEach(item => {
             const currentURL = new URL(item.browserWindow.getURL());
-            net.fetch(getServer(currentURL.port) + "/api/system/exit", { method: "POST" });
+            net.fetch(getServer(currentURL.port) + "/api/system/exit", {method: "POST"});
         });
     });
     powerMonitor.on("lock-screen", () => {
         writeLog("system lock-screen");
         BrowserWindow.getAllWindows().forEach(item => {
-            item.webContents.send("siyuan-send-windows", { cmd: "lockscreenByMode" });
+            item.webContents.send("siyuan-send-windows", {cmd: "lockscreenByMode"});
         });
     });
 });
@@ -1214,7 +1214,7 @@ app.on("activate", () => {
 app.on("web-contents-created", (webContentsCreatedEvent, contents) => {
     contents.setWindowOpenHandler((details) => {
         shell.openExternal(details.url);
-        return { action: "deny" };
+        return {action: "deny"};
     });
 });
 
