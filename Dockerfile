@@ -1,7 +1,7 @@
 FROM node:21 as NODE_BUILD
 WORKDIR /go/src/github.com/siyuan-note/siyuan/
 ADD . /go/src/github.com/siyuan-note/siyuan/
-RUN npm config set registry http://registry.npmmirror.com
+RUN npm config set registry https://registry.npmmirror.com
 RUN cd app  && npm install && npm run build
 
 FROM golang:alpine as GO_BUILD
