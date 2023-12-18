@@ -3,6 +3,7 @@ import {selectRow} from "./row";
 import {cellScrollIntoView, popTextCell} from "./cell";
 import {avContextmenu} from "./action";
 import {hasClosestByClassName} from "../../util/hasClosest";
+import {Constants} from "../../../constants";
 
 export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyle: IProtyle) => {
     if (!nodeElement.classList.contains("av") || !window.siyuan.menus.menu.element.classList.contains("fn__none")) {
@@ -34,7 +35,7 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
             return true;
         }
         let newCellElement;
-        if (event.key === "ArrowLeft") {
+        if (event.key === "ArrowLeft" || matchHotKey("⇧⇥", event)) {
             const previousRowElement = rowElement.previousElementSibling;
             if (selectCellElement.previousElementSibling && !selectCellElement.previousElementSibling.classList.contains("av__firstcol")) {
                 if (selectCellElement.previousElementSibling.classList.contains("av__cell")) {
@@ -54,7 +55,7 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
             event.preventDefault();
             return true;
         }
-        if (event.key === "ArrowRight") {
+        if (event.key === "ArrowRight" || matchHotKey("⇥", event)) {
             const nextRowElement = rowElement.nextElementSibling;
             if (selectCellElement.nextElementSibling && selectCellElement.nextElementSibling.classList.contains("av__cell")) {
                 newCellElement = selectCellElement.nextElementSibling;
@@ -97,8 +98,19 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
             event.preventDefault();
             return true;
         }
-    }
 
+        if (!Constants.KEYCODELIST[event.keyCode] ||
+            (Constants.KEYCODELIST[event.keyCode].length === 1 &&
+                !event.metaKey && !event.ctrlKey &&
+                !["⇧", "⌃", "⌥", "⌘"].includes(Constants.KEYCODELIST[event.keyCode]))) {
+            if (!selectCellElement.style.backgroundColor) {
+                popTextCell(protyle, [selectCellElement]);
+            } else {
+                event.preventDefault();
+            }
+            return true;
+        }
+    }
     const selectRowElements = nodeElement.querySelectorAll(".av__row--select:not(.av__row--header)");
     if (selectRowElements.length > 0) {
         if (matchHotKey("⌘/", event)) {
@@ -137,7 +149,7 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
         if (event.key === "ArrowDown") {
             const nextRowElement = selectRowElements[selectRowElements.length - 1].nextElementSibling;
             selectRow(selectRowElements[0].querySelector(".av__firstcol"), "unselectAll");
-            if (nextRowElement && !nextRowElement.classList.contains("av__row--add")) {
+            if (nextRowElement && !nextRowElement.classList.contains("av__row--util")) {
                 selectRow(nextRowElement.querySelector(".av__firstcol"), "select");
                 cellScrollIntoView(nodeElement, nextRowElement);
             } else {

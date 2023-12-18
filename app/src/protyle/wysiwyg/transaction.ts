@@ -461,6 +461,11 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
                     updateBlock(updateElements, protyle, operation, isUndo);
                 }
             });
+        } else { // updateElements 没有包含嵌入块，在悬浮层编辑嵌入块时，嵌入块也需要更新
+            // 更新 ws 嵌入块
+            updateEmbed(protyle, operation);
+            // 更新 ws 引用块
+            updateRef(protyle, operation.id);
         }
         return;
     }
@@ -711,7 +716,9 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
         "updateAttrViewColOption", "updateAttrViewCell", "sortAttrViewRow", "sortAttrViewCol", "setAttrViewColHidden",
         "setAttrViewColWrap", "setAttrViewColWidth", "removeAttrViewColOption", "setAttrViewName", "setAttrViewFilters",
         "setAttrViewSorts", "setAttrViewColCalc", "removeAttrViewCol", "updateAttrViewColNumberFormat", "removeAttrViewBlock",
-        "replaceAttrViewBlock", "updateAttrViewColTemplate", "setAttrViewColIcon", "setAttrViewColPin"].includes(operation.action)) {
+        "replaceAttrViewBlock", "updateAttrViewColTemplate", "setAttrViewColIcon", "setAttrViewColPin", "addAttrViewView",
+        "removeAttrViewView", "setAttrViewViewName", "setAttrViewViewIcon", "duplicateAttrViewView", "sortAttrViewView",
+        "setAttrViewPageSize"].includes(operation.action)) {
         refreshAV(protyle, operation, isUndo);
     } else if (operation.action === "doUpdateUpdated") {
         updateElements.forEach(item => {
@@ -723,8 +730,8 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
 export const turnsIntoOneTransaction = (options: {
     protyle: IProtyle,
     selectsElement: Element[],
-    type: string,
-    level?: string
+    type: TTurnIntoOne,
+    level?: TTurnIntoOneSub
 }) => {
     let parentElement: Element;
     const id = Lute.NewNodeID();
@@ -834,8 +841,8 @@ export const turnsIntoTransaction = (options: {
     protyle: IProtyle,
     selectsElement?: Element[],
     nodeElement?: Element,
-    type: string,
-    level?: number | string,
+    type: TTurnInto,
+    level?: number,
     isContinue?: boolean,
 }) => {
     let selectsElement: Element[] = options.selectsElement;
@@ -898,7 +905,7 @@ export const turnsIntoTransaction = (options: {
             data: item.outerHTML
         });
 
-        if ((options.type === "Blocks2Ps" || options.type === "Blocks2Hs") && !options.isContinue) {
+        if (!options.isContinue) {
             // @ts-ignore
             item.outerHTML = options.protyle.lute[options.type](item.outerHTML, options.level);
         } else {

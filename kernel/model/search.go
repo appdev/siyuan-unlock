@@ -54,6 +54,28 @@ type EmbedBlock struct {
 	BlockPaths []*BlockPath `json:"blockPaths"`
 }
 
+func UpdateEmbedBlock(id, content string) (err error) {
+	bt := treenode.GetBlockTree(id)
+	if nil == bt {
+		err = ErrBlockNotFound
+		return
+	}
+
+	if treenode.TypeAbbr(ast.NodeBlockQueryEmbed.String()) != bt.Type {
+		err = errors.New("not query embed block")
+		return
+	}
+
+	embedBlock := &EmbedBlock{
+		Block: &Block{
+			Markdown: content,
+		},
+	}
+
+	updateEmbedBlockContent(id, []*EmbedBlock{embedBlock})
+	return
+}
+
 func GetEmbedBlock(embedBlockID string, includeIDs []string, headingMode int, breadcrumb bool) (ret []*EmbedBlock) {
 	return getEmbedBlock(embedBlockID, includeIDs, headingMode, breadcrumb)
 }
@@ -1080,7 +1102,12 @@ func stringQuery(query string) string {
 func markReplaceSpan(n *ast.Node, unlinks *[]*ast.Node, keywords []string, markSpanDataType string, luteEngine *lute.Lute) bool {
 	text := n.Content()
 	if ast.NodeText == n.Type {
-		text = search.EncloseHighlighting(text, keywords, search.GetMarkSpanStart(markSpanDataType), search.GetMarkSpanEnd(), Conf.Search.CaseSensitive, false)
+		text = util.EscapeHTML(text)
+		escapedKeywords := make([]string, len(keywords))
+		for i, keyword := range keywords {
+			escapedKeywords[i] = util.EscapeHTML(keyword)
+		}
+		text = search.EncloseHighlighting(text, escapedKeywords, search.GetMarkSpanStart(markSpanDataType), search.GetMarkSpanEnd(), Conf.Search.CaseSensitive, false)
 		n.Tokens = gulu.Str.ToBytes(text)
 		if bytes.Contains(n.Tokens, []byte(search.MarkDataType)) {
 			linkTree := parse.Inline("", n.Tokens, luteEngine.ParseOptions)

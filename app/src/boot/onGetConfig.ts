@@ -22,13 +22,13 @@ import {showMessage} from "../dialog/message";
 import {replaceLocalPath} from "../editor/rename";
 import {setTabPosition} from "../window/setHeader";
 import {initBar} from "../layout/topBar";
-import {setProxy} from "../config/util/about";
 import {openChangelog} from "./openChangelog";
 import {getIdFromSYProtocol, isSYProtocol} from "../util/pathName";
 import {App} from "../index";
 import {initWindowEvent} from "./globalEvent/event";
 import {sendGlobalShortcut} from "./globalEvent/keydown";
 import {closeWindow} from "../window/closeWin";
+import {checkFold} from "../util/noRelyPCFunction";
 
 const matchKeymap = (keymap: Record<string, IKeymapItem>, key1: "general" | "editor", key2?: "general" | "insert" | "heading" | "list" | "table") => {
     if (key1 === "general") {
@@ -135,7 +135,6 @@ export const onGetConfig = (isStart: boolean, app: App) => {
         }
     });
     initBar(app);
-    setProxy();
     initStatus();
     initWindow(app);
     appearance.onSetappearance(window.siyuan.config.appearance);
@@ -214,13 +213,7 @@ export const initWindow = async (app: App) => {
     ipcRenderer.on(Constants.SIYUAN_EVENT, (event, cmd) => {
         if (cmd === "focus") {
             if (getSelection().rangeCount > 0) {
-                const range = getSelection().getRangeAt(0);
-                const startNode = range.startContainer.childNodes[range.startOffset] as HTMLElement;
-                if (startNode && startNode.nodeType !== 3 && (startNode.tagName === "TEXTAREA" || startNode.tagName === "INPUT")) {
-                    startNode.focus();
-                } else {
-                    focusByRange(getSelection().getRangeAt(0));
-                }
+                focusByRange(getSelection().getRangeAt(0));
             }
             exportLayout({
                 reload: false,
@@ -309,12 +302,12 @@ export const initWindow = async (app: App) => {
                 const focus = urlObj.searchParams.get("focus") === "1";
                 fetchPost("/api/block/checkBlockExist", {id}, existResponse => {
                     if (existResponse.data) {
-                        fetchPost("/api/block/checkBlockFold", {id}, (foldResponse) => {
+                        checkFold(id, (zoomIn) => {
                             openFileById({
                                 app,
                                 id,
-                                action: (foldResponse.data || focus) ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ALL] : [Constants.CB_GET_FOCUS, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL],
-                                zoomIn: foldResponse.data || focus
+                                action: (zoomIn || focus) ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ALL] : [Constants.CB_GET_FOCUS, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL],
+                                zoomIn: zoomIn || focus
                             });
                         });
                         ipcRenderer.send(Constants.SIYUAN_CMD, "show");
@@ -447,11 +440,12 @@ ${response.data.replace("%pages", "<span class=totalPages></span>").replace("%pa
 </div></div>`);
         const pinElement = document.getElementById("pinWindow");
         pinElement.addEventListener("click", () => {
-            pinElement.classList.toggle("toolbar__item--active");
-            if (pinElement.classList.contains("toolbar__item--active")) {
+            if (pinElement.getAttribute("aria-label") === window.siyuan.languages.pin) {
+                pinElement.querySelector("use").setAttribute("xlink:href", "#iconUnpin");
                 pinElement.setAttribute("aria-label", window.siyuan.languages.unpin);
                 ipcRenderer.send(Constants.SIYUAN_CMD, "setAlwaysOnTopTrue");
             } else {
+                pinElement.querySelector("use").setAttribute("xlink:href", "#iconPin");
                 pinElement.setAttribute("aria-label", window.siyuan.languages.pin);
                 ipcRenderer.send(Constants.SIYUAN_CMD, "setAlwaysOnTopFalse");
             }

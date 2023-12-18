@@ -84,7 +84,7 @@ func Export2Liandi(id string) (err error) {
 		request := httpclient.NewCloudRequest30s()
 		resp, getErr := request.
 			SetSuccessResult(result).
-			SetCookies(&http.Cookie{Name: "symphony", Value: Conf.User.UserToken}).
+			SetCookies(&http.Cookie{Name: "symphony", Value: Conf.GetUser().UserToken}).
 			Get(util.GetCloudAccountServer() + "/api/v2/article/update/" + articleId)
 		if nil != getErr {
 			logging.LogErrorf("get liandi article info failed: %s", getErr)
@@ -114,7 +114,7 @@ func Export2Liandi(id string) (err error) {
 
 	title := path.Base(tree.HPath)
 	tags := tree.Root.IALAttr("tags")
-	content := exportMarkdownContent0(tree, util.GetCloudForumAssetsServer()+time.Now().Format("2006/01")+"/siyuan/"+Conf.User.UserId+"/", true,
+	content := exportMarkdownContent0(tree, util.GetCloudForumAssetsServer()+time.Now().Format("2006/01")+"/siyuan/"+Conf.GetUser().UserId+"/", true,
 		4, 1, 0,
 		"#", "#",
 		"", "",
@@ -123,7 +123,7 @@ func Export2Liandi(id string) (err error) {
 	request := httpclient.NewCloudRequest30s()
 	request = request.
 		SetSuccessResult(result).
-		SetCookies(&http.Cookie{Name: "symphony", Value: Conf.User.UserToken}).
+		SetCookies(&http.Cookie{Name: "symphony", Value: Conf.GetUser().UserToken}).
 		SetBody(map[string]interface{}{
 			"articleTitle":   title,
 			"articleTags":    tags,
@@ -1090,7 +1090,7 @@ func ExportStdMarkdown(id string) string {
 
 	cloudAssetsBase := ""
 	if IsSubscriber() {
-		cloudAssetsBase = util.GetCloudAssetsServer() + Conf.User.UserId + "/"
+		cloudAssetsBase = util.GetCloudAssetsServer() + Conf.GetUser().UserId + "/"
 	}
 	return exportMarkdownContent0(tree, cloudAssetsBase, false,
 		Conf.Export.BlockRefMode, Conf.Export.BlockEmbedMode, Conf.Export.FileAnnotationRefMode,
@@ -1910,13 +1910,13 @@ func exportTree(tree *parse.Tree, wysiwyg, expandKaTexMacros, keepFold bool,
 			return ast.WalkContinue
 		}
 
-		view, err := attrView.GetView()
+		view, err := attrView.GetCurrentView()
 		if nil != err {
 			logging.LogErrorf("get attribute view [%s] failed: %s", avID, err)
 			return ast.WalkContinue
 		}
 
-		table, err := renderAttributeViewTable(attrView, view)
+		table, err := renderAttributeViewTable(attrView, view, 1, -1)
 		if nil != err {
 			logging.LogErrorf("render attribute view [%s] table failed: %s", avID, err)
 			return ast.WalkContinue
@@ -1955,6 +1955,18 @@ func exportTree(tree *parse.Tree, wysiwyg, expandKaTexMacros, keepFold bool,
 					} else if av.KeyTypeUpdated == cell.Value.Type {
 						if nil != cell.Value.Updated {
 							cell.Value.Updated = av.NewFormattedValueUpdated(cell.Value.Updated.Content, 0, av.UpdatedFormatNone)
+						}
+					} else if av.KeyTypeMAsset == cell.Value.Type {
+						if nil != cell.Value.MAsset {
+							buf := &bytes.Buffer{}
+							for _, a := range cell.Value.MAsset {
+								buf.WriteString("![](")
+								buf.WriteString(a.Content)
+								buf.WriteString(") ")
+							}
+							val = strings.TrimSpace(buf.String())
+							mdTableCell.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(val)})
+							continue
 						}
 					}
 

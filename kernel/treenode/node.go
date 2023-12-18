@@ -137,6 +137,32 @@ func ExportNodeStdMd(node *ast.Node, luteEngine *lute.Lute) string {
 	return markdown
 }
 
+func IsNodeOCRed(node *ast.Node) (ret bool) {
+	ret = true
+	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering {
+			return ast.WalkContinue
+		}
+
+		if ast.NodeImage == n.Type {
+			linkDest := n.ChildByType(ast.NodeLinkDest)
+			if nil != linkDest {
+				linkDestStr := linkDest.TokensStr()
+				if !cache.ExistAsset(linkDestStr) {
+					return ast.WalkContinue
+				}
+
+				if !util.ExistsAssetText(linkDestStr) {
+					ret = false
+					return ast.WalkStop
+				}
+			}
+		}
+		return ast.WalkContinue
+	})
+	return
+}
+
 func NodeStaticContent(node *ast.Node, excludeTypes []string, includeTextMarkATitleURL, includeAssetPath bool) string {
 	if nil == node {
 		return ""
@@ -508,6 +534,8 @@ func getAttributeViewContent(avID string) (content string) {
 	}
 
 	buf := bytes.Buffer{}
+	buf.WriteString(attrView.Name)
+	buf.WriteByte(' ')
 	for _, v := range attrView.Views {
 		buf.WriteString(v.Name)
 		buf.WriteByte(' ')
@@ -526,7 +554,7 @@ func getAttributeViewContent(avID string) (content string) {
 		}
 	}
 	if nil == view {
-		content = buf.String()
+		content = strings.TrimSpace(buf.String())
 		return
 	}
 
@@ -558,6 +586,7 @@ func getAttributeViewContent(avID string) (content string) {
 func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *av.Table, err error) {
 	ret = &av.Table{
 		ID:      view.ID,
+		Icon:    view.Icon,
 		Name:    view.Name,
 		Columns: []*av.TableColumn{},
 		Rows:    []*av.TableRow{},

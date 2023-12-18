@@ -54,7 +54,11 @@ func FixIndexJob() {
 
 	task.AppendTask(task.DatabaseIndexFix, removeDuplicateDatabaseRefs)
 
-	util.PushStatusBar(Conf.Language(185))
+	// 后面要加任务的话记得修改推送任务栏的进度 util.PushStatusBar(fmt.Sprintf(Conf.Language(58), 1, 5))
+
+	task.AppendTask(task.DatabaseIndexFix, func() {
+		util.PushStatusBar(Conf.Language(185))
+	})
 	debug.FreeOSMemory()
 }
 
@@ -67,7 +71,7 @@ func removeDuplicateDatabaseRefs() {
 	autoFixLock.Lock()
 	defer autoFixLock.Unlock()
 
-	util.PushStatusBar(Conf.Language(58))
+	util.PushStatusBar(fmt.Sprintf(Conf.Language(58), 5, 5))
 	duplicatedRootIDs := sql.GetRefDuplicatedDefRootIDs()
 	for _, rootID := range duplicatedRootIDs {
 		refreshRefsByDefID(rootID)
@@ -85,7 +89,7 @@ func removeDuplicateDatabaseIndex() {
 	autoFixLock.Lock()
 	defer autoFixLock.Unlock()
 
-	util.PushStatusBar(Conf.Language(58))
+	util.PushStatusBar(fmt.Sprintf(Conf.Language(58), 1, 5))
 	duplicatedRootIDs := sql.GetDuplicatedRootIDs("blocks")
 	if 1 > len(duplicatedRootIDs) {
 		duplicatedRootIDs = sql.GetDuplicatedRootIDs("blocks_fts")
@@ -94,7 +98,6 @@ func removeDuplicateDatabaseIndex() {
 		}
 	}
 
-	util.PushStatusBar(Conf.Language(58))
 	roots := sql.GetBlocks(duplicatedRootIDs)
 	rootMap := map[string]*sql.Block{}
 	for _, root := range roots {
@@ -113,7 +116,7 @@ func removeDuplicateDatabaseIndex() {
 		}
 		deletes++
 		toRemoveRootIDs = append(toRemoveRootIDs, rootID)
-		if util.IsExiting {
+		if util.IsExiting.Load() {
 			break
 		}
 	}
@@ -132,7 +135,7 @@ func resetDuplicateBlocksOnFileSys() {
 	autoFixLock.Lock()
 	defer autoFixLock.Unlock()
 
-	util.PushStatusBar(Conf.Language(58))
+	util.PushStatusBar(fmt.Sprintf(Conf.Language(58), 2, 5))
 	boxes := Conf.GetBoxes()
 	luteEngine := lute.New()
 	blockIDs := map[string]bool{}
@@ -288,7 +291,7 @@ func fixBlockTreeByFileSys() {
 	autoFixLock.Lock()
 	defer autoFixLock.Unlock()
 
-	util.PushStatusBar(Conf.Language(58))
+	util.PushStatusBar(fmt.Sprintf(Conf.Language(58), 3, 5))
 	boxes := Conf.GetOpenedBoxes()
 	luteEngine := lute.New()
 	for _, box := range boxes {
@@ -332,12 +335,12 @@ func fixBlockTreeByFileSys() {
 			}
 
 			reindexTreeByPath(box.ID, p, i, size, luteEngine)
-			if util.IsExiting {
+			if util.IsExiting.Load() {
 				break
 			}
 		}
 
-		if util.IsExiting {
+		if util.IsExiting.Load() {
 			break
 		}
 	}
@@ -353,7 +356,7 @@ func fixBlockTreeByFileSys() {
 func fixDatabaseIndexByBlockTree() {
 	defer logging.Recover()
 
-	util.PushStatusBar(Conf.Language(58))
+	util.PushStatusBar(fmt.Sprintf(Conf.Language(58), 4, 5))
 	rootUpdatedMap := treenode.GetRootUpdated()
 	dbRootUpdatedMap, err := sql.GetRootUpdated()
 	if nil == err {
@@ -368,7 +371,7 @@ func reindexTreeByUpdated(rootUpdatedMap, dbRootUpdatedMap map[string]string) {
 	for rootID, updated := range rootUpdatedMap {
 		i++
 
-		if util.IsExiting {
+		if util.IsExiting.Load() {
 			break
 		}
 
@@ -393,7 +396,7 @@ func reindexTreeByUpdated(rootUpdatedMap, dbRootUpdatedMap map[string]string) {
 			continue
 		}
 
-		if util.IsExiting {
+		if util.IsExiting.Load() {
 			break
 		}
 	}
@@ -404,7 +407,7 @@ func reindexTreeByUpdated(rootUpdatedMap, dbRootUpdatedMap map[string]string) {
 			rootIDs = append(rootIDs, rootID)
 		}
 
-		if util.IsExiting {
+		if util.IsExiting.Load() {
 			break
 		}
 	}
@@ -421,7 +424,7 @@ func reindexTreeByUpdated(rootUpdatedMap, dbRootUpdatedMap map[string]string) {
 		}
 
 		toRemoveRootIDs = append(toRemoveRootIDs, id)
-		if util.IsExiting {
+		if util.IsExiting.Load() {
 			break
 		}
 	}

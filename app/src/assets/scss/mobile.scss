@@ -133,7 +133,9 @@
       opacity: 0.38;
     }
 
-    &--active {
+    &--active,
+    &:focus,
+    &:hover {
       background-color: var(--b3-list-hover);
     }
   }
@@ -481,7 +483,6 @@ html .protyle-wysiwyg [data-node-id]:last-child [spellcheck][contenteditable="tr
 html[lang="zh_CN"] .protyle-wysiwyg [data-node-id]:last-child [spellcheck][contenteditable="true"]:empty:before {
   content: "键入文字";
 }
-
 
 @media (max-width: 620px) {
   .protyle-wysiwyg [data-node-id].sb[data-sb-layout="col"] {

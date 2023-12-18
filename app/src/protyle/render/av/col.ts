@@ -7,6 +7,7 @@ import {openMenuPanel} from "./openMenuPanel";
 import {getLabelByNumberFormat} from "./number";
 import {removeAttrViewColAnimation, updateAttrViewCellAnimation} from "./action";
 import {openEmojiPanel, unicode2Emoji} from "../../../emoji";
+import {focusBlock} from "../../util/selection";
 
 export const duplicateCol = (options: {
     protyle: IProtyle,
@@ -99,7 +100,7 @@ export const getEditHTML = (options: {
         }
     });
     let html = `<button class="b3-menu__item" data-type="nobg" data-col-id="${options.colId}">
-    <span class="block__icon" style="padding: 8px;margin-left: -4px;" data-type="goProperties">
+    <span class="block__icon" style="padding: 8px;margin-left: -4px;" data-type="go-properties">
         <svg><use xlink:href="#iconLeft"></use></svg>
     </span>
     <span class="b3-menu__label ft__center">${window.siyuan.languages.edit}</span>
@@ -386,7 +387,7 @@ export const addAttrViewColAnimation = (options: {
         }
         let html = "";
         if (index === 0) {
-            html = `<div class="av__cell" data-icon="${options.icon || ""}" data-col-id="${options.id}" data-dtype="${options.type}" style="width: 200px;white-space: nowrap;">
+            html = `<div class="av__cell" data-icon="${options.icon || ""}" data-col-id="${options.id}" data-dtype="${options.type}" data-wrap="false" style="width: 200px;">
     <div draggable="true" class="av__cellheader">
         ${options.icon ? unicode2Emoji(options.icon, "av__cellheadericon", true) : `<svg class="av__cellheadericon"><use xlink:href="#${getColIconByType(options.type)}"></use></svg>`}
         <span class="av__celltext">${options.name}</span>
@@ -426,6 +427,8 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
             type,
         }]);
         updateAttrViewCellAnimation(cellElement);
+        // https://github.com/siyuan-note/siyuan/issues/9862
+        focusBlock(blockElement);
     });
     menu.addItem({
         iconHTML: `<span style="align-self: center;margin-right: 8px;width: 14px;" class="block__icon block__icon--show">${cellElement.dataset.icon ? unicode2Emoji(cellElement.dataset.icon) : `<svg><use xlink:href="#${getColIconByType(type)}"></use></svg>`}</span>`,
@@ -466,6 +469,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                 }
                 if (event.key === "Enter") {
                     menu.close();
+                    event.preventDefault();
                 }
             });
         }
@@ -589,7 +593,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
     }
     const isPin = cellElement.dataset.pin === "true";
     menu.addItem({
-        icon: "iconPin",
+        icon: isPin ? "iconUnpin" : "iconPin",
         label: isPin ? window.siyuan.languages.unfreezeCol : window.siyuan.languages.freezeCol,
         click() {
             transaction(protyle, [{
@@ -642,7 +646,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
     }
     menu.addItem({
         label: `<label class="fn__flex" style="margin: 4px 0"><span>${window.siyuan.languages.wrap}</span><span class="fn__space fn__flex-1"></span>
-<input type="checkbox" class="b3-switch fn__flex-center"${cellElement.style.whiteSpace === "nowrap" ? "" : " checked"}></label>`,
+<input type="checkbox" class="b3-switch fn__flex-center"${cellElement.dataset.wrap === "true" ? " checked" : ""}></label>`,
         bind(element) {
             const inputElement = element.querySelector("input") as HTMLInputElement;
             inputElement.addEventListener("change", () => {

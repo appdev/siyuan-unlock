@@ -80,11 +80,9 @@ func checkDownloadInstallPkg() {
 		return
 	}
 
-	if util.IsMutexLocked(&checkDownloadInstallPkgLock) {
+	if !checkDownloadInstallPkgLock.TryLock() {
 		return
 	}
-
-	checkDownloadInstallPkgLock.Lock()
 	defer checkDownloadInstallPkgLock.Unlock()
 
 	downloadPkgURLs, checksum, err := getUpdatePkg()

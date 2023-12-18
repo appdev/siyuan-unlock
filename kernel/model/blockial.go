@@ -122,15 +122,8 @@ func setNodeAttrs(node *ast.Node, tree *parse.Tree, nameValues map[string]string
 		return
 	}
 
-	if 1 == len(nameValues) && "" != nameValues["scroll"] {
-		// 文档滚动状态不产生同步冲突 https://github.com/siyuan-note/siyuan/issues/6076
-		if err = indexWriteJSONQueueWithoutChangeTime(tree); nil != err {
-			return
-		}
-	} else {
-		if err = indexWriteJSONQueue(tree); nil != err {
-			return
-		}
+	if err = indexWriteJSONQueue(tree); nil != err {
+		return
 	}
 
 	IncSync()
@@ -250,6 +243,31 @@ func GetBlockAttrs(id string) (ret map[string]string) {
 	}
 
 	WaitForWritingFiles()
+
+	tree, err := loadTreeByBlockID(id)
+	if nil != err {
+		return
+	}
+
+	node := treenode.GetNodeInTree(tree, id)
+	if nil == node {
+		logging.LogWarnf("block [%s] not found", id)
+		return
+	}
+
+	for _, kv := range node.KramdownIAL {
+		ret[kv[0]] = html.UnescapeAttrVal(kv[1])
+	}
+	cache.PutBlockIAL(id, ret)
+	return
+}
+
+func GetBlockAttrsWithoutWaitWriting(id string) (ret map[string]string) {
+	ret = map[string]string{}
+	if cached := cache.GetBlockIAL(id); nil != cached {
+		ret = cached
+		return
+	}
 
 	tree, err := loadTreeByBlockID(id)
 	if nil != err {

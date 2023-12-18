@@ -52,6 +52,8 @@ export abstract class Constants {
     public static readonly CUSTOM_RIFF_DECKS: string = "custom-riff-decks";
 
     // size
+    public static readonly SIZE_SCROLL_TB: number = 24;
+    public static readonly SIZE_SCROLL_STEP: number = 256;
     public static readonly SIZE_LINK_TEXT_MAX: number = 24;
     public static readonly SIZE_TOOLBAR_HEIGHT: number = isMobile() ? 0 : 32;
     public static readonly SIZE_GET_MAX = 102400;
@@ -73,9 +75,9 @@ export abstract class Constants {
     public static readonly CB_GET_ALL = "cb-get-all"; // 获取所有块
     public static readonly CB_GET_BACKLINK = "cb-get-backlink"; // 悬浮窗为传递型需展示上下文
     public static readonly CB_GET_UNUNDO = "cb-get-unundo"; // 不需要记录历史
-    public static readonly CB_GET_SCROLL = "cb-get-scroll"; // 滚动到指定位置
+    public static readonly CB_GET_SCROLL = "cb-get-scroll"; // 滚动到指定位置，用于直接打开文档，必有 rootID
     public static readonly CB_GET_CONTEXT = "cb-get-context"; // 包含上下文
-    public static readonly CB_GET_ROOTSCROLL = "cb-get-rootscroll"; // 如果为 rootID 就滚动到指定位置
+    public static readonly CB_GET_ROOTSCROLL = "cb-get-rootscroll"; // 如果为 rootID 就滚动到指定位置，必有 rootID
     public static readonly CB_GET_HTML = "cb-get-html"; // 直接渲染，不需要再 /api/block/getDocInfo，否则搜索表格无法定位
     public static readonly CB_GET_HISTORY = "cb-get-history"; // 历史渲染
 
@@ -98,6 +100,7 @@ export abstract class Constants {
     public static readonly LOCAL_AI = "local-ai";
     public static readonly LOCAL_PLUGINTOPUNPIN = "local-plugintopunpin";
     public static readonly LOCAL_FLASHCARD = "local-flashcard";
+    public static readonly LOCAL_FILEPOSITION = "local-fileposition";
 
     // timeout
     public static readonly TIMEOUT_DBLCLICK = 190;
@@ -279,6 +282,7 @@ export abstract class Constants {
             closeUnmodified: {default: "", custom: ""},
             closeLeft: {default: "", custom: ""},
             closeRight: {default: "", custom: ""},
+            tabToWindow: {default: "", custom: ""},
         },
         editor: {
             general: {
@@ -289,6 +293,7 @@ export abstract class Constants {
                 copyID: {default: "", custom: ""},
                 copyProtocolInMd: {default: "", custom: ""},
                 netImg2LocalAsset: {default: "", custom: ""},
+                netAssets2LocalAssets: {default: "", custom: ""},
                 optimizeTypography: {default: "", custom: ""},
                 hLayout: {default: "", custom: ""},
                 vLayout: {default: "", custom: ""},

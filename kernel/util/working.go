@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/88250/gulu"
@@ -42,17 +43,31 @@ import (
 var Mode = "prod"
 
 const (
-	Ver       = "2.10.16"
+	Ver       = "2.11.2"
 	IsInsider = false
 )
 
 var (
-	bootProgress float64 // 启动进度，从 0 到 100
-	bootDetails  string  // 启动细节描述
-	HttpServing  = false // 是否 HTTP 伺服已经可用
+	RunInContainer             = false // 是否运行在容器中
+	SiyuanAccessAuthCodeBypass = false // 是否跳过空访问授权码检查
+)
+
+func initEnvVars() {
+	RunInContainer = isRunningInDockerContainer()
+	var err error
+	if SiyuanAccessAuthCodeBypass, err = strconv.ParseBool(os.Getenv("SIYUAN_ACCESS_AUTH_CODE_BYPASS")); nil != err {
+		SiyuanAccessAuthCodeBypass = false
+	}
+}
+
+var (
+	bootProgress = atomic.Int32{} // 启动进度，从 0 到 100
+	bootDetails  string           // 启动细节描述
+	HttpServing  = false          // 是否 HTTP 伺服已经可用
 )
 
 func Boot() {
+	initEnvVars()
 	IncBootProgress(3, "Booting kernel...")
 	rand.Seed(time.Now().UTC().UnixNano())
 	initMime()
@@ -79,12 +94,22 @@ func Boot() {
 	ReadOnly, _ = strconv.ParseBool(*readOnly)
 	AccessAuthCode = *accessAuthCode
 	Container = ContainerStd
-	if isRunningInDockerContainer() {
+	if RunInContainer {
 		Container = ContainerDocker
 		if "" == AccessAuthCode {
-			// The access authorization code command line parameter must be set when deploying via Docker https://github.com/siyuan-note/siyuan/issues/9328
-			fmt.Printf("The access authorization code command line parameter (--accessAuthCode) must be set when deploying via Docker.")
-			os.Exit(1)
+			interruptBoot := true
+
+			// Set the env `SIYUAN_ACCESS_AUTH_CODE_BYPASS=true` to skip checking empty access auth code https://github.com/siyuan-note/siyuan/issues/9709
+			if SiyuanAccessAuthCodeBypass {
+				interruptBoot = false
+				fmt.Println("bypass access auth code check since the env [SIYUAN_ACCESS_AUTH_CODE_BYPASS] is set to [true]")
+			}
+
+			if interruptBoot {
+				// The access authorization code command line parameter must be set when deploying via Docker https://github.com/siyuan-note/siyuan/issues/9328
+				fmt.Printf("the access authorization code command line parameter (--accessAuthCode) must be set when deploying via Docker")
+				os.Exit(1)
+			}
 		}
 	}
 	if ContainerStd != Container {
@@ -122,40 +147,48 @@ func Boot() {
 	logBootInfo()
 }
 
+var bootDetailsLock = sync.Mutex{}
+
 func setBootDetails(details string) {
+	bootDetailsLock.Lock()
 	bootDetails = "v" + Ver + " " + details
+	bootDetailsLock.Unlock()
 }
 
 func SetBootDetails(details string) {
-	if 100 <= bootProgress {
+	if 100 <= bootProgress.Load() {
 		return
 	}
 	setBootDetails(details)
 }
 
-func IncBootProgress(progress float64, details string) {
-	if 100 <= bootProgress {
+func IncBootProgress(progress int32, details string) {
+	if 100 <= bootProgress.Load() {
 		return
 	}
-	bootProgress += progress
+	bootProgress.Add(progress)
 	setBootDetails(details)
 }
 
 func IsBooted() bool {
-	return 100 <= bootProgress
+	return 100 <= bootProgress.Load()
 }
 
-func GetBootProgressDetails() (float64, string) {
-	return bootProgress, bootDetails
+func GetBootProgressDetails() (progress int32, details string) {
+	progress = bootProgress.Load()
+	bootDetailsLock.Lock()
+	details = bootDetails
+	bootDetailsLock.Unlock()
+	return
 }
 
-func GetBootProgress() float64 {
-	return bootProgress
+func GetBootProgress() int32 {
+	return bootProgress.Load()
 }
 
 func SetBooted() {
 	setBootDetails("Finishing boot...")
-	bootProgress = 100
+	bootProgress.Store(100)
 	logging.LogInfof("kernel booted")
 }
 

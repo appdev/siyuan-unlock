@@ -91,6 +91,23 @@ id="preview"></div>
     });
     const refreshPreview = (response: IWebSocketData) => {
         previewElement.innerHTML = response.data.content;
+        // https://github.com/siyuan-note/siyuan/issues/9685
+        previewElement.querySelectorAll('[data-type~="mark"], [data-type~="u"], [data-type~="text"], [data-type~="code"], [data-type~="tag"], [data-type~="kbd"]').forEach((markItem: HTMLElement) => {
+            markItem.childNodes.forEach((item) => {
+                let spanHTML = "";
+                Array.from(item.textContent).forEach(str => {
+                    spanHTML += `<span style="${markItem.getAttribute("style")||""};border-radius: 0;padding-left: 0;padding-right: 0;box-shadow: none;border-left:0;border-right:0;border-top:0" data-type="${markItem.getAttribute("data-type")}">${str}</span>`;
+                });
+                const templateElement = document.createElement("template");
+                templateElement.innerHTML = spanHTML;
+                item.after(templateElement.content);
+                item.remove();
+            });
+            if (markItem.childNodes.length > 0) {
+                markItem.setAttribute("style", "");
+                markItem.setAttribute("data-type", markItem.getAttribute("data-type").replace(/mark|u|text|code|tag|kbd/g, ""));
+            }
+        });
         previewElement.setAttribute("data-doc-type", response.data.type || "NodeDocument");
         if (response.data.attrs.memo) {
             previewElement.setAttribute("memo", response.data.attrs.memo);

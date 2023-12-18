@@ -725,7 +725,7 @@ func GetDoc(startID, endID, id string, index int, query string, queryTypes map[s
 			if "1" == n.IALAttr("heading-fold") {
 				// 折叠标题下被引用的块无法悬浮查看
 				// The referenced block under the folded heading cannot be hovered to view https://github.com/siyuan-note/siyuan/issues/9582
-				if 0 != mode && id != n.ID {
+				if (0 != mode && id != n.ID) || isDoc {
 					unlinks = append(unlinks, n)
 					return ast.WalkContinue
 				}
@@ -967,22 +967,9 @@ func writeJSONQueue(tree *parse.Tree) (err error) {
 	return
 }
 
-func writeJSONQueueWithoutChangeTime(tree *parse.Tree) (err error) {
-	if err = filesys.WriteTreeWithoutChangeTime(tree); nil != err {
-		return
-	}
-	sql.UpsertTreeQueue(tree)
-	return
-}
-
 func indexWriteJSONQueue(tree *parse.Tree) (err error) {
 	treenode.IndexBlockTree(tree)
 	return writeJSONQueue(tree)
-}
-
-func indexWriteJSONQueueWithoutChangeTime(tree *parse.Tree) (err error) {
-	treenode.IndexBlockTree(tree)
-	return writeJSONQueueWithoutChangeTime(tree)
 }
 
 func renameWriteJSONQueue(tree *parse.Tree) (err error) {
@@ -1076,6 +1063,20 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 	if nil != existRoot {
 		existed = true
 		p = existRoot.Path
+
+		tree, loadErr := loadTreeByBlockID(existRoot.RootID)
+		if nil != loadErr {
+			logging.LogWarnf("load tree by block id [%s] failed: %v", existRoot.RootID, loadErr)
+			return
+		}
+		p = tree.Path
+		date := time.Now().Format("20060102")
+		if tree.Root.IALAttr("custom-dailynote-"+date) == "" {
+			tree.Root.SetIALAttr("custom-dailynote-"+date, date)
+			if err = indexWriteJSONQueue(tree); nil != err {
+				return
+			}
+		}
 		return
 	}
 
@@ -1119,8 +1120,20 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 	}
 	IncSync()
 
-	b := treenode.GetBlockTree(id)
-	p = b.Path
+	WaitForWritingFiles()
+
+	tree, err := loadTreeByBlockID(id)
+	if nil != err {
+		logging.LogErrorf("load tree by block id [%s] failed: %v", id, err)
+		return
+	}
+	p = tree.Path
+	date := time.Now().Format("20060102")
+	tree.Root.SetIALAttr("custom-dailynote-"+date, date)
+	if err = indexWriteJSONQueue(tree); nil != err {
+		return
+	}
+
 	return
 }
 
@@ -1409,6 +1422,16 @@ func removeDoc(box *Box, p string, luteEngine *lute.Lute) {
 		return
 	}
 
+	// 关联的属性视图也要复制到历史中 https://github.com/siyuan-note/siyuan/issues/9567
+	avNodes := tree.Root.ChildrenByType(ast.NodeAttributeView)
+	for _, avNode := range avNodes {
+		srcAvPath := filepath.Join(util.DataDir, "storage", "av", avNode.AttributeViewID+".json")
+		destAvPath := filepath.Join(historyDir, "storage", "av", avNode.AttributeViewID+".json")
+		if copyErr := filelock.Copy(srcAvPath, destAvPath); nil != copyErr {
+			logging.LogErrorf("copy av [%s] failed: %s", srcAvPath, copyErr)
+		}
+	}
+
 	copyDocAssetsToDataAssets(box.ID, p)
 
 	removeIDs := treenode.RootChildIDs(tree.ID)
@@ -1581,6 +1604,38 @@ func createDoc(boxID, p, title, dom string) (tree *parse.Tree, err error) {
 	tree.Root.KramdownIAL = [][]string{{"id", id}, {"title", html.EscapeAttrVal(title)}, {"updated", updated}}
 	if nil == tree.Root.FirstChild {
 		tree.Root.AppendChild(treenode.NewParagraph())
+	}
+
+	// 如果段落块中仅包含一个 mp3/mp4 超链接，则将其转换为音视频块
+	// Convert mp3 and mp4 hyperlinks to audio and video when moving cloud inbox to docs https://github.com/siyuan-note/siyuan/issues/9778
+	var unlinks []*ast.Node
+	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering {
+			return ast.WalkContinue
+		}
+
+		if ast.NodeParagraph == n.Type {
+			link := n.FirstChild
+			if nil != link && link.IsTextMarkType("a") {
+				if strings.HasSuffix(link.TextMarkAHref, ".mp3") {
+					unlinks = append(unlinks, n)
+					audio := &ast.Node{ID: n.ID, Type: ast.NodeAudio, Tokens: []byte("<audio controls=\"controls\" src=\"" + link.TextMarkAHref + "\" data-src=\"" + link.TextMarkAHref + "\"></audio>")}
+					audio.SetIALAttr("id", n.ID)
+					audio.SetIALAttr("updated", util.TimeFromID(n.ID))
+					n.InsertBefore(audio)
+				} else if strings.HasSuffix(link.TextMarkAHref, ".mp4") {
+					unlinks = append(unlinks, n)
+					video := &ast.Node{ID: n.ID, Type: ast.NodeVideo, Tokens: []byte("<video controls=\"controls\" src=\"" + link.TextMarkAHref + "\" data-src=\"" + link.TextMarkAHref + "\"></video>")}
+					video.SetIALAttr("id", n.ID)
+					video.SetIALAttr("updated", util.TimeFromID(n.ID))
+					n.InsertBefore(video)
+				}
+			}
+		}
+		return ast.WalkContinue
+	})
+	for _, unlink := range unlinks {
+		unlink.Unlink()
 	}
 
 	transaction := &Transaction{DoOperations: []*Operation{{Action: "create", Data: tree}}}

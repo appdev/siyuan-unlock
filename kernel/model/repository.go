@@ -439,6 +439,7 @@ func ImportRepoKey(base64Key string) (err error) {
 }
 
 func ResetRepo() (err error) {
+	logging.LogInfof("resetting data repo...")
 	msgId := util.PushMsg(Conf.Language(144), 1000*60)
 
 	repo, err := newRepository()
@@ -447,8 +448,10 @@ func ResetRepo() (err error) {
 	}
 
 	if err = repo.Reset(); nil != err {
+		logging.LogErrorf("reset data repo failed: %s", err)
 		return
 	}
+	logging.LogInfof("reset data repo completed")
 
 	Conf.Repo.Key = nil
 	Conf.Sync.Enabled = false
@@ -989,9 +992,10 @@ func syncRepoDownload() (err error) {
 		logging.LogErrorf("sync data repo download failed: %s", err)
 		msg := fmt.Sprintf(Conf.Language(80), formatRepoErrorMsg(err))
 		if errors.Is(err, dejavu.ErrCloudStorageSizeExceeded) {
-			msg = fmt.Sprintf(Conf.Language(43), humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize)))
-			if 2 == Conf.User.UserSiYuanSubscriptionPlan {
-				msg = fmt.Sprintf(Conf.Language(68), humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize)))
+			u := Conf.GetUser()
+			msg = fmt.Sprintf(Conf.Language(43), humanize.Bytes(uint64(u.UserSiYuanRepoSize)))
+			if 2 == u.UserSiYuanSubscriptionPlan {
+				msg = fmt.Sprintf(Conf.Language(68), humanize.Bytes(uint64(u.UserSiYuanRepoSize)))
 			}
 		}
 		Conf.Sync.Stat = msg
@@ -1058,9 +1062,10 @@ func syncRepoUpload() (err error) {
 		logging.LogErrorf("sync data repo upload failed: %s", err)
 		msg := fmt.Sprintf(Conf.Language(80), formatRepoErrorMsg(err))
 		if errors.Is(err, dejavu.ErrCloudStorageSizeExceeded) {
-			msg = fmt.Sprintf(Conf.Language(43), humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize)))
-			if 2 == Conf.User.UserSiYuanSubscriptionPlan {
-				msg = fmt.Sprintf(Conf.Language(68), humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize)))
+			u := Conf.GetUser()
+			msg = fmt.Sprintf(Conf.Language(43), humanize.Bytes(uint64(u.UserSiYuanRepoSize)))
+			if 2 == u.UserSiYuanSubscriptionPlan {
+				msg = fmt.Sprintf(Conf.Language(68), humanize.Bytes(uint64(u.UserSiYuanRepoSize)))
 			}
 		}
 		Conf.Sync.Stat = msg
@@ -1146,9 +1151,10 @@ func bootSyncRepo() (err error) {
 		logging.LogErrorf("sync data repo failed: %s", err)
 		msg := fmt.Sprintf(Conf.Language(80), formatRepoErrorMsg(err))
 		if errors.Is(err, dejavu.ErrCloudStorageSizeExceeded) {
-			msg = fmt.Sprintf(Conf.Language(43), humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize)))
-			if 2 == Conf.User.UserSiYuanSubscriptionPlan {
-				msg = fmt.Sprintf(Conf.Language(68), humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize)))
+			u := Conf.GetUser()
+			msg = fmt.Sprintf(Conf.Language(43), humanize.Bytes(uint64(u.UserSiYuanRepoSize)))
+			if 2 == u.UserSiYuanSubscriptionPlan {
+				msg = fmt.Sprintf(Conf.Language(68), humanize.Bytes(uint64(u.UserSiYuanRepoSize)))
 			}
 		}
 		Conf.Sync.Stat = msg
@@ -1220,9 +1226,10 @@ func syncRepo(exit, byHand bool) (dataChanged bool, err error) {
 		logging.LogErrorf("sync data repo failed: %s", err)
 		msg := fmt.Sprintf(Conf.Language(80), formatRepoErrorMsg(err))
 		if errors.Is(err, dejavu.ErrCloudStorageSizeExceeded) {
-			msg = fmt.Sprintf(Conf.Language(43), humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize)))
-			if 2 == Conf.User.UserSiYuanSubscriptionPlan {
-				msg = fmt.Sprintf(Conf.Language(68), humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize)))
+			u := Conf.GetUser()
+			msg = fmt.Sprintf(Conf.Language(43), humanize.Bytes(uint64(u.UserSiYuanRepoSize)))
+			if 2 == u.UserSiYuanSubscriptionPlan {
+				msg = fmt.Sprintf(Conf.Language(68), humanize.Bytes(uint64(u.UserSiYuanRepoSize)))
 			}
 		}
 		Conf.Sync.Stat = msg
@@ -1237,7 +1244,7 @@ func syncRepo(exit, byHand bool) (dataChanged bool, err error) {
 		return
 	}
 
-	dataChanged = nil == beforeIndex || beforeIndex.ID != afterIndex.ID
+	dataChanged = nil == beforeIndex || beforeIndex.ID != afterIndex.ID || mergeResult.DataChanged()
 
 	util.PushStatusBar(fmt.Sprintf(Conf.Language(149), elapsed.Seconds()))
 	Conf.Sync.Synced = util.CurrentTimeMillis()
@@ -1294,12 +1301,12 @@ func processSyncMergeResult(exit, byHand bool, mergeResult *dejavu.MergeResult, 
 	}
 
 	if 1 > len(mergeResult.Upserts) && 1 > len(mergeResult.Removes) && 1 > len(mergeResult.Conflicts) { // 没有数据变更
-		syncSameCount++
-		if 10 < syncSameCount {
-			syncSameCount = 5
+		syncSameCount.Add(1)
+		if 10 < syncSameCount.Load() {
+			syncSameCount.Store(5)
 		}
 		if !byHand {
-			delay := time.Minute * time.Duration(int(math.Pow(2, float64(syncSameCount))))
+			delay := time.Minute * time.Duration(int(math.Pow(2, float64(syncSameCount.Load()))))
 			if fixSyncInterval.Minutes() > delay.Minutes() {
 				delay = time.Minute * 8
 			}
@@ -1491,6 +1498,12 @@ func indexRepoBeforeCloudSync(repo *dejavu.Repo) (beforeIndex, afterIndex *entit
 			go func() {
 				util.WaitForUILoaded()
 				time.Sleep(3 * time.Second)
+
+				if indexCount, _ := repo.CountIndexes(); 128 > indexCount {
+					// 快照数量较少时不推送提示
+					return
+				}
+
 				util.PushMsg(Conf.language(218), 24000)
 				promotedPurgeDataRepo = true
 			}()
@@ -1592,7 +1605,7 @@ func subscribeRepoEvents() {
 	})
 	eventbus.Subscribe(eventbus.EvtIndexUpsertFile, func(context map[string]interface{}, count int, total int) {
 		msg := fmt.Sprintf(Conf.Language(160), count, total)
-		if 0 == count%64 {
+		if 0 == count%32 {
 			util.SetBootDetails(msg)
 			util.ContextPushMsg(context, msg)
 		}
@@ -1606,24 +1619,24 @@ func subscribeRepoEvents() {
 	coWalkDataCount := 0
 	eventbus.Subscribe(eventbus.EvtCheckoutWalkData, func(context map[string]interface{}, path string) {
 		msg := fmt.Sprintf(Conf.Language(161), filepath.Base(path))
-		if 0 == coWalkDataCount%1024 {
+		if 0 == coWalkDataCount%512 {
 			util.SetBootDetails(msg)
 			util.ContextPushMsg(context, msg)
 		}
 		coWalkDataCount++
 	})
-	var bootProgressPart float64
+	var bootProgressPart int32
 	eventbus.Subscribe(eventbus.EvtCheckoutUpsertFiles, func(context map[string]interface{}, total int) {
 		msg := fmt.Sprintf(Conf.Language(162), 0, total)
 		util.SetBootDetails(msg)
-		bootProgressPart = 10 / float64(total)
+		bootProgressPart = int32(10 / float64(total))
 		util.ContextPushMsg(context, msg)
 	})
 	coUpsertFileCount := 0
 	eventbus.Subscribe(eventbus.EvtCheckoutUpsertFile, func(context map[string]interface{}, count, total int) {
 		msg := fmt.Sprintf(Conf.Language(162), count, total)
 		util.IncBootProgress(bootProgressPart, msg)
-		if 0 == coUpsertFileCount%64 {
+		if 0 == coUpsertFileCount%32 {
 			util.ContextPushMsg(context, msg)
 		}
 		coUpsertFileCount++
@@ -1631,7 +1644,7 @@ func subscribeRepoEvents() {
 	eventbus.Subscribe(eventbus.EvtCheckoutRemoveFiles, func(context map[string]interface{}, total int) {
 		msg := fmt.Sprintf(Conf.Language(163), 0, total)
 		util.SetBootDetails(msg)
-		bootProgressPart = 10 / float64(total)
+		bootProgressPart = int32(10 / float64(total))
 		util.ContextPushMsg(context, msg)
 	})
 
@@ -1652,7 +1665,7 @@ func subscribeRepoEvents() {
 	eventbus.Subscribe(eventbus.EvtCloudBeforeDownloadFiles, func(context map[string]interface{}, total int) {
 		msg := fmt.Sprintf(Conf.Language(165), 0, total)
 		util.SetBootDetails(msg)
-		bootProgressPart = 10 / float64(total)
+		bootProgressPart = int32(10 / float64(total))
 		util.ContextPushMsg(context, msg)
 	})
 
@@ -1666,7 +1679,7 @@ func subscribeRepoEvents() {
 	eventbus.Subscribe(eventbus.EvtCloudBeforeDownloadChunks, func(context map[string]interface{}, total int) {
 		msg := fmt.Sprintf(Conf.Language(166), 0, total)
 		util.SetBootDetails(msg)
-		bootProgressPart = 10 / float64(total)
+		bootProgressPart = int32(10 / float64(total))
 		util.ContextPushMsg(context, msg)
 	})
 	eventbus.Subscribe(eventbus.EvtCloudBeforeDownloadChunk, func(context map[string]interface{}, count, total int) {
@@ -1745,6 +1758,9 @@ func subscribeRepoEvents() {
 		util.SetBootDetails(msg)
 		util.ContextPushMsg(context, msg)
 	})
+	eventbus.Subscribe(eventbus.EvtCloudCorrupted, func() {
+		util.PushErrMsg(Conf.language(220), 30000)
+	})
 }
 
 func buildCloudConf() (ret *cloud.Conf, err error) {
@@ -1756,9 +1772,10 @@ func buildCloudConf() (ret *cloud.Conf, err error) {
 
 	userId, token, availableSize := "0", "", int64(1024*1024*1024*1024*2)
 	if nil != Conf.User && conf.ProviderSiYuan == Conf.Sync.Provider {
-		userId = Conf.User.UserId
-		token = Conf.User.UserToken
-		availableSize = Conf.User.GetCloudRepoAvailableSize()
+		u := Conf.GetUser()
+		userId = u.UserId
+		token = u.UserToken
+		availableSize = u.GetCloudRepoAvailableSize()
 	}
 
 	ret = &cloud.Conf{
@@ -1851,12 +1868,13 @@ func GetCloudSpace() (s *Sync, b *Backup, hSize, hAssetSize, hTotalSize, hExchan
 		b.HSize = humanize.Bytes(uint64(backupSize))
 		hAssetSize = humanize.Bytes(uint64(assetSize))
 		hSize = humanize.Bytes(uint64(totalSize))
-		hTotalSize = humanize.Bytes(uint64(Conf.User.UserSiYuanRepoSize))
-		hExchangeSize = humanize.Bytes(uint64(Conf.User.UserSiYuanPointExchangeRepoSize))
-		hTrafficUploadSize = humanize.Bytes(uint64(Conf.User.UserTrafficUpload))
-		hTrafficDownloadSize = humanize.Bytes(uint64(Conf.User.UserTrafficDownload))
-		hTrafficAPIGet = humanize.SIWithDigits(Conf.User.UserTrafficAPIGet, 2, "")
-		hTrafficAPIPut = humanize.SIWithDigits(Conf.User.UserTrafficAPIPut, 2, "")
+		u := Conf.GetUser()
+		hTotalSize = humanize.Bytes(uint64(u.UserSiYuanRepoSize))
+		hExchangeSize = humanize.Bytes(uint64(u.UserSiYuanPointExchangeRepoSize))
+		hTrafficUploadSize = humanize.Bytes(uint64(u.UserTrafficUpload))
+		hTrafficDownloadSize = humanize.Bytes(uint64(u.UserTrafficDownload))
+		hTrafficAPIGet = humanize.SIWithDigits(u.UserTrafficAPIGet, 2, "")
+		hTrafficAPIPut = humanize.SIWithDigits(u.UserTrafficAPIPut, 2, "")
 	}
 	return
 }

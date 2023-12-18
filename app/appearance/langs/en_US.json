@@ -1,4 +1,10 @@
 {
+  "selected": "Selected",
+  "loadMore": "Load more",
+  "tempUnlock": "Temporarily unlock",
+  "cancelTempUnlock": "Cancel temporary unlock",
+  "addFilter": "Add filter",
+  "removeFilters": "Clear filter",
   "checked": "Checked",
   "unchecked": "Unchecked",
   "percentChecked": "Percent checked",
@@ -446,6 +452,7 @@
   "searchBackmention": "Backlink mentions (backlink mentions search keywords are obtained from)",
   "searchVirtualRef": "Virtual reference (virtual reference search keywords are obtained from)",
   "netImg2LocalAsset": "Convert network images to local images",
+  "netAssets2LocalAssets": "Convert network assets to local",
   "releaseDate": "Release Date",
   "pkgSize": "Package size",
   "installSize": "Install Size",
@@ -471,7 +478,7 @@
   "bootSyncFailed": "Failed to synchronize data at startup",
   "use": "Use",
   "uninstallTip": "Currently in use, please switch it in [Settings - Appearance] before uninstalling",
-  "safeQuit": "Quit the application",
+  "safeQuit": "Exit the application",
   "anchor": "Anchor",
   "showMore": "Show More",
   "refPopover": "Open in popover",
@@ -1108,8 +1115,12 @@
     "cancelWindowTop": "Cancel Window top",
     "officialWebsite": "Visit official website",
     "openSource": "Visit project on GitHub",
-    "resetWindow": "Reset window and quit the program",
+    "resetWindow": "Reset window and exit",
     "quit": "Quit application"
+  },
+  "_attrView": {
+    "table": "Table",
+    "key": "Primary Key"
   },
   "_kernel": {
     "0": "Query notebook failed",
@@ -1170,7 +1181,7 @@
     "55": "Indexed references of [%d] documents",
     "56": "Reindexing, please wait until rebuilding is complete before trying to open",
     "57": "Failed to create temp key",
-    "58": "Verifying index...",
+    "58": "[%d/%d] Verifying index...",
     "59": "Failed to set sync ignore list",
     "60": "Failed to get the update package: %s",
     "61": "⬆️ The new version installation package is ready, do you want to install the new version now?",
@@ -1231,9 +1242,9 @@
     "116": "Processing, please wait...",
     "117": "[%s] is not a valid Pandoc executable",
     "118": "The current settings do not allow the creation of sub-documents under a document 7 levels deep",
-    "119": "Downloading web image [%s]",
+    "119": "Downloading network file [%s]",
     "120": "Download complete, [%d] files total",
-    "121": "There is no network image in this document",
+    "121": "There is no network file in this document",
     "122": "This function needs to be configured on the SiYuan desktop. If you have already configured it, please refresh it in the top account settings",
     "123": "The synchronization function can only be activated after adding/selecting the cloud synchronization directory",
     "124": "Please enable cloud sync in [Settings - Enable Cloud Sync]",
@@ -1331,6 +1342,7 @@
     "216": "Rebuilding asset content data index, please wait...",
     "217": "[%d/%d] Created asset content data index",
     "218": "Too many snapshots of the data repo have been detected, which slows down program startup and data sync. Please consider executing [Settings - About - Data repo purge]",
-    "219": "The cloud storage service is unavailable, please try again later"
+    "219": "The cloud storage service is unavailable, please try again later",
+    "220": "Due to a defect in the previous version, the cloud data is corrupted. Please refer to the User Guide-FAQ-Lost Key steps to reset the local data repo and cloud directory"
   }
 }

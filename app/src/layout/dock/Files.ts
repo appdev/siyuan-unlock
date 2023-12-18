@@ -192,7 +192,7 @@ export class Files extends Model {
                     break;
                 } else if (type === "focus") {
                     const element = document.querySelector(".layout__wnd--active > .fn__flex > .layout-tab-bar > .item--focus") ||
-                        document.querySelector(".layout-tab-bar > .item--focus");
+                        document.querySelector("ul.layout-tab-bar > .item--focus");
                     if (element) {
                         const tab = getInstanceById(element.getAttribute("data-id")) as Tab;
                         if (tab && tab.model instanceof Editor) {
@@ -420,6 +420,13 @@ export class Files extends Model {
         this.element.addEventListener("dragover", (event: DragEvent & { target: HTMLElement }) => {
             if (window.siyuan.config.readonly) {
                 return;
+            }
+            const contentRect = this.element.getBoundingClientRect();
+            if (event.clientY < contentRect.top + Constants.SIZE_SCROLL_TB || event.clientY > contentRect.bottom - Constants.SIZE_SCROLL_TB) {
+                this.element.scroll({
+                    top: this.element.scrollTop + (event.clientY < contentRect.top + Constants.SIZE_SCROLL_TB ? -Constants.SIZE_SCROLL_STEP : Constants.SIZE_SCROLL_STEP),
+                    behavior: "smooth"
+                });
             }
             let liElement = hasClosestByTag(event.target, "LI");
             if (!liElement) {

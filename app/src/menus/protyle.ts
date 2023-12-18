@@ -45,7 +45,7 @@ import {pushBack} from "../mobile/util/MobileBackFoward";
 import {copyPNG, exportAsset} from "./util";
 import {removeInlineType} from "../protyle/toolbar/util";
 import {alignImgCenter, alignImgLeft} from "../protyle/wysiwyg/commonHotkey";
-import {renameTag} from "../util/noRelyPCFunction";
+import {checkFold, renameTag} from "../util/noRelyPCFunction";
 import {hideElements} from "../protyle/ui/hideElements";
 import {emitOpenMenu} from "../plugin/EventBus";
 import {openMobileFileById} from "../mobile/editor";
@@ -207,6 +207,7 @@ export const fileAnnotationRefMenu = (protyle: IProtyle, refElement: HTMLElement
 <div class="b3-menu__label">${window.siyuan.languages.anchor}</div>
 <textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field"></textarea>`,
         bind(menuItemElement) {
+            menuItemElement.style.maxWidth = "none";
             anchorElement = menuItemElement.querySelectorAll(".b3-text-field")[1] as HTMLInputElement;
             anchorElement.value = refElement.textContent;
             const inputEvent = () => {
@@ -350,12 +351,12 @@ export const refMenu = (protyle: IProtyle, element: HTMLElement) => {
         icon: "iconOpen",
         accelerator: window.siyuan.config.keymap.editor.general.openBy.custom + "/Click",
         click() {
-            fetchPost("/api/block/checkBlockFold", {id: refBlockId}, (foldResponse) => {
+            checkFold(refBlockId, (zoomIn, action) => {
                 openFileById({
                     app: protyle.app,
                     id: refBlockId,
-                    action: foldResponse.data ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ALL] : [Constants.CB_GET_FOCUS, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL],
-                    zoomIn: foldResponse.data
+                    action,
+                    zoomIn
                 });
             });
         }
@@ -365,13 +366,13 @@ export const refMenu = (protyle: IProtyle, element: HTMLElement) => {
         icon: "iconEyeoff",
         accelerator: window.siyuan.config.keymap.editor.general.refTab.custom + "/⌘Click",
         click() {
-            fetchPost("/api/block/checkBlockFold", {id: refBlockId}, (foldResponse) => {
+            checkFold(refBlockId, (zoomIn) => {
                 openFileById({
                     app: protyle.app,
                     id: refBlockId,
-                    action: foldResponse.data ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ALL] : [Constants.CB_GET_HL, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL],
+                    action: zoomIn ? [Constants.CB_GET_HL, Constants.CB_GET_ALL] : [Constants.CB_GET_HL, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL],
                     keepCursor: true,
-                    zoomIn: foldResponse.data
+                    zoomIn
                 });
             });
         }
@@ -381,13 +382,13 @@ export const refMenu = (protyle: IProtyle, element: HTMLElement) => {
         icon: "iconLayoutRight",
         accelerator: window.siyuan.config.keymap.editor.general.insertRight.custom + "/⌥Click",
         click() {
-            fetchPost("/api/block/checkBlockFold", {id: refBlockId}, (foldResponse) => {
+            checkFold(refBlockId, (zoomIn, action) => {
                 openFileById({
                     app: protyle.app,
                     id: refBlockId,
                     position: "right",
-                    action: foldResponse.data ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ALL] : [Constants.CB_GET_FOCUS, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL],
-                    zoomIn: foldResponse.data
+                    action,
+                    zoomIn
                 });
             });
         }
@@ -397,13 +398,13 @@ export const refMenu = (protyle: IProtyle, element: HTMLElement) => {
         icon: "iconLayoutBottom",
         accelerator: window.siyuan.config.keymap.editor.general.insertBottom.custom + (window.siyuan.config.keymap.editor.general.insertBottom.custom ? "/" : "") + "⇧Click",
         click() {
-            fetchPost("/api/block/checkBlockFold", {id: refBlockId}, (foldResponse) => {
+            checkFold(refBlockId, (zoomIn, action) => {
                 openFileById({
                     app: protyle.app,
                     id: refBlockId,
                     position: "bottom",
-                    action: foldResponse.data ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ALL] : [Constants.CB_GET_FOCUS, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL],
-                    zoomIn: foldResponse.data
+                    action,
+                    zoomIn
                 });
             });
         }
@@ -622,11 +623,7 @@ export const contentMenu = (protyle: IProtyle, nodeElement: Element) => {
             accelerator: window.siyuan.config.keymap.editor.general.copyPlainText.custom,
             click() {
                 focusByRange(getEditorRange(nodeElement));
-                const cloneContents = getSelection().getRangeAt(0).cloneContents();
-                cloneContents.querySelectorAll('[data-type="backslash"]').forEach(item => {
-                    item.firstElementChild.remove();
-                });
-                copyPlainText(cloneContents.textContent);
+                copyPlainText(getSelection().getRangeAt(0).toString());
             }
         }).element);
         if (protyle.disabled) {
@@ -880,6 +877,7 @@ export const imgMenu = (protyle: IProtyle, range: Range, assetElement: HTMLEleme
 <div class="b3-menu__label">${window.siyuan.languages.tooltipText}</div>
 <textarea style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" rows="1" class="b3-text-field"></textarea>`,
             bind(element) {
+                element.style.maxWidth = "none";
                 const textElements = element.querySelectorAll("textarea");
                 textElements[0].addEventListener("input", (event: InputEvent) => {
                     if (event.isComposing) {
@@ -968,6 +966,7 @@ export const imgMenu = (protyle: IProtyle, range: Range, assetElement: HTMLEleme
                 type: "readonly",
                 label: `<textarea data-type="ocr" style="margin: 4px 0" rows="1" class="b3-text-field fn__size200" placeholder="${window.siyuan.languages.ocrResult}"></textarea>`,
                 bind(element) {
+                    element.style.maxWidth = "none";
                     fetchPost("/api/asset/getImageOCRText", {
                         path: imgElement.getAttribute("src"),
                         force: false
@@ -1103,6 +1102,7 @@ export const linkMenu = (protyle: IProtyle, linkElement: HTMLElement, focusText 
 <div class="b3-menu__label">${window.siyuan.languages.title}</div>
 <textarea style="width: ${isMobile() ? "200" : "360"}px;margin: 4px 0;" rows="1" class="b3-text-field"></textarea>`,
         bind(element) {
+            element.style.maxWidth = "none";
             const inputElements = element.querySelectorAll("textarea");
             inputElements[0].value = Lute.UnEscapeHTMLStr(linkAddress) || "";
             inputElements[0].addEventListener("keydown", (event) => {
@@ -1419,6 +1419,7 @@ export const iframeMenu = (protyle: IProtyle, nodeElement: Element) => {
         type: "readonly",
         label: `<textarea rows="1" class="b3-text-field fn__size200" placeholder="${window.siyuan.languages.link}" style="margin: 4px 0">${iframeElement.getAttribute("src") || ""}</textarea>`,
         bind(element) {
+            element.style.maxWidth = "none";
             element.querySelector("textarea").addEventListener("change", (event) => {
                 const value = (event.target as HTMLTextAreaElement).value.replace(/\n|\r\n|\r|\u2028|\u2029/g, "");
                 const biliMatch = value.match(/(?:www\.|\/\/)bilibili\.com\/video\/(\w+)/);
@@ -1484,6 +1485,7 @@ export const videoMenu = (protyle: IProtyle, nodeElement: Element, type: string)
         type: "readonly",
         label: `<textarea rows="1" style="margin: 4px 0" class="b3-text-field" placeholder="${window.siyuan.languages.link}">${videoElement.getAttribute("src")}</textarea>`,
         bind(element) {
+            element.style.maxWidth = "none";
             element.querySelector("textarea").addEventListener("change", (event) => {
                 videoElement.setAttribute("src", (event.target as HTMLTextAreaElement).value.replace(/\n|\r\n|\r|\u2028|\u2029/g, ""));
                 updateTransaction(protyle, id, nodeElement.outerHTML, html);
@@ -1585,7 +1587,7 @@ export const tableMenu = (protyle: IProtyle, nodeElement: Element, cellElement: 
     }
     const isPinHead = nodeElement.getAttribute("custom-pinthead");
     menus.push({
-        icon: "iconPin",
+        icon: isPinHead ? "iconUnpin" : "iconPin",
         label: isPinHead ? window.siyuan.languages.unpinTableHead : window.siyuan.languages.pinTableHead,
         click: () => {
             const html = nodeElement.outerHTML;

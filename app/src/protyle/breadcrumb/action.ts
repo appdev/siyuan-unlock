@@ -9,13 +9,13 @@ import {hasClosestByClassName} from "../util/hasClosest";
 import {reloadProtyle} from "../util/reload";
 import {resize} from "../util/resize";
 
-export const netImg2LocalAssets = (protyle: IProtyle) => {
+export const net2LocalAssets = (protyle: IProtyle, type: "Assets" | "Img") => {
     if (protyle.element.querySelector(".wysiwygLoading")) {
         return;
     }
     addLoading(protyle);
     hideElements(["toolbar"], protyle);
-    fetchPost("/api/format/netImg2LocalAssets", {
+    fetchPost(`/api/format/net${type}2LocalAssets`, {
         id: protyle.block.rootID
     }, () => {
         /// #if MOBILE

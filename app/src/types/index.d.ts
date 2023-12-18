@@ -42,9 +42,16 @@ type TOperation =
     | "setAttrViewColCalc"
     | "updateAttrViewColNumberFormat"
     | "replaceAttrViewBlock"
+    | "addAttrViewView"
+    | "setAttrViewViewName"
+    | "removeAttrViewView"
+    | "setAttrViewViewIcon"
+    | "duplicateAttrViewView"
+    | "sortAttrViewView"
+    | "setAttrViewPageSize"
 type TBazaarType = "templates" | "icons" | "widgets" | "themes" | "plugins"
 type TCardType = "doc" | "notebook" | "all"
-type TEventBus = "ws-main" |
+type TEventBus = "ws-main" | "sync-start" | "sync-end" | "sync-fail" |
     "click-blockicon" | "click-editorcontent" | "click-pdf" | "click-editortitleicon" |
     "open-noneditableblock" |
     "open-menu-blockref" | "open-menu-fileannotationref" | "open-menu-tag" | "open-menu-link" | "open-menu-image" |
@@ -54,7 +61,8 @@ type TEventBus = "ws-main" |
     "input-search" |
     "loaded-protyle" | "loaded-protyle-dynamic" | "loaded-protyle-static" |
     "switch-protyle" |
-    "destroy-protyle"
+    "destroy-protyle" |
+    "mobile-keyboard-show" | "mobile-keyboard-hide"
 type TAVCol =
     "text"
     | "date"
@@ -94,7 +102,9 @@ declare module "blueimp-md5"
 
 interface Window {
     echarts: {
-        init(element: HTMLElement, theme?: string, options?: { width: number }): {
+        init(element: HTMLElement, theme?: string, options?: {
+            width: number
+        }): {
             setOption(option: any): void;
             getZr(): any;
             on(name: string, event: (e: any) => void): any;
@@ -102,15 +112,26 @@ interface Window {
             resize(): void;
         };
         dispose(element: Element): void;
-        getInstanceById(id: string): { resize: () => void };
+        getInstanceById(id: string): {
+            resize: () => void
+        };
     }
     ABCJS: {
-        renderAbc(element: Element, text: string, options: { responsive: string }): void;
+        renderAbc(element: Element, text: string, options: {
+            responsive: string
+        }): void;
     }
     hljs: {
         listLanguages(): string[];
-        highlight(text: string, options: { language?: string, ignoreIllegals: boolean }): { value: string };
-        getLanguage(text: string): { name: string };
+        highlight(text: string, options: {
+            language?: string,
+            ignoreIllegals: boolean
+        }): {
+            value: string
+        };
+        getLanguage(text: string): {
+            name: string
+        };
     };
     katex: {
         renderToString(math: string, option: {
@@ -262,6 +283,7 @@ interface ISnippet {
 interface IInbox {
     oId: string
     shorthandContent: string
+    shorthandMd: string
     shorthandDesc: string
     shorthandFrom: number
     shorthandTitle: string
@@ -1009,16 +1031,16 @@ interface IAVView {
     name: string
     id: string
     type: string
+    icon: string
 }
 
-interface IAVTable {
+interface IAVTable extends IAVView {
     columns: IAVColumn[],
     filters: IAVFilter[],
     sorts: IAVSort[],
-    name: string,
-    type: "table"
     rows: IAVRow[],
-    id: string
+    rowCount: number,
+    pageSize: number,
 }
 
 interface IAVFilter {

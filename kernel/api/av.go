@@ -26,7 +26,7 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-func renderAttributeView(c *gin.Context) {
+func renderSnapshotAttributeView(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
 
@@ -35,8 +35,9 @@ func renderAttributeView(c *gin.Context) {
 		return
 	}
 
+	index := arg["snapshot"].(string)
 	id := arg["id"].(string)
-	view, attrView, err := model.RenderAttributeView(id)
+	view, attrView, err := model.RenderRepoSnapshotAttributeView(index, id)
 	if nil != err {
 		ret.Code = -1
 		ret.Msg = err.Error()
@@ -47,6 +48,105 @@ func renderAttributeView(c *gin.Context) {
 	for _, v := range attrView.Views {
 		view := map[string]interface{}{
 			"id":   v.ID,
+			"icon": v.Icon,
+			"name": v.Name,
+			"type": v.LayoutType,
+		}
+
+		views = append(views, view)
+	}
+
+	ret.Data = map[string]interface{}{
+		"name":     attrView.Name,
+		"id":       attrView.ID,
+		"viewType": view.GetType(),
+		"viewID":   view.GetID(),
+		"views":    views,
+		"view":     view,
+		"isMirror": av.IsMirror(attrView.ID),
+	}
+}
+
+func renderHistoryAttributeView(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	id := arg["id"].(string)
+	created := arg["created"].(string)
+	view, attrView, err := model.RenderHistoryAttributeView(id, created)
+	if nil != err {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		return
+	}
+
+	var views []map[string]interface{}
+	for _, v := range attrView.Views {
+		view := map[string]interface{}{
+			"id":   v.ID,
+			"icon": v.Icon,
+			"name": v.Name,
+			"type": v.LayoutType,
+		}
+
+		views = append(views, view)
+	}
+
+	ret.Data = map[string]interface{}{
+		"name":     attrView.Name,
+		"id":       attrView.ID,
+		"viewType": view.GetType(),
+		"viewID":   view.GetID(),
+		"views":    views,
+		"view":     view,
+		"isMirror": av.IsMirror(attrView.ID),
+	}
+}
+
+func renderAttributeView(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	id := arg["id"].(string)
+	viewIDArg := arg["viewID"]
+	var viewID string
+	if nil != viewIDArg {
+		viewID = viewIDArg.(string)
+	}
+	page := 1
+	pageArg := arg["page"]
+	if nil != pageArg {
+		page = int(pageArg.(float64))
+	}
+
+	pageSize := -1
+	pageSizeArg := arg["pageSize"]
+	if nil != pageSizeArg {
+		pageSize = int(pageSizeArg.(float64))
+	}
+
+	view, attrView, err := model.RenderAttributeView(id, viewID, page, pageSize)
+	if nil != err {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		return
+	}
+
+	var views []map[string]interface{}
+	for _, v := range attrView.Views {
+		view := map[string]interface{}{
+			"id":   v.ID,
+			"icon": v.Icon,
 			"name": v.Name,
 			"type": v.LayoutType,
 		}

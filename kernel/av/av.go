@@ -23,6 +23,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -59,12 +60,12 @@ func ShallowCloneAttributeView(av *AttributeView) (ret *AttributeView) {
 	}
 
 	ret.ID = ast.NewNodeID()
-	view, err := ret.GetView()
+	view, err := ret.GetCurrentView()
 	if nil == err {
 		view.ID = ast.NewNodeID()
 		ret.ViewID = view.ID
 	} else {
-		view = NewView()
+		view, _ = NewTableViewWithBlockKey(ast.NewNodeID())
 		ret.ViewID = view.ID
 		ret.Views = append(ret.Views, view)
 	}
@@ -546,6 +547,7 @@ type ValueCheckbox struct {
 // View 描述了视图的结构。
 type View struct {
 	ID   string `json:"id"`   // 视图 ID
+	Icon string `json:"icon"` // 视图图标
 	Name string `json:"name"` // 视图名称
 
 	LayoutType LayoutType   `json:"type"`            // 当前布局类型
@@ -559,19 +561,39 @@ const (
 	LayoutTypeTable LayoutType = "table" // 属性视图类型 - 表格
 )
 
-func NewView() *View {
-	name := "Table"
-	return &View{
+func NewTableView() (ret *View) {
+	ret = &View{
+		ID:         ast.NewNodeID(),
+		Name:       getI18nName("table"),
+		LayoutType: LayoutTypeTable,
+		Table: &LayoutTable{
+			Spec:     0,
+			ID:       ast.NewNodeID(),
+			Filters:  []*ViewFilter{},
+			Sorts:    []*ViewSort{},
+			PageSize: 50,
+		},
+	}
+	return
+}
+
+func NewTableViewWithBlockKey(blockKeyID string) (view *View, blockKey *Key) {
+	name := getI18nName("table")
+	view = &View{
 		ID:         ast.NewNodeID(),
 		Name:       name,
 		LayoutType: LayoutTypeTable,
 		Table: &LayoutTable{
-			Spec:    0,
-			ID:      ast.NewNodeID(),
-			Filters: []*ViewFilter{},
-			Sorts:   []*ViewSort{},
+			Spec:     0,
+			ID:       ast.NewNodeID(),
+			Filters:  []*ViewFilter{},
+			Sorts:    []*ViewSort{},
+			PageSize: 50,
 		},
 	}
+	blockKey = NewKey(blockKeyID, getI18nName("key"), "", KeyTypeBlock)
+	view.Table.Columns = []*ViewTableColumn{{ID: blockKeyID}}
+	return
 }
 
 // Viewable 描述了视图的接口。
@@ -585,16 +607,14 @@ type Viewable interface {
 }
 
 func NewAttributeView(id string) (ret *AttributeView) {
-	view := NewView()
-	key := NewKey(ast.NewNodeID(), "Block", "", KeyTypeBlock)
+	view, blockKey := NewTableViewWithBlockKey(ast.NewNodeID())
 	ret = &AttributeView{
 		Spec:      0,
 		ID:        id,
-		KeyValues: []*KeyValues{{Key: key}},
+		KeyValues: []*KeyValues{{Key: blockKey}},
 		ViewID:    view.ID,
 		Views:     []*View{view},
 	}
-	view.Table.Columns = []*ViewTableColumn{{ID: key.ID}}
 	return
 }
 
@@ -657,10 +677,15 @@ func SaveAttributeView(av *AttributeView) (err error) {
 		}
 	}
 
-	// 数据订正 - 行去重
+	// 数据订正
 	for _, view := range av.Views {
 		if nil != view.Table {
+			// 行去重
 			view.Table.RowIDs = gulu.Str.RemoveDuplicatedElem(view.Table.RowIDs)
+			// 分页大小
+			if 1 > view.Table.PageSize {
+				view.Table.PageSize = 50
+			}
 		}
 	}
 
@@ -678,7 +703,17 @@ func SaveAttributeView(av *AttributeView) (err error) {
 	return
 }
 
-func (av *AttributeView) GetView() (ret *View, err error) {
+func (av *AttributeView) GetView(viewID string) (ret *View) {
+	for _, v := range av.Views {
+		if v.ID == viewID {
+			ret = v
+			return
+		}
+	}
+	return
+}
+
+func (av *AttributeView) GetCurrentView() (ret *View, err error) {
 	for _, v := range av.Views {
 		if v.ID == av.ViewID {
 			ret = v
@@ -710,6 +745,30 @@ func (av *AttributeView) GetBlockKeyValues() (ret *KeyValues) {
 	return
 }
 
+func (av *AttributeView) GetBlockKey() (ret *Key) {
+	for _, kv := range av.KeyValues {
+		if KeyTypeBlock == kv.Key.Type {
+			ret = kv.Key
+			return
+		}
+	}
+	return
+}
+
+func (av *AttributeView) GetDuplicateViewName(masterViewName string) (ret string) {
+	ret = masterViewName + " (1)"
+	r := regexp.MustCompile("^(.*) \\((\\d+)\\)$")
+	m := r.FindStringSubmatch(masterViewName)
+	if nil == m || 3 > len(m) {
+		return
+	}
+
+	num, _ := strconv.Atoi(m[2])
+	num++
+	ret = fmt.Sprintf("%s (%d)", m[1], num)
+	return
+}
+
 func GetAttributeViewDataPath(avID string) (ret string) {
 	av := filepath.Join(util.DataDir, "storage", "av")
 	ret = filepath.Join(av, avID+".json")
@@ -720,6 +779,10 @@ func GetAttributeViewDataPath(avID string) (ret string) {
 		}
 	}
 	return
+}
+
+func getI18nName(name string) string {
+	return util.AttrViewLangs[util.Lang][name].(string)
 }
 
 var (

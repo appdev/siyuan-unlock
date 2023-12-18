@@ -6,7 +6,6 @@ import {fetchPost} from "../../util/fetch";
 import {openFileById} from "../../editor/util";
 import {Constants} from "../../constants";
 import {newFileByName} from "../../util/newFile";
-import {upDownHint} from "../../util/upDownHint";
 import {App} from "../../index";
 import {Dialog} from "../../dialog";
 import {getAllModels} from "../../layout/getAll";
@@ -16,6 +15,7 @@ import {showFileInFolder} from "../../util/pathName";
 import {assetInputEvent, renderPreview, toggleAssetHistory} from "../../search/assets";
 import {initSearchMenu} from "../../menus/search";
 import {writeText} from "../../protyle/util/compatibility";
+import {checkFold} from "../../util/noRelyPCFunction";
 
 export const searchKeydown = (app: App, event: KeyboardEvent) => {
     if (getSelection().rangeCount === 0) {
@@ -54,81 +54,32 @@ export const searchKeydown = (app: App, event: KeyboardEvent) => {
     const assetsElement = element.querySelector("#searchAssets");
     const isAsset = !assetsElement.classList.contains("fn__none");
     const listElement = isAsset ? assetsElement.querySelector("#searchAssetList") : element.querySelector("#searchList");
-    let currentList: HTMLElement = listElement.querySelector(".b3-list-item--focus");
-    if (!currentList) {
-        return false;
-    }
     const searchInputElement = element.querySelector("#searchInput") as HTMLInputElement;
     if (!isAsset && matchHotKey(window.siyuan.config.keymap.general.newFile.custom, event)) {
         newFileByName(app, searchInputElement.value);
         return true;
     }
     const targetId = (event.target as HTMLElement).id;
-    const historyElement = element.querySelector("#searchHistoryList");
-    const replaceHistoryElement = element.querySelector("#replaceHistoryList");
-    const replaceInputElement = element.querySelector("#replaceInput") as HTMLInputElement;
-    const assetHistoryElement = assetsElement.querySelector("#searchAssetHistoryList");
-    const assetInputElement = assetsElement.querySelector("#searchAssetInput") as HTMLInputElement;
-    const assetPreviewElement = assetsElement.querySelector("#searchAssetPreview");
     if (event.key === "ArrowDown" && event.altKey) {
         if (isAsset) {
-            toggleAssetHistory(assetHistoryElement, assetInputElement);
+            toggleAssetHistory(assetsElement);
         } else {
             if (targetId === "replaceInput") {
-                toggleReplaceHistory(replaceHistoryElement, historyElement, replaceInputElement);
+                toggleReplaceHistory(element);
             } else {
-                toggleSearchHistory(historyElement, replaceHistoryElement, searchInputElement);
+                toggleSearchHistory(element, config, edit);
             }
         }
         return true;
     }
     const assetLocal = window.siyuan.storage[Constants.LOCAL_SEARCHASSET] as ISearchAssetOption;
-    let history;
-    if (!historyElement.classList.contains("fn__none")) {
-        history = "history";
-    } else if (!replaceHistoryElement.classList.contains("fn__none")) {
-        history = "replaceHistory";
-    } else if (isAsset && !assetHistoryElement.classList.contains("fn__none")) {
-        history = "assetHistory";
+    if (!window.siyuan.menus.menu.element.classList.contains("fn__none")) {
+        // 不能返回 true，否则历史菜单无法使用快捷键
+        return false;
     }
-    if (history) {
-        if (event.key === "Escape") {
-            if (isAsset) {
-                toggleAssetHistory(assetHistoryElement, assetInputElement);
-            } else {
-                if ((event.target as HTMLElement).id === "replaceInput") {
-                    toggleReplaceHistory(replaceHistoryElement, historyElement, replaceInputElement);
-                } else {
-                    toggleSearchHistory(historyElement, replaceHistoryElement, searchInputElement);
-                }
-            }
-        } else if (event.key === "Enter") {
-            if (history === "replaceHistory") {
-                replaceInputElement.value = replaceHistoryElement.querySelector(".b3-list-item--focus").textContent.trim();
-                toggleReplaceHistory(replaceHistoryElement, historyElement, replaceInputElement);
-            } else if (history === "assetHistory") {
-                assetInputElement.value = assetHistoryElement.querySelector(".b3-list-item--focus").textContent.trim();
-                assetInputEvent(assetsElement, assetLocal);
-                toggleAssetHistory(assetHistoryElement, assetInputElement);
-                renderPreview(assetPreviewElement, currentList.dataset.id, assetInputElement.value, assetLocal.method);
-            } else {
-                searchInputElement.value = historyElement.querySelector(".b3-list-item--focus").textContent.trim();
-                config.page = 1;
-                inputEvent(element, config, edit, true);
-                toggleSearchHistory(historyElement, replaceHistoryElement, searchInputElement);
-            }
-        } else {
-            if (history === "assetHistory") {
-                upDownHint(assetHistoryElement, event);
-            } else {
-                if (history === "replaceHistory") {
-                    upDownHint(replaceHistoryElement, event);
-                } else {
-                    upDownHint(historyElement, event);
-                }
-            }
-        }
-        return true;
+    let currentList: HTMLElement = listElement.querySelector(".b3-list-item--focus");
+    if (!currentList) {
+        return false;
     }
     if (currentList.getAttribute("data-type") === "search-new") {
         if (event.key === "Enter") {
@@ -140,14 +91,13 @@ export const searchKeydown = (app: App, event: KeyboardEvent) => {
     if (!isAsset) {
         if (matchHotKey(window.siyuan.config.keymap.editor.general.insertRight.custom, event)) {
             const id = currentList.getAttribute("data-node-id");
-            fetchPost("/api/block/checkBlockFold", {id}, (foldResponse) => {
+            checkFold(id, (zoomIn, action) => {
                 openFileById({
                     app,
                     id,
                     position: "right",
-                    action: foldResponse.data ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ALL] :
-                        (id === currentList.getAttribute("data-root-id") ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ROOTSCROLL] : [Constants.CB_GET_FOCUS, Constants.CB_GET_CONTEXT]),
-                    zoomIn: foldResponse.data
+                    action,
+                    zoomIn
                 });
                 if (dialog) {
                     dialog.destroy({focus: "false"});
@@ -247,13 +197,12 @@ export const searchKeydown = (app: App, event: KeyboardEvent) => {
                 replace(element, config, edit, false);
             } else {
                 const id = currentList.getAttribute("data-node-id");
-                fetchPost("/api/block/checkBlockFold", {id}, (foldResponse) => {
+                checkFold(id, (zoomIn, action) => {
                     openFileById({
                         app,
                         id,
-                        action: foldResponse.data ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ALL] :
-                            (id === currentList.getAttribute("data-root-id") ? [Constants.CB_GET_FOCUS, Constants.CB_GET_ROOTSCROLL] : [Constants.CB_GET_FOCUS, Constants.CB_GET_CONTEXT]),
-                        zoomIn: foldResponse.data
+                        action,
+                        zoomIn
                     });
                     if (dialog) {
                         dialog.destroy({focus: "false"});
@@ -268,6 +217,7 @@ export const searchKeydown = (app: App, event: KeyboardEvent) => {
         return true;
     }
     const lineHeight = 28;
+    const assetPreviewElement = assetsElement.querySelector("#searchAssetPreview");
     if (event.key === "ArrowDown") {
         currentList.classList.remove("b3-list-item--focus");
         if (!currentList.nextElementSibling) {
