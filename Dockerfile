@@ -7,7 +7,9 @@ RUN cd app  && npm install && npm run build
 FROM golang:alpine as GO_BUILD
 WORKDIR /go/src/github.com/siyuan-note/siyuan/
 COPY --from=NODE_BUILD /go/src/github.com/siyuan-note/siyuan/ /go/src/github.com/siyuan-note/siyuan/
+ENV GO111MODULE=auto
 ENV CGO_ENABLED=1
+ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
 RUN apk add --no-cache gcc musl-dev
 RUN cd kernel
 RUN go build --tags fts5 -v -ldflags "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
