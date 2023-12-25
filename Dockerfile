@@ -1,17 +1,19 @@
 FROM node:21 as NODE_BUILD
 WORKDIR /go/src/github.com/siyuan-note/siyuan/
 ADD . /go/src/github.com/siyuan-note/siyuan/
-RUN npm config set registry https://registry.npmmirror.com
+RUN npm config set registry http://registry.npmmirror.com
 RUN cd app  && npm install && npm run build
 
 FROM golang:alpine as GO_BUILD
 WORKDIR /go/src/github.com/siyuan-note/siyuan/
 COPY --from=NODE_BUILD /go/src/github.com/siyuan-note/siyuan/ /go/src/github.com/siyuan-note/siyuan/
-ENV GO111MODULE=on
+ENV GO111MODULE=auto
 ENV CGO_ENABLED=1
-RUN apk add --no-cache gcc musl-dev && \
-    cd kernel && go build --tags fts5 -v -ldflags "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod" && \
-    mkdir /opt/siyuan/ && \
+ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+RUN apk add --no-cache gcc musl-dev
+RUN cd kernel
+RUN go build --tags fts5 -v -ldflags "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
+RUN mkdir /opt/siyuan/ && \
     mv /go/src/github.com/siyuan-note/siyuan/app/appearance/ /opt/siyuan/ && \
     mv /go/src/github.com/siyuan-note/siyuan/app/stage/ /opt/siyuan/ && \
     mv /go/src/github.com/siyuan-note/siyuan/app/guide/ /opt/siyuan/ && \
