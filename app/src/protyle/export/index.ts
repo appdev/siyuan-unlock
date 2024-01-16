@@ -13,6 +13,7 @@ import {Dialog} from "../../dialog";
 import {pathPosix} from "../../util/pathName";
 import {replaceLocalPath} from "../../editor/rename";
 import {setStorageVal} from "../util/compatibility";
+import {isPaidUser} from "../../util/needSubscribe";
 
 export const saveExport = (option: IExportOptions) => {
     /// #if !BROWSER
@@ -50,6 +51,7 @@ export const saveExport = (option: IExportOptions) => {
 </div>`,
             width: "520px",
         });
+        wordDialog.element.setAttribute("data-key", Constants.DIALOG_EXPORTWORD);
         const btnsElement = wordDialog.element.querySelectorAll(".b3-button");
         btnsElement[0].addEventListener("click", () => {
             wordDialog.destroy();
@@ -127,6 +129,7 @@ const renderPDF = (id: string) => {
           position: absolute;
           right: 232px;
           left: 0;
+          box-sizing: border-box;
         }
         
         #preview.exporting {
@@ -161,9 +164,9 @@ const renderPDF = (id: string) => {
         ${getSnippetCSS()}
     </style>
 </head>
-<body>
+<body style="-webkit-print-color-adjust: exact;">
 <div id="action">
-    <label class="b3-label">
+    <div class="b3-label">
         <div>
             ${window.siyuan.languages.exportPDF0}
         </div>
@@ -176,8 +179,8 @@ const renderPDF = (id: string) => {
             <option ${localData.pageSize === "Letter" ? "selected" : ""} value="Letter">Letter</option>
             <option ${localData.pageSize === "Tabloid" ? "selected" : ""} value="Tabloid">Tabloid</option>
         </select>
-    </label>
-    <label class="b3-label">
+    </div>
+    <div class="b3-label">
         <div>
             ${window.siyuan.languages.exportPDF2}
         </div>
@@ -200,17 +203,17 @@ const renderPDF = (id: string) => {
             <input id="marginsBottom" class="b3-text-field fn__block" value="${localData.marginBottom || 0}" type="number" min="0" step="0.01">
             <span class="fn__hr"></span>
             <div>${window.siyuan.languages.marginLeft}</div>
-        <input id="marginsLeft" class="b3-text-field fn__block" value="${localData.marginLeft || 0}" type="number" min="0" step="0.01">
+            <input id="marginsLeft" class="b3-text-field fn__block" value="${localData.marginLeft || 0}" type="number" min="0" step="0.01">
+        </div>
     </div>
-    </label>
-    <label class="b3-label">
+    <div class="b3-label">
         <div>
             ${window.siyuan.languages.exportPDF3}
             <span id="scaleTip" style="float: right;color: var(--b3-theme-on-background);">${localData.scale || 1}</span>
         </div>
         <span class="fn__hr"></span>
         <input style="width: 192px" value="${localData.scale || 1}" id="scale" step="0.1" class="b3-slider" type="range" min="0.1" max="2">
-    </label>
+    </div>
     <label class="b3-label">
         <div>
             ${window.siyuan.languages.exportPDF1}
@@ -239,6 +242,14 @@ const renderPDF = (id: string) => {
         <span class="fn__hr"></span>
         <input id="mergeSubdocs" class="b3-switch" type="checkbox" ${localData.mergeSubdocs ? "checked" : ""}>
     </label>
+    <label class="b3-label">
+        <div>
+            ${window.siyuan.languages.export27}
+        </div>
+        <span class="fn__hr"></span>
+        <input id="watermark" class="b3-switch" type="checkbox" ${localData.watermark ? "checked" : ""}>
+        <div style="display:none;font-size: 12px;margin-top: 12px;color: var(--b3-theme-on-surface);">${window.siyuan.languages._kernel[214]}</div>
+    </label>
     <div class="fn__flex">
       <div class="fn__flex-1"></div>
       <button class="b3-button b3-button--cancel">${window.siyuan.languages.cancel}</button>
@@ -246,8 +257,7 @@ const renderPDF = (id: string) => {
       <button class="b3-button b3-button--text">${window.siyuan.languages.confirm}</button>
     </div>
 </div>
-<div style="zoom:${localData.scale || 1}" class="protyle-wysiwyg${window.siyuan.config.editor.displayBookmarkIcon ? " protyle-wysiwyg--attr" : ""}" 
-id="preview">
+<div style="zoom:${localData.scale || 1}" id="preview">
     <div class="fn__loading" style="left:0"><img width="48px" src="${servePath}/stage/loading-pure.svg"></div>
 </div>
 <script src="${servePath}/appearance/icons/${window.siyuan.config.appearance.icon}/icon.js?${Constants.SIYUAN_VERSION}"></script>
@@ -362,28 +372,29 @@ id="preview">
         })
     }
     const renderPreview = (data) => {
-        previewElement.innerHTML = data.content;
-        previewElement.setAttribute("data-doc-type", data.type || "NodeDocument");
+        previewElement.innerHTML = '<div style="padding:0" class="protyle-wysiwyg${window.siyuan.config.editor.displayBookmarkIcon ? " protyle-wysiwyg--attr" : ""}">' + data.content + '</div>';
+        const wysElement = previewElement.querySelector(".protyle-wysiwyg");
+        wysElement.setAttribute("data-doc-type", data.type || "NodeDocument");
         if (data.attrs.memo) {
-            previewElement.setAttribute("memo", data.attrs.memo);
+            wysElement.setAttribute("memo", data.attrs.memo);
         }
         if (data.attrs.name) {
-            previewElement.setAttribute("name", data.attrs.name);
+            wysElement.setAttribute("name", data.attrs.name);
         }
         if (data.attrs.bookmark) {
-            previewElement.setAttribute("bookmark", data.attrs.bookmark);
+            wysElement.setAttribute("bookmark", data.attrs.bookmark);
         }
         if (data.attrs.alias) {
-            previewElement.setAttribute("alias", data.attrs.alias);
+            wysElement.setAttribute("alias", data.attrs.alias);
         }
-        Protyle.mermaidRender(previewElement, "${servePath}/stage/protyle");
-        Protyle.flowchartRender(previewElement, "${servePath}/stage/protyle");
-        Protyle.graphvizRender(previewElement, "${servePath}/stage/protyle");
-        Protyle.chartRender(previewElement, "${servePath}/stage/protyle");
-        Protyle.mindmapRender(previewElement, "${servePath}/stage/protyle");
-        Protyle.abcRender(previewElement, "${servePath}/stage/protyle");
-        Protyle.htmlRender(previewElement);
-        Protyle.plantumlRender(previewElement, "${servePath}/stage/protyle");
+        Protyle.mermaidRender(wysElement, "${servePath}/stage/protyle");
+        Protyle.flowchartRender(wysElement, "${servePath}/stage/protyle");
+        Protyle.graphvizRender(wysElement, "${servePath}/stage/protyle");
+        Protyle.chartRender(wysElement, "${servePath}/stage/protyle");
+        Protyle.mindmapRender(wysElement, "${servePath}/stage/protyle");
+        Protyle.abcRender(wysElement, "${servePath}/stage/protyle");
+        Protyle.htmlRender(wysElement);
+        Protyle.plantumlRender(wysElement, "${servePath}/stage/protyle");
     }
     fetchPost("/api/export/exportPreviewHTML", {
         id: "${id}",
@@ -441,7 +452,13 @@ id="preview">
         mergeSubdocsElement.addEventListener('change', () => {
             refreshPreview();
         });
-        
+        const  watermarkElement = actionElement.querySelector('#watermark');
+        watermarkElement.addEventListener('change', () => {
+            if (watermarkElement.checked && ${!isPaidUser()}) {
+                watermarkElement.nextElementSibling.style.display = "";
+                watermarkElement.checked = false;
+            }
+        });
         const refreshPreview = () => {
           previewElement.innerHTML = '<div class="fn__loading" style="left:0"><img width="48px" src="${servePath}/stage/loading-pure.svg"></div>'
             fetchPost("/api/export/exportPreviewHTML", {
@@ -513,6 +530,7 @@ id="preview">
               },
               keepFold: keepFoldElement.checked,
               mergeSubdocs: mergeSubdocsElement.checked,
+              watermark: watermarkElement.checked,
               removeAssets: actionElement.querySelector("#removeAssets").checked,
               rootId: "${id}",
               rootTitle: response.data.name,

@@ -28,6 +28,7 @@ import {openEditorTab} from "./util";
 import {makeCard} from "../card/makeCard";
 import {transaction} from "../protyle/wysiwyg/transaction";
 import {emitOpenMenu} from "../plugin/EventBus";
+import {openByMobile} from "../protyle/util/compatibility";
 
 const initMultiMenu = (selectItemElements: NodeListOf<Element>, app: App) => {
     const fileItemElement = Array.from(selectItemElements).find(item => {
@@ -232,12 +233,13 @@ export const initNavigationMenu = (app: App, liElement: HTMLElement) => {
                 k: localData.k,
                 r: localData.r,
                 page: 1,
-                types: Object.assign({}, localData.types)
+                types: Object.assign({}, localData.types),
+                replaceTypes: Object.assign({}, localData.replaceTypes)
             });
             /// #else
             openSearch({
                 app,
-                hotkey: window.siyuan.config.keymap.general.search.custom,
+                hotkey: Constants.DIALOG_SEARCH,
                 notebookId,
             });
             /// #endif
@@ -262,12 +264,13 @@ export const initNavigationMenu = (app: App, liElement: HTMLElement) => {
                     k: localData.k,
                     r: localData.r,
                     page: 1,
-                    types: Object.assign({}, localData.types)
+                    types: Object.assign({}, localData.types),
+                    replaceTypes: Object.assign({}, localData.replaceTypes)
                 });
                 /// #else
                 openSearch({
                     app,
-                    hotkey: window.siyuan.config.keymap.general.replace.custom,
+                    hotkey: Constants.DIALOG_REPLACE,
                     notebookId,
                 });
                 /// #endif
@@ -320,7 +323,7 @@ export const initNavigationMenu = (app: App, liElement: HTMLElement) => {
                     path: "/"
                 }, response => {
                     hideMessage(msgId);
-                    window.open(response.data.zip);
+                    openByMobile(response.data.zip);
                 });
             }
         }, {
@@ -332,7 +335,7 @@ export const initNavigationMenu = (app: App, liElement: HTMLElement) => {
                     id: notebookId,
                 }, response => {
                     hideMessage(msgId);
-                    window.open(response.data.zip);
+                    openByMobile(response.data.zip);
                 });
             }
         }]
@@ -556,12 +559,13 @@ export const initFileMenu = (app: App, notebookId: string, pathString: string, l
                     k: localData.k,
                     r: localData.r,
                     page: 1,
-                    types: Object.assign({}, localData.types)
+                    types: Object.assign({}, localData.types),
+                    replaceTypes: Object.assign({}, localData.replaceTypes)
                 });
                 /// #else
                 openSearch({
                     app,
-                    hotkey: window.siyuan.config.keymap.general.search.custom,
+                    hotkey: Constants.DIALOG_SEARCH,
                     notebookId,
                     searchPath
                 });
@@ -591,12 +595,13 @@ export const initFileMenu = (app: App, notebookId: string, pathString: string, l
                     k: localData.k,
                     r: localData.r,
                     page: 1,
-                    types: Object.assign({}, localData.types)
+                    types: Object.assign({}, localData.types),
+                    replaceTypes: Object.assign({}, localData.replaceTypes)
                 });
                 /// #else
                 openSearch({
                     app,
-                    hotkey: window.siyuan.config.keymap.general.replace.custom,
+                    hotkey: Constants.DIALOG_REPLACE,
                     notebookId,
                     searchPath
                 });

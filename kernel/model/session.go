@@ -23,10 +23,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/88250/gulu"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/util"
 	"github.com/steambap/captcha"
@@ -315,5 +317,49 @@ func Recover(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 	}()
 
+	c.Next()
+}
+
+var (
+	requestingLock = sync.Mutex{}
+	requesting     = map[string]*sync.Mutex{}
+)
+
+func ControlConcurrency(c *gin.Context) {
+	if websocket.IsWebSocketUpgrade(c.Request) {
+		c.Next()
+		return
+	}
+
+	reqPath := c.Request.URL.Path
+
+	// Improve the concurrency of the kernel data reading interfaces https://github.com/siyuan-note/siyuan/issues/10149
+	if strings.HasPrefix(reqPath, "/stage/") || strings.HasPrefix(reqPath, "/assets/") || strings.HasPrefix(reqPath, "/appearance/") {
+		c.Next()
+		return
+	}
+
+	parts := strings.Split(reqPath, "/")
+	function := parts[len(parts)-1]
+	if strings.HasPrefix(function, "get") || strings.HasPrefix(function, "list") ||
+		strings.HasPrefix(function, "search") || strings.HasPrefix(function, "render") || strings.HasPrefix(function, "ls") {
+		c.Next()
+		return
+	}
+	if strings.HasPrefix(function, "/api/query/") || strings.HasPrefix(function, "/api/search/") {
+		c.Next()
+		return
+	}
+
+	requestingLock.Lock()
+	mutex := requesting[reqPath]
+	if nil == mutex {
+		mutex = &sync.Mutex{}
+		requesting[reqPath] = mutex
+	}
+	requestingLock.Unlock()
+
+	mutex.Lock()
+	defer mutex.Unlock()
 	c.Next()
 }

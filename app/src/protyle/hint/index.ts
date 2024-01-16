@@ -58,15 +58,7 @@ export class Hint {
             }
             const btnElement = hasClosestByMatchTag(eventTarget, "BUTTON");
             if (btnElement && !btnElement.classList.contains("emojis__item") && !btnElement.classList.contains("emojis__type")) {
-                if (this.source !== "search") {
-                    this.fill(decodeURIComponent(btnElement.getAttribute("data-value")), protyle, true, isOnlyMeta(event));
-                } else {
-                    setTimeout(() => {
-                        this.fill(decodeURIComponent(btnElement.getAttribute("data-value")), protyle, true, isNotCtrl(event));
-                    }, 148);    // 划选引用点击，需先重置 range
-                }
-                focusByRange(protyle.toolbar.range);
-
+                this.fill(decodeURIComponent(btnElement.getAttribute("data-value")), protyle, false, this.source === "search" ? isNotCtrl(event) : isOnlyMeta(event));
                 event.preventDefault();
                 event.stopPropagation(); // https://github.com/siyuan-note/siyuan/issues/3710
                 return;
@@ -301,10 +293,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
                 }
                 upDownHint(this.element.lastElementChild, event);
                 if (event.key === "Enter") {
-                    setTimeout(() => {
-                        this.fill(decodeURIComponent(this.element.querySelector(".b3-list-item--focus").getAttribute("data-value")), protyle, true, isNotCtrl(event));
-                    }, 148);    // 划选引用点击，需先重置 range
-                    focusByRange(protyle.toolbar.range);
+                    this.fill(decodeURIComponent(this.element.querySelector(".b3-list-item--focus").getAttribute("data-value")), protyle, false, isNotCtrl(event));
                     event.preventDefault();
                 } else if (event.key === "Escape") {
                     this.element.classList.add("fn__none");
@@ -377,9 +366,9 @@ ${genHintItemHTML(item)}
     <button data-type="3" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[2][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("1f433")}</button>
     <button data-type="4" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[3][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("1f96a")}</button>
     <button data-type="5" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[4][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("1f3a8")}</button>
-    <button data-type="6" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[5][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("1f3dd")}</button>
+    <button data-type="6" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[5][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("1f3dd-fe0f")}</button>
     <button data-type="7" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[6][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("1f52e")}</button>
-    <button data-type="8" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[7][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("267e")}</button>
+    <button data-type="8" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[7][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("267e-fe0f")}</button>
     <button data-type="9" class="emojis__type ariaLabel" aria-label="${window.siyuan.emojis[8][window.siyuan.config.lang === "zh_CN" ? "title_zh_cn" : "title"]}">${unicode2Emoji("1f6a9")}</button>
 </div>
 </div>`;
@@ -410,7 +399,10 @@ ${genHintItemHTML(item)}
             return;
         }
         if (this.source === "av") {
-            const cellElement = hasClosestByClassName(protyle.toolbar.range.startContainer, "av__cell");
+            let cellElement = hasClosestByClassName(protyle.toolbar.range.startContainer, "av__cell");
+            if (!cellElement) {
+                cellElement = nodeElement.querySelector(".av__cell--select") as HTMLElement;
+            }
             if (!cellElement) {
                 return;
             }
@@ -514,7 +506,6 @@ ${genHintItemHTML(item)}
         }
         // 新建文件
         if (Constants.BLOCK_HINT_KEYS.includes(this.splitChar) && value.startsWith("((newFile ") && value.endsWith(`${Lute.Caret}'))`)) {
-            focusByRange(range);
             const fileNames = value.substring(11, value.length - 4).split(`"${Constants.ZWSP}'`);
             const realFileName = fileNames.length === 1 ? fileNames[0] : fileNames[1];
             getSavePath(protyle.path, protyle.notebookId, (pathString) => {
@@ -524,6 +515,8 @@ ${genHintItemHTML(item)}
                     parentID: protyle.block.rootID,
                     markdown: ""
                 }, response => {
+                    // https://github.com/siyuan-note/siyuan/issues/10133
+                    protyle.toolbar.range = range;
                     protyle.toolbar.setInlineMark(protyle, "block-ref", "range", {
                         type: "id",
                         color: `${response.data}${Constants.ZWSP}${refIsS ? "s" : "d"}${Constants.ZWSP}${(refIsS ? fileNames[0] : realFileName).substring(0, window.siyuan.config.editor.blockRefDynamicAnchorTextMaxLen)}`

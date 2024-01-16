@@ -40,6 +40,7 @@ import {avRender} from "./render/av/render";
 import {focusBlock, getEditorRange} from "./util/selection";
 import {hasClosestBlock} from "./util/hasClosest";
 import {setStorageVal} from "./util/compatibility";
+import {merge} from "./util/merge";
 
 export class Protyle {
 
@@ -52,9 +53,14 @@ export class Protyle {
      */
     constructor(app: App, id: HTMLElement, options?: IOptions) {
         this.version = Constants.SIYUAN_VERSION;
-        const getOptions = new Options(options);
+        let pluginsOptions: IOptions = options;
+        app.plugins.forEach(item => {
+            if (item.protyleOptions) {
+                pluginsOptions = merge(pluginsOptions, item.protyleOptions);
+            }
+        });
+        const getOptions = new Options(pluginsOptions);
         const mergedOptions = getOptions.merge();
-
         this.protyle = {
             getInstance: () => this,
             app,
@@ -133,7 +139,7 @@ export class Protyle {
                             break;
                         case "readonly":
                             window.siyuan.config.editor.readOnly = data.data;
-                            setReadonlyByConfig(this.protyle);
+                            setReadonlyByConfig(this.protyle, true);
                             break;
                         case "heading2doc":
                         case "li2doc":

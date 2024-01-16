@@ -1015,6 +1015,7 @@ func CreateDocByMd(boxID, p, title, md string, sorts []string) (tree *parse.Tree
 		return
 	}
 
+	WaitForWritingFiles()
 	ChangeFileTreeSort(box.ID, sorts)
 	return
 }
@@ -1033,6 +1034,7 @@ func CreateWithMarkdown(boxID, hPath, md, parentID, id string) (retID string, er
 	luteEngine := util.NewLute()
 	dom := luteEngine.Md2BlockDOM(md, false)
 	retID, err = createDocsByHPath(box.ID, hPath, dom, parentID, id)
+	WaitForWritingFiles()
 	return
 }
 
@@ -1197,6 +1199,7 @@ func GetFullHPathByID(id string) (hPath string, err error) {
 }
 
 func GetIDsByHPath(hpath, boxID string) (ret []string, err error) {
+	ret = []string{}
 	roots := treenode.GetBlockTreeRootsByHPath(boxID, hpath)
 	if 1 > len(roots) {
 		return
@@ -1206,6 +1209,9 @@ func GetIDsByHPath(hpath, boxID string) (ret []string, err error) {
 		ret = append(ret, root.ID)
 	}
 	ret = gulu.Str.RemoveDuplicatedElem(ret)
+	if 1 > len(ret) {
+		ret = []string{}
+	}
 	return
 }
 
@@ -1450,12 +1456,17 @@ func removeDoc(box *Box, p string, luteEngine *lute.Lute) {
 
 	if existChildren {
 		if err = box.Remove(childrenDir); nil != err {
+			logging.LogErrorf("remove children dir [%s%s] failed: %s", box.ID, childrenDir, err)
 			return
 		}
+		logging.LogInfof("removed children dir [%s%s]", box.ID, childrenDir)
 	}
 	if err = box.Remove(p); nil != err {
+		logging.LogErrorf("remove [%s%s] failed: %s", box.ID, p, err)
 		return
 	}
+	logging.LogInfof("removed doc [%s%s]", box.ID, p)
+
 	box.removeSort(removeIDs)
 	RemoveRecentDoc(removeIDs)
 	if "/" != dir {

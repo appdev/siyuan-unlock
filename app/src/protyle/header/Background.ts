@@ -14,6 +14,7 @@ import {getEventName} from "../util/compatibility";
 import {Dialog} from "../../dialog";
 import {Constants} from "../../constants";
 import {assetMenu} from "../../menus/protyle";
+import {previewImage} from "../preview/image";
 
 const bgs = [
     "background:radial-gradient(black 3px, transparent 4px),radial-gradient(black 3px, transparent 4px),linear-gradient(#fff 4px, transparent 0),linear-gradient(45deg, transparent 74px, transparent 75px, #a4a4a4 75px, #a4a4a4 76px, transparent 77px, transparent 109px),linear-gradient(-45deg, transparent 75px, transparent 76px, #a4a4a4 76px, #a4a4a4 77px, transparent 78px, transparent 109px),#fff;background-size: 109px 109px, 109px 109px,100% 6px, 109px 109px, 109px 109px;background-position: 54px 55px, 0px 0px, 0px 0px, 0px 0px, 0px 0px;",
@@ -200,7 +201,17 @@ export class Background {
 
             while (target && !target.isEqualNode(this.element)) {
                 const type = target.getAttribute("data-type");
-                if (type === "position") {
+                if (target.tagName === "IMG") {
+                    const imgSrc = target.getAttribute("src");
+                    if (event.detail > 1 && !imgSrc.startsWith("data:image/png;base64")) {
+                        previewImage(imgSrc);
+                    }
+                    // 点击题头图菜单无法消失
+                    window.siyuan.menus.menu.remove();
+                    event.preventDefault();
+                    event.stopPropagation();
+                    break;
+                } else if (type === "position") {
                     const iconElements = this.element.firstElementChild.querySelectorAll(".protyle-icons");
                     iconElements[0].classList.add("fn__none");
                     iconElements[1].classList.remove("fn__none");
@@ -250,6 +261,7 @@ export class Background {
                         width: isMobile() ? "92vw" : "912px",
                         height: isMobile() ? "80vh" : "70vh",
                     });
+                    dialog.element.setAttribute("data-key", Constants.DIALOG_BACKGROUNDRANDOM);
                     dialog.element.addEventListener("click", (event) => {
                         const target = event.target as HTMLElement;
                         if (target.classList.contains("b3-card")) {
@@ -331,13 +343,14 @@ export class Background {
                         title: window.siyuan.languages.link,
                         width: isMobile() ? "92vw" : "520px",
                         content: `<div class="b3-dialog__content">
-        <input class="b3-text-field fn__block">
+        <input class="b3-text-field fn__block" value="${this.imgElement.src.startsWith("data:") ? "" : this.imgElement.getAttribute("src")}">
 </div>
 <div class="b3-dialog__action">
     <button class="b3-button b3-button--cancel">${window.siyuan.languages.cancel}</button><div class="fn__space"></div>
     <button class="b3-button b3-button--text">${window.siyuan.languages.confirm}</button>
 </div>`,
                     });
+                    dialog.element.setAttribute("data-key", Constants.DIALOG_BACKGROUNDLINK);
                     const btnsElement = dialog.element.querySelectorAll(".b3-button");
                     btnsElement[0].addEventListener("click", () => {
                         dialog.destroy();
@@ -372,7 +385,8 @@ export class Background {
                         k: `#${target.textContent}#`,
                         r: "",
                         page: 1,
-                        types: Object.assign({}, searchOption.types)
+                        types: Object.assign({}, searchOption.types),
+                        replaceTypes: Object.assign({}, searchOption.replaceTypes)
                     });
                     /// #endif
                     event.preventDefault();

@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/88250/gulu"
@@ -56,18 +57,25 @@ import (
 	"github.com/studio-b12/gowebdav"
 )
 
-func init() {
-	subscribeRepoEvents()
-}
+func GetRepoFile(fileID string) (ret []byte, p string, err error) {
+	if 1 > len(Conf.Repo.Key) {
+		err = errors.New(Conf.Language(26))
+		return
+	}
 
-type Snapshot struct {
-	*dejavu.Log
-	TypesCount []*TypeCount `json:"typesCount"`
-}
+	repo, err := newRepository()
+	if nil != err {
+		return
+	}
 
-type TypeCount struct {
-	Type  string `json:"type"`
-	Count int    `json:"count"`
+	file, err := repo.GetFile(fileID)
+	if nil != err {
+		return
+	}
+
+	ret, err = repo.OpenFile(file)
+	p = file.Path
+	return
 }
 
 func OpenRepoSnapshotDoc(fileID string) (content string, isProtyleDoc bool, updated int64, err error) {
@@ -326,6 +334,16 @@ func parseTreeInSnapshot(data []byte, luteEngine *lute.Lute) (isProtyleDoc bool,
 	return
 }
 
+type Snapshot struct {
+	*dejavu.Log
+	TypesCount []*TypeCount `json:"typesCount"`
+}
+
+type TypeCount struct {
+	Type  string `json:"type"`
+	Count int    `json:"count"`
+}
+
 func GetRepoSnapshots(page int) (ret []*Snapshot, pageCount, totalCount int, err error) {
 	ret = []*Snapshot{}
 	if 1 > len(Conf.Repo.Key) {
@@ -462,6 +480,30 @@ func ResetRepo() (err error) {
 		time.Sleep(2 * time.Second)
 		util.ReloadUI()
 	}()
+	return
+}
+
+func PurgeCloud() (err error) {
+	// TODO https://github.com/siyuan-note/siyuan/issues/10081
+	msg := Conf.Language(223)
+	util.PushEndlessProgress(msg)
+	defer util.PushClearProgress()
+
+	repo, err := newRepository()
+	if nil != err {
+		return
+	}
+
+	stat, err := repo.PurgeCloud()
+	if nil != err {
+		return
+	}
+
+	deletedIndexes := stat.Indexes
+	deletedObjects := stat.Objects
+	deletedSize := humanize.Bytes(uint64(stat.Size))
+	msg = fmt.Sprintf(Conf.Language(203), deletedIndexes, deletedObjects, deletedSize)
+	util.PushMsg(msg, 5000)
 	return
 }
 
@@ -934,12 +976,16 @@ func IndexRepo(memo string) (err error) {
 }
 
 var syncingFiles = sync.Map{}
-var syncingStorages = false
+var syncingStorages = atomic.Bool{}
 
 func waitForSyncingStorages() {
-	for syncingStorages {
+	for isSyncingStorages() {
 		time.Sleep(time.Second)
 	}
+}
+
+func isSyncingStorages() bool {
+	return syncingStorages.Load() || isBootSyncing.Load()
 }
 
 func IsSyncingFile(rootID string) (ret bool) {
@@ -979,7 +1025,7 @@ func syncRepoDownload() (err error) {
 
 	syncContext := map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
 	mergeResult, trafficStat, err := repo.SyncDownload(syncContext)
-	if errors.Is(err, dejavu.ErrRepoFatalErr) {
+	if errors.Is(err, dejavu.ErrRepoFatal) {
 		// 重置仓库并再次尝试同步
 		if _, resetErr := resetRepository(repo); nil == resetErr {
 			mergeResult, trafficStat, err = repo.SyncDownload(syncContext)
@@ -1049,7 +1095,7 @@ func syncRepoUpload() (err error) {
 
 	syncContext := map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
 	trafficStat, err := repo.SyncUpload(syncContext)
-	if errors.Is(err, dejavu.ErrRepoFatalErr) {
+	if errors.Is(err, dejavu.ErrRepoFatal) {
 		// 重置仓库并再次尝试同步
 		if _, resetErr := resetRepository(repo); nil == resetErr {
 			trafficStat, err = repo.SyncUpload(syncContext)
@@ -1087,6 +1133,8 @@ func syncRepoUpload() (err error) {
 	return
 }
 
+var isBootSyncing = atomic.Bool{}
+
 func bootSyncRepo() (err error) {
 	if 1 > len(Conf.Repo.Key) {
 		autoSyncErrCount++
@@ -1111,17 +1159,20 @@ func bootSyncRepo() (err error) {
 		return
 	}
 
+	isBootSyncing.Store(true)
+
 	start := time.Now()
 	_, _, err = indexRepoBeforeCloudSync(repo)
 	if nil != err {
 		autoSyncErrCount++
 		planSyncAfter(fixSyncInterval)
+		isBootSyncing.Store(false)
 		return
 	}
 
 	syncContext := map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
 	fetchedFiles, err := repo.GetSyncCloudFiles(syncContext)
-	if errors.Is(err, dejavu.ErrRepoFatalErr) {
+	if errors.Is(err, dejavu.ErrRepoFatal) {
 		// 重置仓库并再次尝试同步
 		if _, resetErr := resetRepository(repo); nil == resetErr {
 			fetchedFiles, err = repo.GetSyncCloudFiles(syncContext)
@@ -1129,7 +1180,7 @@ func bootSyncRepo() (err error) {
 	}
 
 	syncingFiles = sync.Map{}
-	syncingStorages = false
+	syncingStorages.Store(false)
 	for _, fetchedFile := range fetchedFiles {
 		name := path.Base(fetchedFile.Path)
 		if strings.HasSuffix(name, ".sy") {
@@ -1138,7 +1189,7 @@ func bootSyncRepo() (err error) {
 			continue
 		}
 		if strings.HasPrefix(fetchedFile.Path, "/storage/") {
-			syncingStorages = true
+			syncingStorages.Store(true)
 		}
 	}
 
@@ -1162,17 +1213,21 @@ func bootSyncRepo() (err error) {
 		util.PushStatusBar(msg)
 		util.PushErrMsg(msg, 0)
 		BootSyncSucc = 1
+		isBootSyncing.Store(false)
 		return
 	}
 
 	if 0 < len(fetchedFiles) {
 		go func() {
 			_, syncErr := syncRepo(false, false)
+			isBootSyncing.Store(false)
 			if nil != err {
 				logging.LogErrorf("boot background sync repo failed: %s", syncErr)
 				return
 			}
 		}()
+	} else {
+		isBootSyncing.Store(false)
 	}
 	return
 }
@@ -1212,7 +1267,7 @@ func syncRepo(exit, byHand bool) (dataChanged bool, err error) {
 
 	syncContext := map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
 	mergeResult, trafficStat, err := repo.Sync(syncContext)
-	if errors.Is(err, dejavu.ErrRepoFatalErr) {
+	if errors.Is(err, dejavu.ErrRepoFatal) {
 		// 重置仓库并再次尝试同步
 		if _, resetErr := resetRepository(repo); nil == resetErr {
 			mergeResult, trafficStat, err = repo.Sync(syncContext)
@@ -1362,7 +1417,7 @@ func processSyncMergeResult(exit, byHand bool, mergeResult *dejavu.MergeResult, 
 	}
 
 	syncingFiles = sync.Map{}
-	syncingStorages = false
+	syncingStorages.Store(false)
 
 	cache.ClearDocsIAL()              // 同步后文档树文档图标没有更新 https://github.com/siyuan-note/siyuan/issues/4939
 	if needFullReindex(upsertTrees) { // 改进同步后全量重建索引判断 https://github.com/siyuan-note/siyuan/issues/5764
@@ -1559,7 +1614,7 @@ func newRepository() (ret *dejavu.Repo, err error) {
 		return
 	}
 
-	ignoreLines := getIgnoreLines()
+	ignoreLines := getSyncIgnoreLines()
 	ignoreLines = append(ignoreLines, "/.siyuan/conf.json") // 忽略旧版同步配置
 	ret, err = dejavu.NewRepo(util.DataDir, util.RepoDir, util.HistoryDir, util.TempDir, Conf.System.ID, Conf.System.Name, Conf.System.OS, Conf.Repo.Key, ignoreLines, cloudRepo)
 	if nil != err {
@@ -1567,6 +1622,10 @@ func newRepository() (ret *dejavu.Repo, err error) {
 		return
 	}
 	return
+}
+
+func init() {
+	subscribeRepoEvents()
 }
 
 func subscribeRepoEvents() {

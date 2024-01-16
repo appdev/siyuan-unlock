@@ -113,6 +113,8 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/filetree/heading2Doc", model.CheckAuth, model.CheckReadonly, heading2Doc)
 	ginServer.Handle("POST", "/api/filetree/li2Doc", model.CheckAuth, model.CheckReadonly, li2Doc)
 	ginServer.Handle("POST", "/api/filetree/refreshFiletree", model.CheckAuth, model.CheckReadonly, refreshFiletree)
+	ginServer.Handle("POST", "/api/filetree/upsertIndexes", model.CheckAuth, model.CheckReadonly, upsertIndexes)
+	ginServer.Handle("POST", "/api/filetree/removeIndexes", model.CheckAuth, model.CheckReadonly, removeIndexes)
 
 	ginServer.Handle("POST", "/api/format/autoSpace", model.CheckAuth, model.CheckReadonly, autoSpace)
 	ginServer.Handle("POST", "/api/format/netImg2LocalAssets", model.CheckAuth, model.CheckReadonly, netImg2LocalAssets)
@@ -141,6 +143,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/lute/copyStdMarkdown", model.CheckAuth, copyStdMarkdown)
 
 	ginServer.Handle("POST", "/api/query/sql", model.CheckAuth, SQL)
+	ginServer.Handle("POST", "/api/sqlite/flushTransaction", model.CheckAuth, model.CheckReadonly, flushTransaction)
 
 	ginServer.Handle("POST", "/api/search/searchTag", model.CheckAuth, searchTag)
 	ginServer.Handle("POST", "/api/search/searchTemplate", model.CheckAuth, searchTemplate)
@@ -160,6 +163,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/block/getBlockDOM", model.CheckAuth, getBlockDOM)
 	ginServer.Handle("POST", "/api/block/getBlockKramdown", model.CheckAuth, getBlockKramdown)
 	ginServer.Handle("POST", "/api/block/getChildBlocks", model.CheckAuth, getChildBlocks)
+	ginServer.Handle("POST", "/api/block/getTailChildBlocks", model.CheckAuth, getTailChildBlocks)
 	ginServer.Handle("POST", "/api/block/getBlockBreadcrumb", model.CheckAuth, getBlockBreadcrumb)
 	ginServer.Handle("POST", "/api/block/getBlockIndex", model.CheckAuth, getBlockIndex)
 	ginServer.Handle("POST", "/api/block/getRefIDs", model.CheckAuth, getRefIDs)
@@ -180,6 +184,8 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/block/updateBlock", model.CheckAuth, model.CheckReadonly, updateBlock)
 	ginServer.Handle("POST", "/api/block/deleteBlock", model.CheckAuth, model.CheckReadonly, deleteBlock)
 	ginServer.Handle("POST", "/api/block/moveBlock", model.CheckAuth, model.CheckReadonly, moveBlock)
+	ginServer.Handle("POST", "/api/block/foldBlock", model.CheckAuth, model.CheckReadonly, foldBlock)
+	ginServer.Handle("POST", "/api/block/unfoldBlock", model.CheckAuth, model.CheckReadonly, unfoldBlock)
 	ginServer.Handle("POST", "/api/block/setBlockReminder", model.CheckAuth, model.CheckReadonly, setBlockReminder)
 	ginServer.Handle("POST", "/api/block/getHeadingLevelTransaction", model.CheckAuth, getHeadingLevelTransaction)
 	ginServer.Handle("POST", "/api/block/getHeadingDeleteTransaction", model.CheckAuth, getHeadingDeleteTransaction)
@@ -279,6 +285,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/export/exportODT", model.CheckAuth, exportODT)
 	ginServer.Handle("POST", "/api/export/exportRTF", model.CheckAuth, exportRTF)
 	ginServer.Handle("POST", "/api/export/exportEPUB", model.CheckAuth, exportEPUB)
+	ginServer.Handle("POST", "/api/export/exportAttributeView", model.CheckAuth, exportAttributeView)
 
 	ginServer.Handle("POST", "/api/import/importStdMd", model.CheckAuth, model.CheckReadonly, importStdMd)
 	ginServer.Handle("POST", "/api/import/importData", model.CheckAuth, model.CheckReadonly, importData)
@@ -307,6 +314,9 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/setting/setAI", model.CheckAuth, model.CheckReadonly, setAI)
 	ginServer.Handle("POST", "/api/setting/setBazaar", model.CheckAuth, model.CheckReadonly, setBazaar)
 	ginServer.Handle("POST", "/api/setting/refreshVirtualBlockRef", model.CheckAuth, model.CheckReadonly, refreshVirtualBlockRef)
+	ginServer.Handle("POST", "/api/setting/addVirtualBlockRefInclude", model.CheckAuth, model.CheckReadonly, addVirtualBlockRefInclude)
+	ginServer.Handle("POST", "/api/setting/addVirtualBlockRefExclude", model.CheckAuth, model.CheckReadonly, addVirtualBlockRefExclude)
+	ginServer.Handle("POST", "/api/setting/setSnippet", model.CheckAuth, model.CheckReadonly, setConfSnippet)
 
 	ginServer.Handle("POST", "/api/graph/resetGraph", model.CheckAuth, model.CheckReadonly, resetGraph)
 	ginServer.Handle("POST", "/api/graph/resetLocalGraph", model.CheckAuth, model.CheckReadonly, resetLocalGraph)
@@ -353,6 +363,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/repo/downloadCloudSnapshot", model.CheckAuth, model.CheckReadonly, downloadCloudSnapshot)
 	ginServer.Handle("POST", "/api/repo/diffRepoSnapshots", model.CheckAuth, diffRepoSnapshots)
 	ginServer.Handle("POST", "/api/repo/openRepoSnapshotDoc", model.CheckAuth, openRepoSnapshotDoc)
+	ginServer.Handle("POST", "/api/repo/getRepoFile", model.CheckAuth, getRepoFile)
 
 	ginServer.Handle("POST", "/api/riff/createRiffDeck", model.CheckAuth, model.CheckReadonly, createRiffDeck)
 	ginServer.Handle("POST", "/api/riff/renameRiffDeck", model.CheckAuth, model.CheckReadonly, renameRiffDeck)
@@ -382,6 +393,14 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/av/renderSnapshotAttributeView", model.CheckAuth, renderSnapshotAttributeView)
 	ginServer.Handle("POST", "/api/av/getAttributeViewKeys", model.CheckAuth, getAttributeViewKeys)
 	ginServer.Handle("POST", "/api/av/setAttributeViewBlockAttr", model.CheckAuth, model.CheckReadonly, setAttributeViewBlockAttr)
+	ginServer.Handle("POST", "/api/av/searchAttributeView", model.CheckAuth, model.CheckReadonly, searchAttributeView)
+	ginServer.Handle("POST", "/api/av/getAttributeView", model.CheckAuth, model.CheckReadonly, getAttributeView)
+	ginServer.Handle("POST", "/api/av/searchAttributeViewRelationKey", model.CheckAuth, model.CheckReadonly, searchAttributeViewRelationKey)
+	ginServer.Handle("POST", "/api/av/searchAttributeViewNonRelationKey", model.CheckAuth, model.CheckReadonly, searchAttributeViewNonRelationKey)
+	ginServer.Handle("POST", "/api/av/getAttributeViewFilterSort", model.CheckAuth, model.CheckReadonly, getAttributeViewFilterSort)
+	ginServer.Handle("POST", "/api/av/addAttributeViewKey", model.CheckAuth, model.CheckReadonly, addAttributeViewCol)
+	ginServer.Handle("POST", "/api/av/removeAttributeViewKey", model.CheckAuth, model.CheckReadonly, removeAttributeViewCol)
+	ginServer.Handle("POST", "/api/av/sortAttributeViewKey", model.CheckAuth, model.CheckReadonly, sortAttributeViewCol)
 
 	ginServer.Handle("POST", "/api/ai/chatGPT", model.CheckAuth, chatGPT)
 	ginServer.Handle("POST", "/api/ai/chatGPTWithAction", model.CheckAuth, chatGPTWithAction)

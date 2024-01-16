@@ -17,6 +17,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/88250/gulu"
@@ -28,6 +29,126 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/treenode"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
+
+func unfoldBlock(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	id := arg["id"].(string)
+	if util.InvalidIDPattern(id, ret) {
+		return
+	}
+
+	bt := treenode.GetBlockTree(id)
+	if nil == bt {
+		ret.Code = -1
+		ret.Msg = "block tree not found [id=" + id + "]"
+		return
+	}
+
+	if bt.Type == "d" {
+		ret.Code = -1
+		ret.Msg = "document can not be unfolded"
+		return
+	}
+
+	var transactions []*model.Transaction
+	if "h" == bt.Type {
+		transactions = []*model.Transaction{
+			{
+				DoOperations: []*model.Operation{
+					{
+						Action: "unfoldHeading",
+						ID:     id,
+					},
+				},
+			},
+		}
+	} else {
+		data, _ := gulu.JSON.MarshalJSON(map[string]interface{}{"unfold": "1"})
+		transactions = []*model.Transaction{
+			{
+				DoOperations: []*model.Operation{
+					{
+						Action: "setAttrs",
+						ID:     id,
+						Data:   string(data),
+					},
+				},
+			},
+		}
+	}
+
+	model.PerformTransactions(&transactions)
+	model.WaitForWritingFiles()
+
+	broadcastTransactions(transactions)
+}
+
+func foldBlock(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	id := arg["id"].(string)
+	if util.InvalidIDPattern(id, ret) {
+		return
+	}
+
+	bt := treenode.GetBlockTree(id)
+	if nil == bt {
+		ret.Code = -1
+		ret.Msg = "block tree not found [id=" + id + "]"
+		return
+	}
+
+	if bt.Type == "d" {
+		ret.Code = -1
+		ret.Msg = "document can not be folded"
+		return
+	}
+
+	var transactions []*model.Transaction
+	if "h" == bt.Type {
+		transactions = []*model.Transaction{
+			{
+				DoOperations: []*model.Operation{
+					{
+						Action: "foldHeading",
+						ID:     id,
+					},
+				},
+			},
+		}
+	} else {
+		data, _ := gulu.JSON.MarshalJSON(map[string]interface{}{"fold": "1"})
+		transactions = []*model.Transaction{
+			{
+				DoOperations: []*model.Operation{
+					{
+						Action: "setAttrs",
+						ID:     id,
+						Data:   string(data),
+					},
+				},
+			},
+		}
+	}
+
+	model.PerformTransactions(&transactions)
+	model.WaitForWritingFiles()
+
+	broadcastTransactions(transactions)
+}
 
 func moveBlock(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
@@ -101,7 +222,13 @@ func appendBlock(c *gin.Context) {
 	}
 	if "markdown" == dataType {
 		luteEngine := util.NewLute()
-		data = dataBlockDOM(data, luteEngine)
+		var err error
+		data, err = dataBlockDOM(data, luteEngine)
+		if nil != err {
+			ret.Code = -1
+			ret.Msg = "data block DOM failed: " + err.Error()
+			return
+		}
 	}
 
 	transactions := []*model.Transaction{
@@ -140,7 +267,13 @@ func prependBlock(c *gin.Context) {
 	}
 	if "markdown" == dataType {
 		luteEngine := util.NewLute()
-		data = dataBlockDOM(data, luteEngine)
+		var err error
+		data, err = dataBlockDOM(data, luteEngine)
+		if nil != err {
+			ret.Code = -1
+			ret.Msg = "data block DOM failed: " + err.Error()
+			return
+		}
 	}
 
 	transactions := []*model.Transaction{
@@ -195,7 +328,13 @@ func insertBlock(c *gin.Context) {
 
 	if "markdown" == dataType {
 		luteEngine := util.NewLute()
-		data = dataBlockDOM(data, luteEngine)
+		var err error
+		data, err = dataBlockDOM(data, luteEngine)
+		if nil != err {
+			ret.Code = -1
+			ret.Msg = "data block DOM failed: " + err.Error()
+			return
+		}
 	}
 
 	transactions := []*model.Transaction{
@@ -237,7 +376,13 @@ func updateBlock(c *gin.Context) {
 
 	luteEngine := util.NewLute()
 	if "markdown" == dataType {
-		data = dataBlockDOM(data, luteEngine)
+		var err error
+		data, err = dataBlockDOM(data, luteEngine)
+		if nil != err {
+			ret.Code = -1
+			ret.Msg = "data block DOM failed: " + err.Error()
+			return
+		}
 	}
 	tree := luteEngine.BlockDOM2Tree(data)
 	if nil == tree || nil == tree.Root || nil == tree.Root.FirstChild {
@@ -341,14 +486,35 @@ func broadcastTransactions(transactions []*model.Transaction) {
 	util.PushEvent(evt)
 }
 
-func dataBlockDOM(data string, luteEngine *lute.Lute) (ret string) {
+func dataBlockDOM(data string, luteEngine *lute.Lute) (ret string, err error) {
 	luteEngine.SetHTMLTag2TextMark(true) // API `/api/block/**` 无法使用 `<u>foo</u>` 与 `<kbd>bar</kbd>` 插入/更新行内元素 https://github.com/siyuan-note/siyuan/issues/6039
 
-	ret = luteEngine.Md2BlockDOM(data, true)
+	ret, tree := luteEngine.Md2BlockDOMTree(data, true)
 	if "" == ret {
 		// 使用 API 插入空字符串出现错误 https://github.com/siyuan-note/siyuan/issues/3931
 		blankParagraph := treenode.NewParagraph()
 		ret = luteEngine.RenderNodeBlockDOM(blankParagraph)
+	}
+
+	invalidID := ""
+	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering {
+			return ast.WalkContinue
+		}
+
+		if "" != n.ID {
+			if !ast.IsNodeIDPattern(n.ID) {
+				invalidID = n.ID
+				return ast.WalkStop
+			}
+		}
+		return ast.WalkContinue
+	})
+
+	if "" != invalidID {
+		err = errors.New("found invalid ID [" + invalidID + "]")
+		ret = ""
+		return
 	}
 	return
 }

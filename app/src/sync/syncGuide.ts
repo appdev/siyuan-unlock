@@ -1,14 +1,15 @@
+import {isPaidUser, needSubscribe} from "../util/needSubscribe";
+import {showMessage} from "../dialog/message";
+import {fetchPost} from "../util/fetch";
 import {Dialog} from "../dialog";
 import {confirmDialog} from "../dialog/confirmDialog";
-import {showMessage} from "../dialog/message";
-import {processSync} from "../dialog/processSystem";
-import {fetchPost} from "../util/fetch";
 import {isMobile} from "../util/functions";
-import {needLogin, needSubscribe} from "../util/needSubscribe";
+import {processSync} from "../dialog/processSystem";
 /// #if !MOBILE
 import {openSetting} from "../config";
 /// #endif
 import {App} from "../index";
+import {Constants} from "../constants";
 
 export const addCloudName = (cloudPanelElement: Element) => {
     const dialog = new Dialog({
@@ -23,6 +24,7 @@ export const addCloudName = (cloudPanelElement: Element) => {
 </div>`,
         width: isMobile() ? "92vw" : "520px",
     });
+    dialog.element.setAttribute("data-key", Constants.DIALOG_SYNCADDCLOUDDIR);
     const inputElement = dialog.element.querySelector("input") as HTMLInputElement;
     const btnsElement = dialog.element.querySelectorAll(".b3-button");
     dialog.bindInput(inputElement, () => {
@@ -153,7 +155,8 @@ export const syncGuide = (app?: App) => {
 
     /// #if MOBILE
     if ((0 === window.siyuan.config.sync.provider && needSubscribe()) ||
-        (0 !== window.siyuan.config.sync.provider && needLogin())) {
+        (0 !== window.siyuan.config.sync.provider && !isPaidUser())) {
+        showMessage(window.siyuan.languages["_kernel"][214]);
         return;
     }
     /// #else
@@ -170,10 +173,8 @@ export const syncGuide = (app?: App) => {
         }
         return;
     }
-    if (0 !== window.siyuan.config.sync.provider && needLogin("") && app) {
-        const dialogSetting = openSetting(app);
-        dialogSetting.element.querySelector('.b3-tab-bar [data-name="account"]').dispatchEvent(new CustomEvent("click"));
-        dialogSetting.element.querySelector('.config__tab-container[data-name="account"]').setAttribute("data-action", "go-repos");
+    if (0 !== window.siyuan.config.sync.provider && !isPaidUser() && app) {
+        showMessage(window.siyuan.languages["_kernel"][214]);
         return;
     }
     /// #endif
@@ -219,6 +220,7 @@ const syncNow = () => {
 </div>`,
         width: isMobile() ? "92vw" : "520px",
     });
+    manualDialog.element.setAttribute("data-key", Constants.DIALOG_SYNCCHOOSEDIRECTION);
     const btnsElement = manualDialog.element.querySelectorAll(".b3-button");
     btnsElement[0].addEventListener("click", () => {
         manualDialog.destroy();
@@ -259,6 +261,7 @@ const setSync = (key?: string, dialog?: Dialog) => {
                 width: isMobile() ? "92vw" : "520px",
             });
         }
+        dialog.element.setAttribute("data-key", Constants.DIALOG_SYNCCHOOSEDIR);
         const contentElement = dialog.element.querySelector(".b3-dialog__content").lastElementChild;
         const btnElement = dialog.element.querySelector(".b3-button");
         bindSyncCloudListEvent(contentElement, () => {
@@ -322,6 +325,7 @@ export const setKey = (isSync: boolean, cb?: () => void) => {
 </div>`,
         width: isMobile() ? "92vw" : "520px",
     });
+    dialog.element.setAttribute("data-key", Constants.DIALOG_SETPASSWORD);
     dialog.element.querySelector(".b3-button--cancel").addEventListener("click", () => {
         dialog.destroy();
     });

@@ -1,6 +1,6 @@
 import {matchHotKey} from "../../util/hotKey";
-import {selectRow} from "./row";
-import {cellScrollIntoView, popTextCell} from "./cell";
+import {deleteRow, selectRow} from "./row";
+import {cellScrollIntoView, popTextCell, updateCellsValue} from "./cell";
 import {avContextmenu} from "./action";
 import {hasClosestByClassName} from "../../util/hasClosest";
 import {Constants} from "../../../constants";
@@ -23,6 +23,10 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
         if (!rowElement) {
             return false;
         }
+        nodeElement.querySelectorAll(".av__cell--active").forEach(item => {
+            item.classList.remove("av__cell--active");
+            item.querySelector(".av__drag-fill")?.remove();
+        });
         if (event.key === "Escape") {
             selectCellElement.classList.remove("av__cell--select");
             selectRow(rowElement.querySelector(".av__firstcol"), "select");
@@ -31,6 +35,11 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
         }
         if (event.key === "Enter") {
             popTextCell(protyle, [selectCellElement]);
+            event.preventDefault();
+            return true;
+        }
+        if (event.key === "Backspace" || event.key === "Delete") {
+            updateCellsValue(protyle, nodeElement, undefined, [selectCellElement]);
             event.preventDefault();
             return true;
         }
@@ -125,6 +134,11 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
         if (event.key === "Escape") {
             event.preventDefault();
             selectRow(selectRowElements[0].querySelector(".av__firstcol"), "unselectAll");
+            return true;
+        }
+        if (event.key === "Backspace") {
+            event.preventDefault();
+            deleteRow(nodeElement, protyle);
             return true;
         }
         if (event.key === "Enter") {

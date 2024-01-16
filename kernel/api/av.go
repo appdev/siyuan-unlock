@@ -26,6 +26,169 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
+func addAttributeViewCol(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, _ := util.JsonArg(c, ret)
+	if nil == arg {
+		return
+	}
+
+	avID := arg["avID"].(string)
+	keyID := arg["keyID"].(string)
+	keyName := arg["keyName"].(string)
+	keyType := arg["keyType"].(string)
+	keyIcon := arg["keyIcon"].(string)
+	previousKeyID := arg["previousKeyID"].(string)
+
+	err := model.AddAttributeViewKey(avID, keyID, keyName, keyType, keyIcon, previousKeyID)
+	if nil != err {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		return
+	}
+}
+
+func removeAttributeViewCol(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, _ := util.JsonArg(c, ret)
+	if nil == arg {
+		return
+	}
+
+	avID := arg["avID"].(string)
+	keyID := arg["keyID"].(string)
+
+	err := model.RemoveAttributeViewKey(avID, keyID)
+	if nil != err {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		return
+	}
+}
+
+func sortAttributeViewCol(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	avID := arg["avID"].(string)
+	keyID := arg["keyID"].(string)
+	previousKeyID := arg["previousKeyID"].(string)
+
+	err := model.SortAttributeViewKey(avID, keyID, previousKeyID)
+	if nil != err {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		return
+	}
+}
+
+func getAttributeViewFilterSort(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, _ := util.JsonArg(c, ret)
+	if nil == arg {
+		return
+	}
+
+	avID := arg["id"].(string)
+
+	filters, sorts := model.GetAttributeViewFilterSort(avID)
+	ret.Data = map[string]interface{}{
+		"filters": filters,
+		"sorts":   sorts,
+	}
+}
+
+func searchAttributeViewNonRelationKey(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, _ := util.JsonArg(c, ret)
+	if nil == arg {
+		return
+	}
+
+	avID := arg["avID"].(string)
+	keyword := arg["keyword"].(string)
+
+	nonRelationKeys := model.SearchAttributeViewNonRelationKey(avID, keyword)
+	ret.Data = map[string]interface{}{
+		"keys": nonRelationKeys,
+	}
+}
+
+func searchAttributeViewRelationKey(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, _ := util.JsonArg(c, ret)
+	if nil == arg {
+		return
+	}
+
+	avID := arg["avID"].(string)
+	keyword := arg["keyword"].(string)
+
+	relationKeys := model.SearchAttributeViewRelationKey(avID, keyword)
+	ret.Data = map[string]interface{}{
+		"keys": relationKeys,
+	}
+}
+
+func getAttributeView(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, _ := util.JsonArg(c, ret)
+	if nil == arg {
+		return
+	}
+
+	id := arg["id"].(string)
+	ret.Data = map[string]interface{}{
+		"av": model.GetAttributeView(id),
+	}
+}
+
+func searchAttributeView(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, _ := util.JsonArg(c, ret)
+	if nil == arg {
+		return
+	}
+
+	keyword := arg["keyword"].(string)
+	page := 1
+	pageArg := arg["page"]
+	if nil != pageArg {
+		page = int(pageArg.(float64))
+	}
+
+	pageSize := 10
+	pageSizeArg := arg["pageSize"]
+	if nil != pageSizeArg {
+		pageSize = int(pageSizeArg.(float64))
+	}
+
+	results, total := model.SearchAttributeView(keyword, page, pageSize)
+	ret.Data = map[string]interface{}{
+		"results": results,
+		"total":   total,
+	}
+}
+
 func renderSnapshotAttributeView(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)

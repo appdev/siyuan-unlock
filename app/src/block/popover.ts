@@ -5,6 +5,7 @@ import {hideTooltip, showTooltip} from "../dialog/tooltip";
 import {getIdFromSYProtocol} from "../util/pathName";
 import {App} from "../index";
 import {Constants} from "../constants";
+import {getCellText} from "../protyle/render/av/cell";
 
 let popoverTargetElement: HTMLElement;
 export const initBlockPopover = (app: App) => {
@@ -16,21 +17,24 @@ export const initBlockPopover = (app: App) => {
             return;
         }
         const aElement = hasClosestByAttribute(event.target, "data-type", "a", true) ||
-            hasClosestByAttribute(event.target, "data-type", "tab-header") ||
-            hasClosestByClassName(event.target, "av__celltext") ||
             hasClosestByClassName(event.target, "ariaLabel") ||
-            hasClosestByAttribute(event.target, "data-type", "inline-memo");
+            hasClosestByAttribute(event.target, "data-type", "tab-header") ||
+            hasClosestByAttribute(event.target, "data-type", "inline-memo") ||
+            hasClosestByClassName(event.target, "av__cell");
         if (aElement) {
             let tip = aElement.getAttribute("aria-label") || aElement.getAttribute("data-inline-memo-content");
-            if (aElement.classList.contains("av__celltext")) {
-                if (aElement.offsetWidth > aElement.parentElement.clientWidth - 5) {    // 只能减左边 padding，换行时字体会穿透到右侧 padding
-                    if (aElement.querySelector(".av__cellicon")) {
-                        tip = `${aElement.firstChild.textContent} → ${aElement.lastChild.textContent}`;
-                    } else {
-                        tip = aElement.textContent;
+            if (aElement.classList.contains("av__cell")) {
+                if (aElement.classList.contains("av__cell--header")) {
+                    const textElement = aElement.querySelector(".av__celltext");
+                    if (textElement.scrollWidth > textElement.clientWidth + 2) {
+                        tip = getCellText(aElement);
                     }
-                } else {
-                    return;
+                } else if (aElement.dataset.wrap !== "true" && event.target.dataset.type !== "block-more" && !hasClosestByClassName(event.target, "block__icon")) {
+                    aElement.style.overflow = "auto";
+                    if (aElement.scrollWidth > aElement.clientWidth + 2) {
+                        tip = getCellText(aElement);
+                    }
+                    aElement.style.overflow = "";
                 }
             }
             if (!tip) {
@@ -40,10 +44,11 @@ export const initBlockPopover = (app: App) => {
                     tip += "<br>" + title;
                 }
             }
-            if (tip && !tip.startsWith("siyuan://blocks") && !aElement.classList.contains("b3-tooltips")) {
+            if (tip && !aElement.classList.contains("b3-tooltips")) {
                 showTooltip(tip, aElement);
                 event.stopPropagation();
-                return;
+            } else {
+                hideTooltip();
             }
         } else if (!aElement) {
             const tipElement = hasClosestByAttribute(event.target, "id", "tooltip", true);
@@ -102,14 +107,38 @@ const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
     if (!target) {
         return false;
     }
-    if (hasClosestByClassName(target, "b3-menu") ||
-        (target.id && target.tagName !== "svg" && (target.id.startsWith("minder_node") || target.id.startsWith("kity_") || target.id.startsWith("node_")))
+    if ((target.id && target.tagName !== "svg" && (target.id.startsWith("minder_node") || target.id.startsWith("kity_") || target.id.startsWith("node_")))
         || target.classList.contains("counter")
         || target.tagName === "circle"
     ) {
-        // b3-menu 需要处理，(( 后的 hint 上的图表移上去需显示预览
         // gutter & mindmap & 文件树上的数字 & 关系图节点不处理
         return false;
+    }
+
+    const avPanelElement = hasClosestByClassName(target, "av__panel");
+    if (avPanelElement) {
+        // 浮窗上点击 av 操作，浮窗不能消失
+        const blockPanel = window.siyuan.blockPanels.find((item) => {
+            if (item.element.style.zIndex < avPanelElement.style.zIndex) {
+                return true;
+            }
+        });
+        if (blockPanel) {
+            return false;
+        }
+    } else {
+        // 浮窗上点击菜单，浮窗不能消失 https://ld246.com/article/1632668091023
+        const menuElement = hasClosestByClassName(target, "b3-menu");
+        if (menuElement) {
+            const blockPanel = window.siyuan.blockPanels.find((item) => {
+                if (item.element.style.zIndex < menuElement.style.zIndex) {
+                    return true;
+                }
+            });
+            if (blockPanel) {
+                return false;
+            }
+        }
     }
     popoverTargetElement = hasClosestByAttribute(target, "data-type", "block-ref") as HTMLElement ||
         hasClosestByAttribute(target, "data-type", "virtual-block-ref") as HTMLElement;
@@ -180,10 +209,15 @@ const getTarget = (event: MouseEvent & { target: HTMLElement }, aElement: false 
     if (!popoverTargetElement) {
         popoverTargetElement = hasClosestByClassName(event.target, "popover__block") as HTMLElement;
     }
-    if (!popoverTargetElement && aElement && (
-        (aElement.getAttribute("data-href")?.startsWith("siyuan://blocks") && aElement.getAttribute("prevent-popover") !== "true") ||
-        (aElement.classList.contains("av__celltext") && aElement.dataset.type === "url"))) {
-        popoverTargetElement = aElement;
+    if (!popoverTargetElement && aElement) {
+        if (aElement.getAttribute("data-href")?.startsWith("siyuan://blocks") && aElement.getAttribute("prevent-popover") !== "true") {
+            popoverTargetElement = aElement;
+        } else if (aElement.classList.contains("av__cell")) {
+            const textElement = aElement.querySelector(".av__celltext--url") as HTMLElement;
+            if (textElement && textElement.dataset.type === "url" && textElement.dataset.href?.startsWith("siyuan://blocks")) {
+                popoverTargetElement = textElement;
+            }
+        }
     }
     if (!popoverTargetElement || window.siyuan.altIsPressed ||
         (window.siyuan.config.editor.floatWindowMode === 0 && window.siyuan.ctrlIsPressed) ||

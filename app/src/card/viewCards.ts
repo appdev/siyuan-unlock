@@ -21,6 +21,7 @@ export const viewCards = (app: App, deckID: string, title: string, deckType: "Tr
         page: pageIndex
     }, (response) => {
         const dialog = new Dialog({
+            positionId: Constants.DIALOG_VIEWCARDS,
             content: `<div class="fn__flex-column" style="height: 100%">
     <div class="block__icons">
         <span class="fn__flex-1 fn__flex-center resize__move">${escapeHtml(title)}</span>
@@ -78,7 +79,7 @@ export const viewCards = (app: App, deckID: string, title: string, deckType: "Tr
         if (response.data.pageCount > 1) {
             nextElement.removeAttribute("disabled");
         }
-        dialog.element.setAttribute("data-key", "viewCards");
+        dialog.element.setAttribute("data-key", Constants.DIALOG_VIEWCARDS);
         dialog.element.addEventListener("click", (event) => {
             if (typeof event.detail === "string") {
                 let currentElement = listElement.querySelector(".b3-list-item--focus");
@@ -88,6 +89,10 @@ export const viewCards = (app: App, deckID: string, title: string, deckType: "Tr
                         currentElement = currentElement.previousElementSibling || currentElement.parentElement.lastElementChild;
                     } else if (event.detail === "arrowdown") {
                         currentElement = currentElement.nextElementSibling || currentElement.parentElement.firstElementChild;
+                    } else if (event.detail === "home") {
+                        currentElement = currentElement.parentElement.firstElementChild;
+                    } else if (event.detail === "end") {
+                        currentElement = currentElement.parentElement.lastElementChild;
                     }
                     const currentRect = currentElement.getBoundingClientRect();
                     const parentRect = currentElement.parentElement.getBoundingClientRect();
@@ -166,16 +171,16 @@ export const viewCards = (app: App, deckID: string, title: string, deckType: "Tr
                 } else if (type === "resetAll") {
                     confirmDialog(window.siyuan.languages.reset,
                         window.siyuan.languages.resetCardTip.replace("${x}", dialog.element.querySelector(".counter").textContent), () => {
-                        fetchPost("/api/riff/resetRiffCards", {
-                            type: deckType === "" ? "deck" : deckType.toLowerCase(),
-                            deckID: deckType === "" ? deckID : Constants.QUICK_DECK_ID,
-                            id: deckID,
-                        }, () => {
-                            dialog.element.querySelectorAll(".ariaLabel.b3-list-item__meta").forEach(item => {
-                                item.textContent = dayjs().format("YYYY-MM-DD");
+                            fetchPost("/api/riff/resetRiffCards", {
+                                type: deckType === "" ? "deck" : deckType.toLowerCase(),
+                                deckID: deckType === "" ? deckID : Constants.QUICK_DECK_ID,
+                                id: deckID,
+                            }, () => {
+                                dialog.element.querySelectorAll(".ariaLabel.b3-list-item__meta").forEach(item => {
+                                    item.textContent = dayjs().format("YYYY-MM-DD");
+                                });
                             });
                         });
-                    });
                     event.stopPropagation();
                     event.preventDefault();
                     break;

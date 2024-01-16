@@ -3,15 +3,14 @@ import {hasClosestBlock, hasClosestByAttribute, hasClosestByClassName} from "../
 import {transaction} from "../../wysiwyg/transaction";
 import {openEditorTab} from "../../../menus/util";
 import {copySubMenu} from "../../../menus/commonMenuItem";
-import {getTypeByCellElement, popTextCell} from "./cell";
+import {getCellText, getTypeByCellElement, popTextCell, renderCell, updateHeaderCell} from "./cell";
 import {getColIconByType, showColMenu} from "./col";
-import {insertAttrViewBlockAnimation, setPageSize, stickyRow, updateHeader} from "./row";
+import {deleteRow, insertAttrViewBlockAnimation, setPageSize, updateHeader} from "./row";
 import {emitOpenMenu} from "../../../plugin/EventBus";
 import {addCol} from "./col";
 import {openMenuPanel} from "./openMenuPanel";
 import {hintRef} from "../../hint/extend";
 import {focusByRange} from "../../util/selection";
-import {writeText} from "../../util/compatibility";
 import {showMessage} from "../../../dialog/message";
 import {previewImage} from "../../preview/image";
 import {isLocalPath, pathPosix} from "../../../util/pathName";
@@ -26,6 +25,7 @@ import * as dayjs from "dayjs";
 import {openCalcMenu} from "./calc";
 import {avRender} from "./render";
 import {addView, openViewMenu} from "./view";
+import {writeText} from "../../util/compatibility";
 
 export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLElement }) => {
     const blockElement = hasClosestBlock(event.target);
@@ -42,12 +42,7 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
 
     const copyElement = hasClosestByAttribute(event.target, "data-type", "copy");
     if (copyElement) {
-        const textElement = copyElement.previousElementSibling;
-        if (textElement.querySelector(".av__cellicon")) {
-            writeText(`${textElement.firstChild.textContent} → ${textElement.lastChild.textContent}`);
-        } else {
-            writeText(textElement.textContent);
-        }
+        writeText(getCellText(hasClosestByClassName(copyElement, "av__cell")));
         showMessage(window.siyuan.languages.copied);
         event.preventDefault();
         event.stopPropagation();
@@ -90,7 +85,7 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
                 srcIDs,
                 avID,
             }]);
-            insertAttrViewBlockAnimation(blockElement, srcIDs, undefined, avID);
+            insertAttrViewBlockAnimation(protyle, blockElement, srcIDs, undefined, avID);
             event.preventDefault();
             event.stopPropagation();
             return true;
@@ -160,40 +155,7 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
                 srcIDs,
                 avID,
             }]);
-            insertAttrViewBlockAnimation(blockElement, srcIDs, previousID, avID);
-            event.preventDefault();
-            event.stopPropagation();
-            return true;
-        } else if (target.classList.contains("av__gutter")) {
-            const rowElement = hasClosestByClassName(target, "av__row");
-            if (!rowElement) {
-                return;
-            }
-            if (target.dataset.action === "add") {
-                const avID = blockElement.getAttribute("data-av-id");
-                const srcIDs = [Lute.NewNodeID()];
-                const previousID = event.altKey ? (rowElement.previousElementSibling.getAttribute("data-id") || "") : rowElement.getAttribute("data-id");
-                transaction(protyle, [{
-                    action: "insertAttrViewBlock",
-                    avID,
-                    previousID,
-                    srcIDs,
-                    isDetached: true,
-                }], [{
-                    action: "removeAttrViewBlock",
-                    srcIDs,
-                    avID,
-                }]);
-                insertAttrViewBlockAnimation(blockElement, srcIDs, previousID, avID);
-            } else {
-                const gutterRect = target.getBoundingClientRect();
-                avContextmenu(protyle, rowElement, {
-                    x: gutterRect.left,
-                    y: gutterRect.bottom,
-                    w: gutterRect.width,
-                    h: gutterRect.height
-                });
-            }
+            insertAttrViewBlockAnimation(protyle, blockElement, srcIDs, previousID, avID);
             event.preventDefault();
             event.stopPropagation();
             return true;
@@ -235,8 +197,8 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
             event.preventDefault();
             event.stopPropagation();
             return true;
-        } else if (target.classList.contains("av__cellheader")) {
-            showColMenu(protyle, blockElement, target.parentElement);
+        } else if (target.classList.contains("av__cell--header")) {
+            showColMenu(protyle, blockElement, target);
             event.preventDefault();
             event.stopPropagation();
             return true;
@@ -294,6 +256,10 @@ export const avContextmenu = (protyle: IProtyle, rowElement: HTMLElement, positi
     if (!blockElement) {
         return false;
     }
+    blockElement.querySelectorAll(".av__cell--select, .av__cell--active").forEach(item => {
+        item.classList.remove("av__cell--select", "av__cell--active");
+        item.querySelector(".av__drag-fill")?.remove();
+    });
     if (!rowElement.classList.contains("av__row--select")) {
         blockElement.querySelectorAll(".av__row--select").forEach(item => {
             item.classList.remove("av__row--select");
@@ -309,82 +275,62 @@ export const avContextmenu = (protyle: IProtyle, rowElement: HTMLElement, positi
     }
     rowElement.classList.add("av__row--select");
     rowElement.querySelector(".av__firstcol use").setAttribute("xlink:href", "#iconCheck");
-    const rowIds: string[] = [];
-    const blockIds: string[] = [];
     const rowElements = blockElement.querySelectorAll(".av__row--select:not(.av__row--header)");
-    rowElements.forEach(item => {
-        rowIds.push(item.getAttribute("data-id"));
-        blockIds.push(item.querySelector(".av__cell[data-block-id]").getAttribute("data-block-id"));
-    });
     updateHeader(rowElement);
-    menu.addItem({
-        icon: "iconTrashcan",
-        label: window.siyuan.languages.delete,
-        click() {
-            const avID = blockElement.getAttribute("data-av-id");
-            const undoOperations: IOperation[] = [];
-            rowElements.forEach(item => {
-                undoOperations.push({
-                    action: "insertAttrViewBlock",
-                    avID,
-                    previousID: item.previousElementSibling?.getAttribute("data-id") || "",
-                    srcIDs: [item.getAttribute("data-id")],
-                    isDetached: item.querySelector('.av__cell[data-detached="true"]') ? true : false,
-                });
-            });
-            transaction(protyle, [{
-                action: "removeAttrViewBlock",
-                srcIDs: blockIds,
-                avID,
-            }], undoOperations);
-            rowElements.forEach(item => {
-                item.remove();
-            });
-            stickyRow(blockElement, protyle.contentElement.getBoundingClientRect(), "all");
-            updateHeader(blockElement.querySelector(".av__row"));
+    if (!protyle.disabled) {
+        menu.addItem({
+            icon: "iconTrashcan",
+            label: window.siyuan.languages.delete,
+            click() {
+                deleteRow(blockElement, protyle);
+            }
+        });
+    }
+    if (rowElements.length === 1 && !rowElements[0].querySelector('[data-detached="true"]')) {
+        if (!protyle.disabled) {
+            menu.addSeparator();
         }
-    });
-    if (rowIds.length === 1 && !rowElements[0].querySelector('[data-detached="true"]')) {
-        menu.addSeparator();
-        openEditorTab(protyle.app, rowIds[0]);
+        openEditorTab(protyle.app, rowElements[0].getAttribute("data-id"));
         menu.addItem({
             label: window.siyuan.languages.copy,
             icon: "iconCopy",
             type: "submenu",
-            submenu: copySubMenu(rowIds[0])
+            submenu: copySubMenu(rowElements[0].getAttribute("data-id"))
         });
     }
-    menu.addSeparator();
-    const editAttrSubmenu: IMenu[] = [];
-    rowElement.parentElement.querySelectorAll(".av__row--header .av__cell").forEach((cellElement: HTMLElement) => {
-        let hideBlock = false;
-        const selectElements: HTMLElement[] = Array.from(blockElement.querySelectorAll(`.av__row--select:not(.av__row--header) .av__cell[data-col-id="${cellElement.dataset.colId}"]`));
-        if (cellElement.dataset.dtype === "block") {
-            selectElements.find(item => {
-                if (!item.dataset.detached) {
-                    hideBlock = true;
-                    return true;
-                }
-            });
-        }
-        const type = cellElement.getAttribute("data-dtype") as TAVCol;
-        if (!hideBlock && !["updated", "created"].includes(type)) {
-            const icon = cellElement.dataset.icon;
-            editAttrSubmenu.push({
-                iconHTML: icon ? unicode2Emoji(icon, "b3-menu__icon", true) : `<svg class="b3-menu__icon"><use xlink:href="#${getColIconByType(type)}"></use></svg>`,
-                label: cellElement.querySelector(".av__celltext").textContent.trim(),
-                click() {
-                    popTextCell(protyle, selectElements);
-                }
-            });
-        }
-    });
-    menu.addItem({
-        icon: "iconAttr",
-        label: window.siyuan.languages.attr,
-        type: "submenu",
-        submenu: editAttrSubmenu
-    });
+    if (!protyle.disabled) {
+        menu.addSeparator();
+        const editAttrSubmenu: IMenu[] = [];
+        rowElement.parentElement.querySelectorAll(".av__row--header .av__cell").forEach((cellElement: HTMLElement) => {
+            let hideBlock = false;
+            const selectElements: HTMLElement[] = Array.from(blockElement.querySelectorAll(`.av__row--select:not(.av__row--header) .av__cell[data-col-id="${cellElement.dataset.colId}"]`));
+            if (cellElement.dataset.dtype === "block") {
+                selectElements.find(item => {
+                    if (!item.dataset.detached) {
+                        hideBlock = true;
+                        return true;
+                    }
+                });
+            }
+            const type = cellElement.getAttribute("data-dtype") as TAVCol;
+            if (!hideBlock && !["updated", "created"].includes(type)) {
+                const icon = cellElement.dataset.icon;
+                editAttrSubmenu.push({
+                    iconHTML: icon ? unicode2Emoji(icon, "b3-menu__icon", true) : `<svg class="b3-menu__icon"><use xlink:href="#${getColIconByType(type)}"></use></svg>`,
+                    label: cellElement.querySelector(".av__celltext").textContent.trim(),
+                    click() {
+                        popTextCell(protyle, selectElements);
+                    }
+                });
+            }
+        });
+        menu.addItem({
+            icon: "iconAttr",
+            label: window.siyuan.languages.attr,
+            type: "submenu",
+            submenu: editAttrSubmenu
+        });
+    }
     if (protyle?.app?.plugins) {
         emitOpenMenu({
             plugins: protyle.app.plugins,
@@ -444,8 +390,17 @@ export const updateAVName = (protyle: IProtyle, blockElement: Element) => {
     });
 };
 
-export const updateAttrViewCellAnimation = (cellElement: HTMLElement) => {
-    cellElement.style.backgroundColor = "var(--b3-av-hover)";
+export const updateAttrViewCellAnimation = (cellElement: HTMLElement, value: IAVCellValue, headerValue?: {
+    icon?: string,
+    name?: string,
+    pin?: boolean,
+    type?: TAVCol
+}) => {
+    if (headerValue) {
+        updateHeaderCell(cellElement, headerValue);
+    } else {
+        cellElement.innerHTML = renderCell(value);
+    }
 };
 
 export const removeAttrViewColAnimation = (blockElement: Element, id: string) => {

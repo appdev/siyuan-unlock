@@ -21,14 +21,14 @@ export const initAbout = () => {
         title: window.siyuan.languages.about,
         icon: "iconInfo",
         html: `<div>
-<div class="b3-label fn__flex${window.siyuan.config.readonly ? " fn__none" : ""}">
+<label class="b3-label fn__flex${window.siyuan.config.readonly ? " fn__none" : ""}">
     <div class="fn__flex-1">
         ${window.siyuan.languages.about11}
         <div class="b3-label__text">${window.siyuan.languages.about12}</div>
     </div>
     <div class="fn__space"></div>
     <input class="b3-switch fn__flex-center" id="networkServe" type="checkbox"${window.siyuan.config.system.networkServe ? " checked" : ""}>
-</div>
+</label>
 <div class="b3-label">
         ${window.siyuan.languages.about2}
         <div class="fn__hr"></div>
@@ -173,6 +173,7 @@ export const initAbout = () => {
 </div>`,
                             width: "92vw",
                         });
+                        passwordDialog.element.setAttribute("data-key", Constants.DIALOG_PASSWORD);
                         const textAreaElement = passwordDialog.element.querySelector("textarea");
                         textAreaElement.focus();
                         const btnsElement = passwordDialog.element.querySelectorAll(".b3-button");
@@ -272,6 +273,7 @@ export const initAbout = () => {
 </div>`,
                                 width: "92vw",
                             });
+                            openWorkspaceDialog.element.setAttribute("data-key", Constants.SIYUAN_OPEN_WORKSPACE);
                             const btnsElement = openWorkspaceDialog.element.querySelectorAll(".b3-button");
                             btnsElement[0].addEventListener("click", () => {
                                 openWorkspaceDialog.destroy();
@@ -306,6 +308,7 @@ export const initAbout = () => {
 </div>`,
                             width: "92vw",
                         });
+                        createWorkspaceDialog.element.setAttribute("data-key", Constants.DIALOG_CREATEWORKSPACE);
                         const inputElement = createWorkspaceDialog.element.querySelector("input");
                         inputElement.focus();
                         const btnsElement = createWorkspaceDialog.element.querySelectorAll(".b3-button");

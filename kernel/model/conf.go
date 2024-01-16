@@ -80,6 +80,7 @@ type AppConf struct {
 	OpenHelp       bool             `json:"openHelp"`       // 启动后是否需要打开用户指南
 	ShowChangelog  bool             `json:"showChangelog"`  // 是否显示版本更新日志
 	CloudRegion    int              `json:"cloudRegion"`    // 云端区域，0：中国大陆，1：北美
+	Snippet        *conf.Snpt       `json:"snippet"`        // 代码片段
 
 	m *sync.Mutex
 }
@@ -207,10 +208,6 @@ func InitConf() {
 	if "../" == Conf.FileTree.DocCreateSavePath {
 		Conf.FileTree.DocCreateSavePath = "../Untitled"
 	}
-	for strings.HasSuffix(Conf.FileTree.DocCreateSavePath, "/") {
-		Conf.FileTree.DocCreateSavePath = strings.TrimSuffix(Conf.FileTree.DocCreateSavePath, "/")
-		Conf.FileTree.DocCreateSavePath = strings.TrimSpace(Conf.FileTree.DocCreateSavePath)
-	}
 	util.UseSingleLineSave = Conf.FileTree.UseSingleLineSave
 
 	util.CurrentCloudRegion = Conf.CloudRegion
@@ -298,6 +295,10 @@ func InitConf() {
 	if util.ContainerStd == util.Container {
 		Conf.System.ID = util.GetDeviceID()
 		Conf.System.Name = util.GetDeviceName()
+	}
+
+	if nil == Conf.Snippet {
+		Conf.Snippet = conf.NewSnpt()
 	}
 
 	Conf.System.AppDir = util.WorkingDir
@@ -644,6 +645,15 @@ func (conf *AppConf) Box(boxID string) *Box {
 	return nil
 }
 
+func (conf *AppConf) GetBox(boxID string) *Box {
+	for _, box := range conf.GetBoxes() {
+		if box.ID == boxID {
+			return box
+		}
+	}
+	return nil
+}
+
 func (conf *AppConf) BoxNames(boxIDs []string) (ret map[string]string) {
 	ret = map[string]string{}
 
@@ -766,6 +776,7 @@ func IsSubscriber() bool {
 }
 
 func IsPaidUser() bool {
+	// S3/WebDAV data sync and backup are available for a fee https://github.com/siyuan-note/siyuan/issues/8780
 	// if IsSubscriber() {
 	// 	return true
 	// }
