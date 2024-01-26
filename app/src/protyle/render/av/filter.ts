@@ -270,12 +270,13 @@ export const setFilter = async (options: {
     }
     menu.addItem({
         iconHTML: "",
+        type: "readonly",
         label: `<select style="margin: 4px 0" class="b3-select fn__size200">${selectHTML}</select>`
     });
     if (filterType === "select" || filterType === "mSelect") {
         colData.options?.forEach((option) => {
             let icon = "iconUncheck";
-            options.filter.value?.mSelect.find((optionItem) => {
+            options.filter.value?.mSelect?.find((optionItem) => {
                 if (optionItem.content === option.name) {
                     icon = "iconCheck";
                 }
@@ -308,21 +309,25 @@ export const setFilter = async (options: {
         }
         menu.addItem({
             iconHTML: "",
+            type: "readonly",
             label: `<input style="margin: 4px 0" value="${value}" class="b3-text-field fn__size200">`
         });
     } else if (filterType === "number") {
         menu.addItem({
             iconHTML: "",
+            type: "readonly",
             label: `<input style="margin: 4px 0" value="${options.filter.value?.number.isNotEmpty ? options.filter.value.number.content : ""}" class="b3-text-field fn__size200">`
         });
     } else if (["date", "updated", "created"].includes(filterType)) {
         const dateValue = options.filter.value ? options.filter.value[filterType as "date"] : null;
         menu.addItem({
             iconHTML: "",
+            type: "readonly",
             label: `<input style="margin: 4px 0" value="${(dateValue.isNotEmpty || filterType !== "date") ? dayjs(dateValue.content).format("YYYY-MM-DD") : ""}" type="date" max="9999-12-31" class="b3-text-field fn__size200">`
         });
         menu.addItem({
             iconHTML: "",
+            type: "readonly",
             label: `<input style="margin: 4px 0" value="${dateValue.isNotEmpty2 ? dayjs(dateValue.content2).format("YYYY-MM-DD") : ""}" type="date" max="9999-12-31" class="b3-text-field fn__size200">`
         });
     }
@@ -508,7 +513,7 @@ export const getFiltersHTML = (data: IAVTable) => {
 
     data.filters.forEach((item: IAVFilter) => {
         html += `<button class="b3-menu__item" draggable="true" data-id="${item.column}">
-    <svg class="b3-menu__icon"><use xlink:href="#iconDrag"></use></svg>
+    <svg class="b3-menu__icon fn__grab"><use xlink:href="#iconDrag"></use></svg>
     <div class="fn__flex-1">${genFilterItem(item)}</div>
     <svg class="b3-menu__action" data-type="removeFilter"><use xlink:href="#iconTrashcan"></use></svg>
 </button>`;

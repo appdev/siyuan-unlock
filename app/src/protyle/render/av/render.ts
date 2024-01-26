@@ -8,6 +8,7 @@ import {hasClosestBlock, hasClosestByClassName} from "../../util/hasClosest";
 import {stickyRow} from "./row";
 import {getCalcValue} from "./calc";
 import {openMenuPanel} from "./openMenuPanel";
+import {renderAVAttribute} from "./blockAttr";
 
 export const avRender = (element: Element, protyle: IProtyle, cb?: () => void, viewID?: string) => {
     let avElements: Element[] = [];
@@ -68,7 +69,7 @@ export const avRender = (element: Element, protyle: IProtyle, cb?: () => void, v
                 }
                 // header
                 let tableHTML = '<div class="av__row av__row--header"><div class="av__firstcol av__colsticky"><svg><use xlink:href="#iconUncheck"></use></svg></div>';
-                let calcHTML = '<div style="width: 24px"></div>';
+                let calcHTML = "";
                 let pinIndex = -1;
                 let pinMaxIndex = -1;
                 let indexWidth = 0;
@@ -87,7 +88,7 @@ export const avRender = (element: Element, protyle: IProtyle, cb?: () => void, v
                 pinIndex = Math.min(pinIndex, pinMaxIndex);
                 if (pinIndex > -1) {
                     tableHTML = '<div class="av__row av__row--header"><div class="av__colsticky"><div class="av__firstcol"><svg><use xlink:href="#iconUncheck"></use></svg></div>';
-                    calcHTML = '<div class="av__colsticky"><div style="width: 24px"></div>';
+                    calcHTML = '<div class="av__colsticky">';
                 }
                 data.columns.forEach((column: IAVColumn, index: number) => {
                     if (column.hidden) {
@@ -104,8 +105,8 @@ style="width: ${column.width || "200px"};">
                     if (pinIndex === index) {
                         tableHTML += "</div>";
                     }
-                    calcHTML += `<div class="av__calc${calcHTML ? "" : " av__calc--show"}${column.calc && column.calc.operator !== "" ? " av__calc--ashow" : ""}" data-col-id="${column.id}" data-dtype="${column.type}" data-operator="${column.calc?.operator || ""}"  
-style="width: ${column.width || "200px"}">${getCalcValue(column) || '<svg><use xlink:href="#iconDown"></use></svg>' + window.siyuan.languages.calc}</div>`;
+                    calcHTML += `<div class="av__calc${column.calc && column.calc.operator !== "" ? " av__calc--ashow" : ""}" data-col-id="${column.id}" data-dtype="${column.type}" data-operator="${column.calc?.operator || ""}"  
+style="width: ${index === 0 ? ((parseInt(column.width || "200") + 24) + "px") : (column.width || "200px")}">${getCalcValue(column) || '<svg><use xlink:href="#iconDown"></use></svg>' + window.siyuan.languages.calc}</div>`;
                     if (pinIndex === index) {
                         calcHTML += "</div>";
                     }
@@ -290,9 +291,20 @@ export const refreshAV = (protyle: IProtyle, operation: IOperation) => {
         } else {
             Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-av-id="${operation.avID}"]`)).forEach((item: HTMLElement) => {
                 item.removeAttribute("data-render");
+                const isPulse = item.querySelector(".av__pulse");
                 avRender(item, protyle, () => {
-                    if (operation.action === "addAttrViewCol" && item.querySelector(".av__pulse")) {
+                    if (operation.action === "addAttrViewCol" && isPulse) {
                         openMenuPanel({protyle, blockElement: item, type: "edit", colId: operation.id});
+                    }
+
+                    const attrElement = document.querySelector(`.b3-dialog--open[data-key="${Constants.DIALOG_ATTR}"] div[data-av-id="${operation.avID}"]`) as HTMLElement;
+                    if (attrElement) {
+                        // 更新属性面板
+                        renderAVAttribute(attrElement.parentElement, attrElement.dataset.nodeId, protyle, (newElment) => {
+                            if (operation.action === "addAttrViewCol") {
+                                openMenuPanel({protyle, blockElement: newElment.querySelector(`div[data-av-id="${operation.avID}"]`), type: "edit", colId: operation.id});
+                            }
+                        });
                     }
                 }, ["addAttrViewView", "duplicateAttrViewView"].includes(operation.action) ? operation.id :
                     (operation.action === "removeAttrViewView" ? null : undefined));

@@ -1,4 +1,6 @@
 {
+  "cloudStoragePurge": "Purger le stockage cloud",
+  "cloudStoragePurgeConfirm": "Remarque :<ul class='fn__list'><li>Veuillez vous assurer que la synchronisation des autres appareils a été suspendue avant l'exécution</li><li>L'opération de purge prend beaucoup de temps, veuillez vous assurer que le réseau est stable</li></ul>Êtes-vous sûr de l'exécuter maintenant ?",
   "dragFill": "Arrastra verticalmente para rellenar el valor",
   "switchReadonly": "Changer de mode lecture seule",
   "original": "Originale",
@@ -851,6 +853,7 @@
   "insertBottom": "Ouvrir en bas de l'onglet",
   "insertRight": "Ouvrir en droit de l'onglet",
   "account1": "Devenez membre payant",
+  "account4": "Mise à niveau vers un Membre abonné",
   "account2": "Synchronisation et sauvegarde des données cryptées de bout en bout",
   "account3": "Abonnement d'essai",
   "account5": "Hébergement d'actifs cloud",
@@ -1390,6 +1393,15 @@
     "220": "En raison d'un défaut dans la version précédente, les données cloud sont corrompues. Veuillez vous référer aux étapes User Guide-FAQ-Lost Key pour réinitialiser le référentiel de données local et le répertoire cloud",
     "221": "L'opération de remplacement n'est pas prise en charge après le regroupement par document. Veuillez utiliser le dissociation puis remplacer",
     "222": "La synchronisation des données est en cours, veuillez attendre que la synchronisation des données soit terminée et réessayer",
-    "223": "Nettoyage du stockage cloud..."
+    "223": "Purger le stockage cloud...",
+    "224": "Liste des objets de données de stockage cloud...",
+    "225": "Liste des instantanés de stockage cloud...",
+    "226": "Liste des références d'instantanés de stockage cloud...",
+    "227": "Téléchargement de l'instantané de stockage cloud...",
+    "228": "Téléchargement des fichiers de données de stockage cloud...",
+    "229": "Suppression des instantanés non référencés du stockage cloud...",
+    "230": "Suppression des index de vérification non référencés du stockage cloud...",
+    "231": "Suppression des objets de données non référencés dans le stockage cloud...",
+    "232": "Le stockage de données cloud a été purgé. [%d] instantanés et [%d] objets de données ont été supprimés, et un total de [%s] espace disque a été libéré"
   }
 }

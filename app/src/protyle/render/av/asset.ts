@@ -53,7 +53,7 @@ export const bindAssetEvent = (options: {
 
 export const getAssetHTML = (cellElements: HTMLElement[]) => {
     let html = "";
-    genCellValueByElement(getTypeByCellElement(cellElements[0]), cellElements[0]).mAsset.forEach(item => {
+    genCellValueByElement("mAsset", cellElements[0]).mAsset.forEach(item => {
         if (!item.content) {
             return;
         }
@@ -67,7 +67,7 @@ export const getAssetHTML = (cellElements: HTMLElement[]) => {
         }
 
         html += `<button class="b3-menu__item" draggable="true" data-name="${item.name}" data-type="${item.type}" data-content="${item.content}">
-<svg class="b3-menu__icon"><use xlink:href="#iconDrag"></use></svg>
+<svg class="b3-menu__icon fn__grab"><use xlink:href="#iconDrag"></use></svg>
 ${contentHTML}
 <svg class="b3-menu__action" data-type="editAssetItem"><use xlink:href="#iconEdit"></use></svg>
 </button>`;
@@ -225,7 +225,8 @@ export const editAssetItem = (protyle: IProtyle, data: IAV, cellElements: HTMLEl
     if (type === "file") {
         menu.addItem({
             iconHTML: "",
-            label: `<textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field"></textarea>`,
+            type: "readonly",
+            label: `${window.siyuan.languages.title}<textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field"></textarea>`,
         });
     } else {
         menu.addItem({
@@ -293,11 +294,12 @@ export const addAssetLink = (protyle: IProtyle, data: IAV, cellElements: HTMLEle
     }
     menu.addItem({
         iconHTML: "",
-        label: `<textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field" placeholder="${window.siyuan.languages.link}"></textarea>`,
-    });
-    menu.addItem({
-        iconHTML: "",
-        label: `<textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field" placeholder="${window.siyuan.languages.title}"></textarea>`,
+        type: "readonly",
+        label: `${window.siyuan.languages.link}
+<textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field"></textarea>
+<div class="fn__hr"></div>
+${window.siyuan.languages.title}
+<textarea style="width: ${isMobile() ? "200" : "360"}px;margin: 4px 0;" rows="1" class="b3-text-field"></textarea>`,
     });
     const rect = target.getBoundingClientRect();
     menu.open({

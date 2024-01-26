@@ -86,7 +86,7 @@ const renderAssetList = (element: Element, k: string, position: IPosition, exts:
     });
 };
 
-export const assetMenu = (protyle: IProtyle, position: IPosition, callback?: (url: string) => void, exts?: string[]) => {
+export const assetMenu = (protyle: IProtyle, position: IPosition, callback?: (url: string, name: string) => void, exts?: string[]) => {
     const menu = new Menu("background-asset");
     if (menu.isOpen) {
         return;
@@ -135,11 +135,11 @@ export const assetMenu = (protyle: IProtyle, position: IPosition, callback?: (ur
 
                 if (event.key === "Enter") {
                     if (!isEmpty) {
-                        const currentURL = element.querySelector(".b3-list-item--focus").getAttribute("data-value");
+                        const currentElement = element.querySelector(".b3-list-item--focus");
                         if (callback) {
-                            callback(currentURL);
+                            callback(currentElement.getAttribute("data-value"), currentElement.textContent);
                         } else {
-                            hintRenderAssets(currentURL, protyle);
+                            hintRenderAssets(currentElement.getAttribute("data-value"), protyle);
                             window.siyuan.menus.menu.remove();
                         }
                     } else if (!callback) {
@@ -155,7 +155,14 @@ export const assetMenu = (protyle: IProtyle, position: IPosition, callback?: (ur
                     }
                 }
             });
-            inputElement.addEventListener("input", (event) => {
+            inputElement.addEventListener("input", (event: InputEvent) => {
+                if (event.isComposing) {
+                    return;
+                }
+                event.stopPropagation();
+                renderAssetList(element, inputElement.value, position, exts);
+            });
+            inputElement.addEventListener("compositionend", (event: InputEvent) => {
                 event.stopPropagation();
                 renderAssetList(element, inputElement.value, position, exts);
             });
@@ -178,7 +185,7 @@ export const assetMenu = (protyle: IProtyle, position: IPosition, callback?: (ur
                     event.stopPropagation();
                     const currentURL = listItemElement.getAttribute("data-value");
                     if (callback) {
-                        callback(currentURL);
+                        callback(currentURL, listItemElement.textContent);
                     } else {
                         hintRenderAssets(currentURL, protyle);
                         window.siyuan.menus.menu.remove();
@@ -203,10 +210,10 @@ export const fileAnnotationRefMenu = (protyle: IProtyle, refElement: HTMLElement
     window.siyuan.menus.menu.append(new MenuItem({
         iconHTML: "",
         type: "readonly",
-        label: `<div class="b3-menu__label">ID</div>
+        label: `<div>ID</div>
 <textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field" readonly>${refElement.getAttribute("data-id") || ""}</textarea>
 <div class="fn__hr"></div>
-<div class="b3-menu__label">${window.siyuan.languages.anchor}</div>
+<div>${window.siyuan.languages.anchor}</div>
 <textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field"></textarea>`,
         bind(menuItemElement) {
             menuItemElement.style.maxWidth = "none";
@@ -879,13 +886,13 @@ export const imgMenu = (protyle: IProtyle, range: Range, assetElement: HTMLEleme
         window.siyuan.menus.menu.append(new MenuItem({
             iconHTML: "",
             type: "readonly",
-            label: `<div class="b3-menu__label">${window.siyuan.languages.imageURL}</div>
+            label: `<div>${window.siyuan.languages.imageURL}</div>
 <textarea style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" rows="1" class="b3-text-field">${imgElement.getAttribute("src")}</textarea>
 <div class="fn__hr"></div>
-<div class="b3-menu__label">${window.siyuan.languages.title}</div>
+<div>${window.siyuan.languages.title}</div>
 <textarea style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" rows="1" class="b3-text-field"></textarea>
 <div class="fn__hr"></div>
-<div class="b3-menu__label">${window.siyuan.languages.tooltipText}</div>
+<div>${window.siyuan.languages.tooltipText}</div>
 <textarea style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" rows="1" class="b3-text-field"></textarea>`,
             bind(element) {
                 element.style.maxWidth = "none";
@@ -1106,13 +1113,13 @@ export const linkMenu = (protyle: IProtyle, linkElement: HTMLElement, focusText 
     window.siyuan.menus.menu.append(new MenuItem({
         iconHTML: "",
         type: "readonly",
-        label: `<div class="b3-menu__label">${window.siyuan.languages.link}</div>
+        label: `<div>${window.siyuan.languages.link}</div>
 <textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px" class="b3-text-field"></textarea>
 <div class="fn__hr"></div>
-<div class="b3-menu__label">${window.siyuan.languages.anchor}</div>
+<div>${window.siyuan.languages.anchor}</div>
 <textarea style="width: ${isMobile() ? "200" : "360"}px;margin: 4px 0;" rows="1" class="b3-text-field"></textarea>
 <div class="fn__hr"></div>
-<div class="b3-menu__label">${window.siyuan.languages.title}</div>
+<div>${window.siyuan.languages.title}</div>
 <textarea style="width: ${isMobile() ? "200" : "360"}px;margin: 4px 0;" rows="1" class="b3-text-field"></textarea>`,
         bind(element) {
             element.style.maxWidth = "none";

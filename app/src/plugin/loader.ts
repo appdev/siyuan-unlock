@@ -2,11 +2,12 @@ import {fetchSyncPost} from "../util/fetch";
 import {App} from "../index";
 import {Plugin} from "./index";
 /// #if !MOBILE
-import {resizeTopBar} from "../layout/util";
+import {resizeTopBar, saveLayout} from "../layout/util";
 /// #endif
 import {API} from "./API";
 import {getFrontend, isMobile, isWindow} from "../util/functions";
 import {Constants} from "../constants";
+import {uninstall} from "./uninstall";
 
 const requireFunc = (key: string) => {
     const modules = {
@@ -80,6 +81,7 @@ export const loadPlugin = async (app: App, item: IPluginData) => {
     styleElement.textContent = item.css;
     document.head.append(styleElement);
     afterLoadPlugin(plugin);
+    saveLayout();
     return plugin;
 };
 
@@ -228,5 +230,19 @@ export const afterLoadPlugin = (plugin: Plugin) => {
             }], dock.config.position === "RightBottom" ? 1 : 0, dock.config.index);
         }
     });
+    /// #endif
+};
+
+export const reloadPlugin = (app: App) => {
+    app.plugins.forEach((item) => {
+        uninstall(this, item.name);
+    });
+    loadPlugins(this).then(() => {
+        app.plugins.forEach(item => {
+            afterLoadPlugin(item);
+        });
+    });
+    /// #if !MOBILE
+    saveLayout();
     /// #endif
 };

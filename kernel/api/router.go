@@ -349,6 +349,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/repo/initRepoKeyFromPassphrase", model.CheckAuth, model.CheckReadonly, initRepoKeyFromPassphrase)
 	ginServer.Handle("POST", "/api/repo/resetRepo", model.CheckAuth, model.CheckReadonly, resetRepo)
 	ginServer.Handle("POST", "/api/repo/purgeRepo", model.CheckAuth, model.CheckReadonly, purgeRepo)
+	ginServer.Handle("POST", "/api/repo/purgeCloudRepo", model.CheckAuth, model.CheckReadonly, purgeCloudRepo)
 	ginServer.Handle("POST", "/api/repo/importRepoKey", model.CheckAuth, model.CheckReadonly, importRepoKey)
 	ginServer.Handle("POST", "/api/repo/createSnapshot", model.CheckAuth, model.CheckReadonly, createSnapshot)
 	ginServer.Handle("POST", "/api/repo/tagSnapshot", model.CheckAuth, model.CheckReadonly, tagSnapshot)
@@ -401,6 +402,8 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/av/addAttributeViewKey", model.CheckAuth, model.CheckReadonly, addAttributeViewCol)
 	ginServer.Handle("POST", "/api/av/removeAttributeViewKey", model.CheckAuth, model.CheckReadonly, removeAttributeViewCol)
 	ginServer.Handle("POST", "/api/av/sortAttributeViewKey", model.CheckAuth, model.CheckReadonly, sortAttributeViewCol)
+	ginServer.Handle("POST", "/api/av/addAttributeViewValues", model.CheckAuth, model.CheckReadonly, addAttributeViewValues)
+	ginServer.Handle("POST", "/api/av/removeAttributeViewValues", model.CheckAuth, model.CheckReadonly, removeAttributeViewValues)
 
 	ginServer.Handle("POST", "/api/ai/chatGPT", model.CheckAuth, chatGPT)
 	ginServer.Handle("POST", "/api/ai/chatGPTWithAction", model.CheckAuth, chatGPTWithAction)
