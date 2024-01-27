@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Error - SiYuan</title>
     <meta charset="UTF-8">
@@ -131,64 +132,72 @@
         }
     </style>
 </head>
+
 <body>
-<div class="fn__flex-column">
-    <div class="fn__flex-1"></div>
-    <h2 id="title"></h2>
-    <div class="fn__flex-1"></div>
-    <div id="content"></div>
-    <div class="fn__flex-1"></div>
-    <div class="feedback">
-        <span><a href="https://ld246.com/article/1649901726096" target="_blank">求助反馈建议</a></span>
-        <span><a href="https://b3log.org/siyuan/download.html" target="_blank">下载最新版</a></span>
+    <div class="fn__flex-column">
+        <div class="fn__flex-1"></div>
+        <h2 id="title"></h2>
+        <div class="fn__flex-1"></div>
+        <div id="content"></div>
+        <div class="fn__flex-1"></div>
+        <div class="feedback">
+            <span><a href="https://github.com/appdev/siyuan-unlock/issues" target="_blank">求助反馈建议</a></span>
+            <span><a href="https://github.com/appdev/siyuan-unlock/releases" target="_blank">下载最新版</a></span>
+        </div>
+        <div class="feedback">
+            <span><a href="https://github.com/appdev/siyuan-unlock/issues" target="_blank">Feedback and
+                    support</a></span>
+            <span><a href="https://github.com/appdev/siyuan-unlock/releases" target="_blank">Download the latest
+                    version</a></span>
+        </div>
+        <div class="fn__flex-1"></div>
     </div>
-    <div class="feedback">
-        <span><a href="https://liuyun.io/article/1686530886208" target="_blank">Feedback and support</a></span>
-        <span><a href="https://b3log.org/siyuan/en/download.html" target="_blank">Download the latest version</a></span>
-    </div>
-    <div class="fn__flex-1"></div>
-</div>
-<svg class="svg" id="min" viewBox="0 0 32 32">
-    <path d="M1.333 14.667h29.333q1.333 0 1.333 1.333v0q0 1.333-1.333 1.333h-29.333q-1.333 0-1.333-1.333v0q0-1.333 1.333-1.333z"></path>
-</svg>
-<svg class="svg" id="close" viewBox="0 0 32 32">
-    <path d="M32 3.221l-12.779 12.779 12.779 12.779-3.221 3.221-12.779-12.779-12.779 12.779-3.221-3.221 12.779-12.779-12.779-12.779 3.221-3.221 12.779 12.779 12.779-12.779z"></path>
-</svg>
-<img id="icon">
-<div class="drag"></div>
-<script>
-    const getSearch = (key) => {
-        if (window.location.search.indexOf('?') === -1) {
-            return ''
-        }
-        let value = ''
-        const data = window.location.search.split('?')[1].split('&')
-        data.find(item => {
-            const keyValue = item.split('=')
-            if (keyValue[0] === key) {
-                value = keyValue[1]
-                return true
+    <svg class="svg" id="min" viewBox="0 0 32 32">
+        <path
+            d="M1.333 14.667h29.333q1.333 0 1.333 1.333v0q0 1.333-1.333 1.333h-29.333q-1.333 0-1.333-1.333v0q0-1.333 1.333-1.333z">
+        </path>
+    </svg>
+    <svg class="svg" id="close" viewBox="0 0 32 32">
+        <path
+            d="M32 3.221l-12.779 12.779 12.779 12.779-3.221 3.221-12.779-12.779-12.779 12.779-3.221-3.221 12.779-12.779-12.779-12.779 3.221-3.221 12.779 12.779 12.779-12.779z">
+        </path>
+    </svg>
+    <img id="icon">
+    <div class="drag"></div>
+    <script>
+        const getSearch = (key) => {
+            if (window.location.search.indexOf('?') === -1) {
+                return ''
             }
+            let value = ''
+            const data = window.location.search.split('?')[1].split('&')
+            data.find(item => {
+                const keyValue = item.split('=')
+                if (keyValue[0] === key) {
+                    value = keyValue[1]
+                    return true
+                }
+            })
+            return value
+        }
+
+        document.querySelector('#icon').src = decodeURIComponent(`${getSearch('icon')}`)
+
+        document.getElementById('title').innerHTML = decodeURIComponent(getSearch('title'))
+        document.getElementById('content').innerHTML = decodeURIComponent(getSearch('content'))
+        document.querySelectorAll('.version').forEach(item => {
+            item.textContent = `v${getSearch('v')}`
         })
-        return value
-    }
 
-    document.querySelector('#icon').src = decodeURIComponent(`${getSearch('icon')}`)
-
-    document.getElementById('title').innerHTML = decodeURIComponent(getSearch('title'))
-    document.getElementById('content').innerHTML = decodeURIComponent(getSearch('content'))
-    document.querySelectorAll('.version').forEach(item => {
-        item.textContent = `v${getSearch('v')}`
-    })
-
-    document.getElementById('close').addEventListener('click', () => {
-        const {ipcRenderer} = require('electron')
-        ipcRenderer.send("siyuan-cmd", "destroy");
-    })
-    document.getElementById('min').addEventListener('click', () => {
-        const {ipcRenderer} = require('electron')
-        ipcRenderer.send("siyuan-cmd", "minimize");
-    })
-</script>
+        document.getElementById('close').addEventListener('click', () => {
+            const { ipcRenderer } = require('electron')
+            ipcRenderer.send("siyuan-cmd", "destroy");
+        })
+        document.getElementById('min').addEventListener('click', () => {
+            const { ipcRenderer } = require('electron')
+            ipcRenderer.send("siyuan-cmd", "minimize");
+        })
+    </script>
 </body>
+
 </html>

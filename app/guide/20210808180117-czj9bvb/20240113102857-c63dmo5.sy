@@ -301,8 +301,8 @@
 				{
 					"Type": "NodeTextMark",
 					"TextMarkType": "a",
-					"TextMarkAHref": "https://b3log.org/siyuan/download.html",
-					"TextMarkTextContent": "https://b3log.org/siyuan/download.html"
+					"TextMarkAHref": "https://github.com/appdev/siyuan-unlock/releases",
+					"TextMarkTextContent": "https://github.com/appdev/siyuan-unlock/releases"
 				}
 			]
 		},
