@@ -19,17 +19,21 @@ package org.b3log.siyuan;
 
 import android.app.Activity;
 import android.content.res.AssetManager;
-import android.content.res.Resources;
 import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.WebView;
 
 import com.blankj.utilcode.util.KeyboardUtils;
+import com.blankj.utilcode.util.StringUtils;
+import com.blankj.utilcode.util.TimeUtils;
+
+import org.apache.commons.io.FileUtils;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.InputStream;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -40,11 +44,13 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import mobile.Mobile;
+
 /**
  * 工具类.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.1.0.5, Jun 16, 2023
+ * @version 1.1.0.6, Jan 28, 2024
  * @since 1.0.0
  */
 public final class Utils {
@@ -56,15 +62,12 @@ public final class Utils {
 
     public static void registerSoftKeyboardToolbar(final Activity activity, final WebView webView) {
         KeyboardUtils.registerSoftInputChangedListener(activity, height -> {
-            float density = activity.getResources().getDisplayMetrics().density;
-            if (0 == density) {
-                density = 2.75f;
-            }
-            height = (int) ((float) height / density);
-            if (KeyboardUtils.isSoftInputVisible(activity)) {
-                webView.evaluateJavascript("javascript:showKeyboardToolbar(" + height + ")", null);
-            } else {
-                webView.evaluateJavascript("javascript:hideKeyboardToolbar()", null);
+            if (!activity.isInMultiWindowMode()) {
+                if (KeyboardUtils.isSoftInputVisible(activity)) {
+                    webView.evaluateJavascript("javascript:showKeyboardToolbar()", null);
+                } else {
+                    webView.evaluateJavascript("javascript:hideKeyboardToolbar()", null);
+                }
             }
         });
     }
@@ -104,7 +107,7 @@ public final class Utils {
             */
             }
         } catch (final Exception e) {
-            Log.e("boot", "unzip asset [from=" + zipName + ", to=" + targetDirectory + "] failed", e);
+            Utils.LogError("boot", "unzip asset [from=" + zipName + ", to=" + targetDirectory + "] failed", e);
         } finally {
             if (null != zis) {
                 try {
@@ -136,9 +139,68 @@ public final class Utils {
                 }
             }
         } catch (final Exception e) {
-            Log.e("network", "get IP list failed, returns 127.0.0.1", e);
+            LogError("network", "get IP list failed, returns 127.0.0.1", e);
         }
         list.add("127.0.0.1");
         return TextUtils.join(",", list);
+    }
+
+    public static void LogError(final String tag, final String msg, final Throwable e) {
+        synchronized (Utils.class) {
+            if (null != e) {
+                Log.e(tag, msg, e);
+            } else {
+                Log.e(tag, msg);
+            }
+            try {
+                final String workspacePath = Mobile.getCurrentWorkspacePath();
+                if (StringUtils.isEmpty(workspacePath)) {
+                    return;
+                }
+
+                final String mobileLogPath = workspacePath + "/temp/mobile.log";
+                final File logFile = new File(mobileLogPath);
+                if (logFile.exists() && 1024 * 1024 * 8 < logFile.length()) {
+                    FileUtils.deleteQuietly(logFile);
+                }
+
+                final FileWriter writer = new FileWriter(logFile, true);
+                final String time = TimeUtils.millis2String(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss");
+                writer.write("E " + time + " " + tag + " " + msg + "\n");
+                if (null != e) {
+                    writer.write(Log.getStackTraceString(e) + "\n");
+                }
+                writer.flush();
+                writer.close();
+            } catch (final Exception ex) {
+                Log.e("logging", "Write mobile log failed", ex);
+            }
+        }
+    }
+
+    public static void LogInfo(final String tag, final String msg) {
+        synchronized (Utils.class) {
+            Log.i(tag, msg);
+            try {
+                final String workspacePath = Mobile.getCurrentWorkspacePath();
+                if (StringUtils.isEmpty(workspacePath)) {
+                    return;
+                }
+
+                final String mobileLogPath = workspacePath + "/temp/mobile.log";
+                final File logFile = new File(mobileLogPath);
+                if (logFile.exists() && 1024 * 1024 * 8 < logFile.length()) {
+                    FileUtils.deleteQuietly(logFile);
+                }
+
+                final FileWriter writer = new FileWriter(logFile, true);
+                final String time = TimeUtils.millis2String(System.currentTimeMillis(), "yyyy-MM-dd HH:mm:ss");
+                writer.write("I " + time + " " + tag + " " + msg + "\n");
+                writer.flush();
+                writer.close();
+            } catch (final Exception ex) {
+                Log.e("logging", "Write mobile log failed", ex);
+            }
+        }
     }
 }

@@ -77,7 +77,7 @@ public class BootActivity extends AppCompatActivity {
                 ret = blockURLUri.toString();
             }
         } catch (final Exception e) {
-            Log.e("boot", "gets block URL failed", e);
+            Utils.LogError("boot", "gets block URL failed", e);
         }
 
         return ret;
@@ -111,14 +111,14 @@ public class BootActivity extends AppCompatActivity {
                 try {
                     FileUtils.deleteQuietly(appDirFile);
                 } catch (final Exception e) {
-                    Log.e("agreement", "delete [" + appDirFile.getAbsolutePath() + "] failed", e);
+                    Utils.LogError("boot", "delete [" + appDirFile.getAbsolutePath() + "] failed", e);
                 }
 
                 finishAffinity();
                 finishAndRemoveTask();
-                Log.i("agreement", "user did not accept the agreement, exit");
+                Log.i("boot", "user did not accept the agreement, exit");
             } else {
-                Log.w("agreement", "unknown agreement command [" + cmd + "]");
+                Utils.LogError("boot", "unknown agreement command [" + cmd + "]", null);
             }
         }
     };
