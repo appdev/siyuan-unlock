@@ -45,7 +45,7 @@ const setDatabase = (avId: string, element: HTMLElement, item: HTMLElement) => {
     }
 };
 
-export const openSearchAV = (avId: string, target: HTMLElement) => {
+export const openSearchAV = (avId: string, target: HTMLElement, cb?: (element: HTMLElement) => void) => {
     window.siyuan.menus.menu.remove();
     const menu = new Menu();
     menu.addItem({
@@ -72,19 +72,34 @@ export const openSearchAV = (avId: string, target: HTMLElement) => {
                 if (event.key === "Enter") {
                     event.preventDefault();
                     event.stopPropagation();
-                    setDatabase(avId, target, listElement.querySelector(".b3-list-item--focus"));
+                    const listItemElement = listElement.querySelector(".b3-list-item--focus") as HTMLElement;
+                    if (cb) {
+                        cb(listItemElement);
+                    } else {
+                        setDatabase(avId, target, listItemElement);
+                    }
                     window.siyuan.menus.menu.remove();
                 }
             });
-            inputElement.addEventListener("input", (event) => {
+            inputElement.addEventListener("input", (event: InputEvent) => {
                 event.stopPropagation();
+                if (event.isComposing) {
+                    return;
+                }
+                genSearchList(listElement, inputElement.value, avId);
+            });
+            inputElement.addEventListener("compositionend", () => {
                 genSearchList(listElement, inputElement.value, avId);
             });
             element.lastElementChild.addEventListener("click", (event) => {
                 const listItemElement = hasClosestByClassName(event.target as HTMLElement, "b3-list-item");
                 if (listItemElement) {
                     event.stopPropagation();
-                    setDatabase(avId, target, listItemElement);
+                    if (cb) {
+                        cb(listItemElement);
+                    } else {
+                        setDatabase(avId, target, listItemElement);
+                    }
                     window.siyuan.menus.menu.remove();
                 }
             });
@@ -220,11 +235,12 @@ const filterItem = (listElement: Element, key: string) => {
             if (item.textContent.includes(key)) {
                 item.classList.remove("fn__none");
             } else {
-                item.classList.add("fn__none")
+                item.classList.add("fn__none");
             }
         }
-    })
-}
+    });
+};
+
 export const bindRelationEvent = (options: {
     menuElement: HTMLElement,
     protyle: IProtyle,
@@ -274,9 +290,9 @@ export const bindRelationEvent = (options: {
         const cellRect = options.cellElements[options.cellElements.length - 1].getBoundingClientRect();
         setPosition(options.menuElement, cellRect.left, cellRect.bottom, cellRect.height);
         options.menuElement.querySelector(".b3-menu__items .b3-menu__item").classList.add("b3-menu__item--current");
-        const inputElement = options.menuElement.querySelector("input")
+        const inputElement = options.menuElement.querySelector("input");
         inputElement.focus();
-        const listElement = options.menuElement.querySelector(".b3-menu__items")
+        const listElement = options.menuElement.querySelector(".b3-menu__items");
         inputElement.addEventListener("keydown", (event) => {
             event.stopPropagation();
             if (event.isComposing) {
@@ -293,18 +309,18 @@ export const bindRelationEvent = (options: {
                 event.preventDefault();
                 event.stopPropagation();
             }
-        })
+        });
         inputElement.addEventListener("input", (event: InputEvent) => {
             if (event.isComposing) {
                 return;
             }
             filterItem(listElement, inputElement.value);
             event.stopPropagation();
-        })
+        });
         inputElement.addEventListener("compositionend", (event) => {
             event.stopPropagation();
             filterItem(listElement, inputElement.value);
-        })
+        });
     });
 };
 
@@ -381,7 +397,7 @@ export const setRelationCell = (protyle: IProtyle, nodeElement: HTMLElement, tar
                 separatorElement.insertAdjacentHTML("afterend", genSelectItemHTML("empty"));
             }
         }
-        menuElement.firstElementChild.classList.add("b3-menu__item--current")
+        menuElement.firstElementChild.classList.add("b3-menu__item--current");
     }
     updateCellsValue(protyle, nodeElement, newValue, cellElements);
 };

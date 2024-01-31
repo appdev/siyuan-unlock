@@ -37,10 +37,7 @@ export const loadAssets = (data: IAppearance) => {
     }
 
     const defaultStyleElement = document.getElementById("themeDefaultStyle");
-    let defaultThemeAddress = `/appearance/themes/${data.mode === 1 ? "midnight" : "daylight"}/theme.css?v=${Constants.SIYUAN_VERSION}`;
-    if ((data.mode === 1 && data.themeDark !== "midnight") || (data.mode === 0 && data.themeLight !== "daylight")) {
-        defaultThemeAddress = `/appearance/themes/${data.mode === 1 ? "midnight" : "daylight"}/theme.css?v=${Constants.SIYUAN_VERSION}`;
-    }
+    const defaultThemeAddress = `/appearance/themes/${data.mode === 1 ? "midnight" : "daylight"}/theme.css?v=${Constants.SIYUAN_VERSION}`;
     if (defaultStyleElement) {
         if (!defaultStyleElement.getAttribute("href").startsWith(defaultThemeAddress)) {
             defaultStyleElement.remove();
@@ -135,19 +132,28 @@ export const initAssets = () => {
         }
         fetchPost("/api/system/setAppearanceMode", {
             mode: OSTheme === "light" ? 0 : 1
-        }, response => {
+        }, async response => {
             if (window.siyuan.config.appearance.themeJS) {
-                /// #if !MOBILE
-                exportLayout({
-                    cb() {
-                        window.location.reload();
-                    },
-                    errorExit: false,
-                });
-                /// #else
-                window.location.reload();
-                /// #endif
-                return;
+                if (window.destroyTheme) {
+                    try {
+                        await window.destroyTheme();
+                        window.destroyTheme = undefined;
+                    } catch (e) {
+                        console.error("destroyTheme error: " + e);
+                    }
+                } else {
+                    /// #if !MOBILE
+                    exportLayout({
+                        cb() {
+                            window.location.reload();
+                        },
+                        errorExit: false,
+                    });
+                    /// #else
+                    window.location.reload();
+                    /// #endif
+                    return;
+                }
             }
             window.siyuan.config.appearance = response.data.appearance;
             loadAssets(response.data.appearance);
@@ -264,32 +270,41 @@ export const setMode = (modeElementValue: number) => {
     fetchPost("/api/setting/setAppearance", Object.assign({}, window.siyuan.config.appearance, {
         mode: modeElementValue === 2 ? window.siyuan.config.appearance.mode : modeElementValue,
         modeOS: modeElementValue === 2,
-    }), response => {
+    }), async response => {
         if (window.siyuan.config.appearance.themeJS) {
-            if (!response.data.modeOS && (
-                response.data.mode !== window.siyuan.config.appearance.mode ||
-                window.siyuan.config.appearance.themeLight !== response.data.themeLight ||
-                window.siyuan.config.appearance.themeDark !== response.data.themeDark
-            )) {
-                exportLayout({
-                    cb() {
-                        window.location.reload();
-                    },
-                    errorExit: false,
-                });
-                return;
-            }
-            const OSTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-            if (response.data.modeOS && (
-                (response.data.mode === 1 && OSTheme === "light") || (response.data.mode === 0 && OSTheme === "dark")
-            )) {
-                exportLayout({
-                    cb() {
-                        window.location.reload();
-                    },
-                    errorExit: false,
-                });
-                return;
+            if (window.destroyTheme) {
+                try {
+                    await window.destroyTheme();
+                    window.destroyTheme = undefined;
+                } catch (e) {
+                    console.error("destroyTheme error: " + e);
+                }
+            } else {
+                if (!response.data.modeOS && (
+                    response.data.mode !== window.siyuan.config.appearance.mode ||
+                    window.siyuan.config.appearance.themeLight !== response.data.themeLight ||
+                    window.siyuan.config.appearance.themeDark !== response.data.themeDark
+                )) {
+                    exportLayout({
+                        cb() {
+                            window.location.reload();
+                        },
+                        errorExit: false,
+                    });
+                    return;
+                }
+                const OSTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                if (response.data.modeOS && (
+                    (response.data.mode === 1 && OSTheme === "light") || (response.data.mode === 0 && OSTheme === "dark")
+                )) {
+                    exportLayout({
+                        cb() {
+                            window.location.reload();
+                        },
+                        errorExit: false,
+                    });
+                    return;
+                }
             }
         }
         appearance.onSetappearance(response.data);
@@ -297,10 +312,29 @@ export const setMode = (modeElementValue: number) => {
     /// #endif
 };
 
+const rgba2hex = (rgba: string) => {
+    let a: any;
+    const rgb: any = rgba.replace(/\s/g, "").match(/^rgba?\((\d+),(\d+),(\d+),?([^,\s)]+)?/i);
+    const alpha = (rgb && rgb[4] || "").trim();
+    let hex = rgb ?
+        (rgb[1] | 1 << 8).toString(16).slice(1) +
+        (rgb[2] | 1 << 8).toString(16).slice(1) +
+        (rgb[3] | 1 << 8).toString(16).slice(1) : rgba;
+
+    if (alpha !== "") {
+        a = alpha;
+    } else {
+        a = 0o1;
+    }
+    a = ((a * 255) | 1 << 8).toString(16).slice(1);
+    hex = hex + a;
+    return hex;
+};
+
 const updateMobileTheme = (OSTheme: string) => {
     if (isInIOS() || isInAndroid()) {
         setTimeout(() => {
-            const backgroundColor = getComputedStyle(document.body).getPropertyValue("--b3-theme-background").trim();
+            const backgroundColor = rgba2hex(getComputedStyle(document.body).getPropertyValue("--b3-theme-background").trim().replace(" ", ""));
             let mode = window.siyuan.config.appearance.mode;
             if (window.siyuan.config.appearance.modeOS) {
                 if (OSTheme === "dark") {
