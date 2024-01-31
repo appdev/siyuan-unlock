@@ -46,6 +46,14 @@ android {
         }
     }
 
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            def currentBuildType = project.android.buildTypes.find { it.name == variant.buildType.name }
+            def newApkName = "siyuan-unlock-" + currentBuildType.name + "-v" + versionName + ".apk"
+            outputFileName = newApkName
+        }
+    }
+
     repositories {
         flatDir {
             dirs 'libs'
