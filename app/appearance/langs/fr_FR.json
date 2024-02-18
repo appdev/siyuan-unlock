@@ -1,4 +1,5 @@
 {
+  "fileAnnoRefPlaceholder": "Veuillez saisir l'ID de bloc",
   "addToDatabase": "Ajouter à la base de données",
   "clearContext": "Effacer le contexte",
   "cloudStoragePurge": "Purger le stockage cloud",
@@ -204,6 +205,8 @@
   "pinTableHead": "Épingler la tête du tableau",
   "unpinTableHead": "Désépingler l'en-tête du tableau",
   "enablePluginTip": "Avez-vous besoin d'activer ce plugin maintenant ? Vous pouvez l'activer, le désactiver ou le désinstaller plus tard dans [Téléchargé - Plugin]",
+  "enablePluginTip2": "Tous les plugins sont actuellement désactivés, veuillez les activer dans [Téléchargés - Plugin]",
+  "enablePlugin": "Activer le plugin",
   "color": "Couleur",
   "confirmPassword": "J'ai déjà retenu le mot de passe",
   "passwordNoMatch": "Les mots de passe saisis deux fois ne correspondent pas",
@@ -212,6 +215,7 @@
   "scrollGetMore": "Ne paniquez pas... faites défiler de haut en bas pour en charger plus",
   "flashcardNewCard": "Nouvelle carte",
   "flashcardReviewCard": "Revoir la carte",
+  "flashcardDueCard": "Carte due",
   "flashcardCard": "Tous",
   "plugin": "Plugin",
   "attrBookmarkTip": "Associez ce bloc à un signet pour un affichage ultérieur via le panneau des signets",
@@ -366,8 +370,11 @@
   "backmentionExpandTip": "Si configuré comme <code class='fn__code'>0</code>, il ne sera pas développé",
   "googleAnalytics": "Google Analytics",
   "googleAnalyticsTip": "Après l'activation, il utilisera <a href=\"https://analytics.google.com/\" target=\"_blank\">Google Analytics</a> pour compter le statut d'ouverture du l'application et ne collectera pas les Données et Opérations des utilisateurs",
-  "floatWindowMode": "Survolez pour afficher une fenêtre flottante",
-  "floatWindowModeTip": "Après l'activation, une fenêtre flottante apparaît lorsque la souris survole la référence du bloc, l'icône du fil d'Ariane, etc. Après la désactivation, vous devez maintenir enfoncée la touche <code class='fn__code'>${hotkey}</code> pour apparaît la fenêtre flottante",
+  "floatWindowMode": "Méthode de déclenchement de fenêtre flottante",
+  "floatWindowModeTip": "Choisissez comment déclencher la fenêtre flottante lorsque la souris survole l'icône de bloc, l'icône de fil d'Ariane, etc.",
+  "floatWindowMode0": "Flotter",
+  "floatWindowMode1": "Appuyez et maintenez <code class='fn__code'>${hotkey}</code>+Flotter",
+  "floatWindowMode2": "Ne pas déclencher",
   "codeSnippet": "Extrait de code",
   "expandDown": "Développer vers le bas",
   "expandUp": "Développer vers le haut",
@@ -1154,7 +1161,6 @@
     "task.history.database.index.commit": "Effectuer la validation de l'index de la base de données d'historique",
     "task.database.index.embedBlock": "Exécuter le bloc d'intégration d'index de base de données",
     "task.reload.ui": "Interface utilisateur de rechargement de tâche",
-    "task.upgrade.userGuide": "Mise à niveau de la tâche de guide utilisateur",
     "task.asset.database.index.full": "Exécuter l'index de reconstruction de la base de données d'actifs",
     "task.asset.database.index.commit": "Exécuter la validation de l'index de la base de données des actifs"
   },
@@ -1308,7 +1314,7 @@
     "132": "La méthode de recherche actuelle ne prend pas en charge l'opération de remplacement, veuillez utiliser la méthode de recherche [Mot-clé] ou [Regex]",
     "133": "Téléchargement du package d'installation de la mise à jour [%s]",
     "134": "Afin d'éviter que les données nouvellement restaurées ne soient écrasées par la synchronisation, la fonction de synchronisation des données a été automatiquement suspendue",
-    "135": "Impossible de déchiffrer les données. Assurez-vous d'utiliser la même clé sur plusieurs appareils, puis créez un nouveau répertoire cloud à synchroniser",
+    "135": "La clé du dépôt de données est incorrecte et les données ne peuvent pas être déchiffrées. Veuillez vous référer aux étapes du User Guide-FAQ-Lost Key pour résoudre le problème",
     "136": "Initialisation de la clé du référentiel de données...",
     "137": "Échec de l'initialisation de la clé du référentiel de données: %s",
     "138": "La clé du référentiel de données est définie",
@@ -1405,6 +1411,7 @@
     "229": "Suppression des instantanés non référencés du stockage cloud...",
     "230": "Suppression des index de vérification non référencés du stockage cloud...",
     "231": "Suppression des objets de données non référencés dans le stockage cloud...",
-    "232": "Le stockage de données cloud a été purgé. [%d] instantanés et [%d] objets de données ont été supprimés, et un total de [%s] espace disque a été libéré"
+    "232": "Le stockage de données cloud a été purgé. [%d] instantanés et [%d] objets de données ont été supprimés, et un total de [%s] espace disque a été libéré",
+    "233": "Fermeture du guide de l'utilisateur..."
   }
 }

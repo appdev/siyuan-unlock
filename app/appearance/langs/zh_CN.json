@@ -1,4 +1,5 @@
 {
+  "fileAnnoRefPlaceholder": "请输入块 ID",
   "addToDatabase": "添加到数据库",
   "clearContext": "清空上下文",
   "cloudStoragePurge": "清理云端存储",
@@ -204,6 +205,8 @@
   "pinTableHead": "固定表头",
   "unpinTableHead": "取消固定表头",
   "enablePluginTip": "现在需要启用该插件吗？后续可以在 [已下载 - 插件] 中进行启用、禁用或者卸载",
+  "enablePluginTip2": "目前已经禁用所有插件，请在 [已下载 - 插件] 中启用",
+  "enablePlugin": "启用插件",
   "color": "颜色",
   "confirmPassword": "我已经牢记密码了",
   "passwordNoMatch": "两次输入的密码不一致",
@@ -212,6 +215,7 @@
   "scrollGetMore": "不要惊慌...上下滚动即可加载更多内容",
   "flashcardNewCard": "新卡",
   "flashcardReviewCard": "复习卡",
+  "flashcardDueCard": "到期卡",
   "flashcardCard": "所有",
   "plugin": "插件",
   "attrBookmarkTip": "将该块和一个书签进行关联，以便后续通过书签面板查看",
@@ -366,8 +370,11 @@
   "backmentionExpandTip": "配置为 <code class='fn__code'>0</code> 则不展开",
   "googleAnalytics": "Google Analytics",
   "googleAnalyticsTip": "启用后会通过 <a href=\"https://analytics.google.com/\" target=\"_blank\">Google Analytics</a> 统计应用打开状态，不会收集用户数据和操作",
-  "floatWindowMode": "悬停出现浮窗",
-  "floatWindowModeTip": "启用后鼠标悬停块引、面包屑块标等位置会出现浮窗，关闭后需按住 <code class='fn__code'>${hotkey}</code> 键才会出现浮窗",
+  "floatWindowMode": "浮窗触发方式",
+  "floatWindowModeTip": "选择鼠标悬停块引、面包屑块标等位置触发浮窗的方式",
+  "floatWindowMode0": "悬停",
+  "floatWindowMode1": "按住 <code class='fn__code'>${hotkey}</code>+悬停",
+  "floatWindowMode2": "不触发浮窗",
   "codeSnippet": "代码片段",
   "expandDown": "向下扩选",
   "expandUp": "向上扩选",
@@ -1154,7 +1161,6 @@
     "task.history.database.index.commit": "执行历史数据库索引提交",
     "task.database.index.embedBlock": "执行数据库索引嵌入块",
     "task.reload.ui": "执行重载界面",
-    "task.upgrade.userGuide": "执行升级用户指南",
     "task.asset.database.index.full": "执行资源文件数据库重建索引",
     "task.asset.database.index.commit": "执行资源文件数据库索引提交"
   },
@@ -1308,7 +1314,7 @@
     "132": "当前搜索方式下不支持替换操作，请使用 [关键字] 或 [正则表达式] 搜索方式",
     "133": "正在下载更新安装包 [%s]",
     "134": "为避免刚恢复的数据被同步覆盖，数据同步功能已被自动暂停",
-    "135": "无法解密数据。请确保多个设备上使用相同的密钥，然后创建新的云端目录进行同步",
+    "135": "数据仓库密钥不正确，无法解密数据。请参考 用户指南-常见问题-遗失密钥 步骤处理",
     "136": "初始化数据仓库密钥...",
     "137": "初始化数据仓库密钥失败：%s",
     "138": "数据仓库密钥设置完毕",
@@ -1405,6 +1411,7 @@
     "229": "正在删除云端存储未引用快照...",
     "230": "正在删除云端存储未引用校验快照...",
     "231": "正在删除云端存储未引用数据对象...",
-    "232": "云端数据存储清理完毕，已删除 [%d] 个快照和 [%d] 个数据对象，共释放 [%s] 磁盘空间"
+    "232": "云端数据存储清理完毕，已删除 [%d] 个快照和 [%d] 个数据对象，共释放 [%s] 磁盘空间",
+    "233": "正在关闭用户指南..."
   }
 }

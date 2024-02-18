@@ -998,6 +998,9 @@ const updateRef = (protyle: IProtyle, id: string, index = 0) => {
 
 let transactionsTimeout: number;
 export const transaction = (protyle: IProtyle, doOperations: IOperation[], undoOperations?: IOperation[]) => {
+    if (doOperations.length === 0) {
+        return;
+    }
     if (!protyle) {
         // 文档书中点开属性->数据库后的变更操作
         fetchPost("/api/transactions", {
@@ -1027,9 +1030,9 @@ export const transaction = (protyle: IProtyle, doOperations: IOperation[], undoO
         protyle.updated = true;
 
         if (needDebounce) {
-            protyle.undo.replace(doOperations);
+            protyle.undo.replace(doOperations, protyle);
         } else {
-            protyle.undo.add(doOperations, undoOperations);
+            protyle.undo.add(doOperations, undoOperations, protyle);
         }
     }
     if (needDebounce) {

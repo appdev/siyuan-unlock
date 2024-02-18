@@ -85,13 +85,10 @@ export const loadAssets = (data: IAppearance) => {
     const themeScriptElement = document.getElementById("themeScript");
     const themeScriptAddress = `/appearance/themes/${data.mode === 1 ? data.themeDark : data.themeLight}/theme.js?v=${data.themeVer}`;
     if (themeScriptElement) {
-        if (!themeScriptElement.getAttribute("src").startsWith(themeScriptAddress)) {
-            themeScriptElement.remove();
-            addScript(themeScriptAddress, "themeScript");
-        }
-    } else {
-        addScript(themeScriptAddress, "themeScript");
+        // https://github.com/siyuan-note/siyuan/issues/10341
+        themeScriptElement.remove();
     }
+    addScript(themeScriptAddress, "themeScript");
 
     const iconDefaultScriptElement = document.getElementById("iconDefaultScript");
     // 不能使用 data.iconVer，因为其他主题也需要加载默认图标，此时 data.iconVer 为其他图标的版本号
@@ -216,14 +213,7 @@ export const setInlineStyle = (set = true) => {
 .protyle-wysiwyg [data-node-id] [spellcheck] {min-height:${height}px;}
 .protyle-wysiwyg [data-node-id] {${window.siyuan.config.editor.rtl ? " direction: rtl;" : ""}${window.siyuan.config.editor.justify ? " text-align: justify;" : ""}}
 .protyle-wysiwyg .li {min-height:${height + 8}px}
-.protyle-gutters button svg {height:${height}px}
-.protyle-wysiwyg img.emoji, .b3-typography img.emoji {width:${height - 8}px}
-.protyle-wysiwyg .h1 img.emoji, .b3-typography h1 img.emoji {width:${Math.floor(window.siyuan.config.editor.fontSize * 1.75 * 1.25)}px}
-.protyle-wysiwyg .h2 img.emoji, .b3-typography h2 img.emoji {width:${Math.floor(window.siyuan.config.editor.fontSize * 1.55 * 1.25)}px}
-.protyle-wysiwyg .h3 img.emoji, .b3-typography h3 img.emoji {width:${Math.floor(window.siyuan.config.editor.fontSize * 1.38 * 1.25)}px}
-.protyle-wysiwyg .h4 img.emoji, .b3-typography h4 img.emoji {width:${Math.floor(window.siyuan.config.editor.fontSize * 1.25 * 1.25)}px}
-.protyle-wysiwyg .h5 img.emoji, .b3-typography h5 img.emoji {width:${Math.floor(window.siyuan.config.editor.fontSize * 1.13 * 1.25)}px}
-.protyle-wysiwyg .h6 img.emoji, .b3-typography h6 img.emoji {width:${Math.floor(window.siyuan.config.editor.fontSize * 1.25)}px}`;
+.protyle-gutters button svg {height:${height}px}`;
     if (window.siyuan.config.editor.fontFamily) {
         style += `\n.b3-typography:not(.b3-typography--default), .protyle-wysiwyg, .protyle-title {font-family: "${window.siyuan.config.editor.fontFamily}", var(--b3-font-family-protyle)}`;
     }
@@ -313,6 +303,9 @@ export const setMode = (modeElementValue: number) => {
 };
 
 const rgba2hex = (rgba: string) => {
+    if (rgba.startsWith("#")) {
+        return rgba;
+    }
     let a: any;
     const rgb: any = rgba.replace(/\s/g, "").match(/^rgba?\((\d+),(\d+),(\d+),?([^,\s)]+)?/i);
     const alpha = (rgb && rgb[4] || "").trim();
@@ -334,7 +327,7 @@ const rgba2hex = (rgba: string) => {
 const updateMobileTheme = (OSTheme: string) => {
     if (isInIOS() || isInAndroid()) {
         setTimeout(() => {
-            const backgroundColor = rgba2hex(getComputedStyle(document.body).getPropertyValue("--b3-theme-background").trim().replace(" ", ""));
+            const backgroundColor = rgba2hex(getComputedStyle(document.body).getPropertyValue("--b3-theme-background").trim());
             let mode = window.siyuan.config.appearance.mode;
             if (window.siyuan.config.appearance.modeOS) {
                 if (OSTheme === "dark") {

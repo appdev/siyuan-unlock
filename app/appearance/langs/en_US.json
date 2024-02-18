@@ -1,4 +1,5 @@
 {
+  "fileAnnoRefPlaceholder": "Please enter block ID",
   "addToDatabase": "Add to Database",
   "clearContext": "Clear context",
   "cloudStoragePurge": "Purge cloud storage",
@@ -204,6 +205,8 @@
   "pinTableHead": "Pin Table Head",
   "unpinTableHead": "Unpin Table Head",
   "enablePluginTip": "Do you need to enable this plugin now? You can enable, disable or uninstall it later in [Downloaded - Plugin]",
+  "enablePluginTip2": "All plugins are currently disabled, please enable them in [Downloaded - Plugin]",
+  "enablePlugin": "Enable plugin",
   "color": "Color",
   "confirmPassword": "I have already remembered the password",
   "passwordNoMatch": "The passwords entered twice do not match",
@@ -212,6 +215,7 @@
   "scrollGetMore": "Don't panic... scroll up and down to load more",
   "flashcardNewCard": "New",
   "flashcardReviewCard": "Review",
+  "flashcardDueCard": "Due",
   "flashcardCard": "Total",
   "plugin": "Plugin",
   "attrBookmarkTip": "Associate this block with a bookmark for subsequent viewing through the bookmark panel",
@@ -366,8 +370,11 @@
   "backmentionExpandTip": "If configured as <code class='fn__code'>0</code>, it will not be expanded",
   "googleAnalytics": "Google Analytics",
   "googleAnalyticsTip": "After enabling, it will use <a href=\"https://analytics.google.com/\" target=\"_blank\">Google Analytics</a> to count the opening status of the application and will not collect users data and operations",
-  "floatWindowMode": "Hover to display a floating window",
-  "floatWindowModeTip": "After enabling, a floating window will appear when the mouse hovers over the block reference, breadcrumb block icon, etc. After disabling, you need to hold down the <code class='fn__code'>${hotkey}</code> key to appear the floating window",
+  "floatWindowMode": "Floating window trigger method",
+  "floatWindowModeTip": "Choose how to trigger the floating window when the mouse hovers over the block icon, breadcrumb icon, etc.",
+  "floatWindowMode0": "Hover",
+  "floatWindowMode1": "Press and hold <code class='fn__code'>${hotkey}</code>+Hover",
+  "floatWindowMode2": "Do not trigger",
   "codeSnippet": "Code Snippet",
   "expandDown": "Expand Down",
   "expandUp": "Expand Up",
@@ -1154,7 +1161,6 @@
     "task.history.database.index.commit": "Execute history database index commit",
     "task.database.index.embedBlock": "Execute database index embed block",
     "task.reload.ui": "Execute reload UI",
-    "task.upgrade.userGuide": "Execute upgrade user guide",
     "task.asset.database.index.full": "Execute asset database rebuild index",
     "task.asset.database.index.commit": "Execute asset database index commit"
   },
@@ -1308,7 +1314,7 @@
     "132": "The current search method does not support the replace operation, please use the [Keyword] or [Regex] search method",
     "133": "Downloading update installation package [%s]",
     "134": "In order to prevent the newly restored data from being overwritten by synchronization, the data synchronization function has been automatically suspended",
-    "135": "Unable to decrypt data. Make sure to use the same key on multiple devices, then create a new cloud directory to sync",
+    "135": "The data repo key is incorrect and the data cannot be decrypted. Please refer to the User Guide-FAQ-Lost Key steps to resolve the issue",
     "136": "Initializing data repository key...",
     "137": "Failed to initialize data repository key: %s",
     "138": "Data repository key is set",
@@ -1405,6 +1411,7 @@
     "229": "Deleting cloud storage unreferenced snapshots...",
     "230": "Deleting cloud storage unreferenced check indexes...",
     "231": "Deleting unreferenced data objects in cloud storage...",
-    "232": "The cloud data storage has been purged. [%d] snapshots and [%d] data objects have been deleted, and a total of [%s] disk space has been released"
+    "232": "The cloud data storage has been purged. [%d] snapshots and [%d] data objects have been deleted, and a total of [%s] disk space has been released",
+    "233": "Closing user guide..."
   }
 }

@@ -89,6 +89,7 @@ import {
     getTypeByCellElement,
     updateCellsValue
 } from "../render/av/cell";
+import {openEmojiPanel, unicode2Emoji} from "../../emoji";
 
 export class WYSIWYG {
     public lastHTMLs: { [key: string]: string } = {};
@@ -304,12 +305,12 @@ export class WYSIWYG {
                 }
                 if (cellElements.length > 0) {
                     html = "[";
-                    cellElements.forEach((item: HTMLElement) => {
+                    cellElements.forEach((item: HTMLElement, index) => {
                         const cellText = getCellText(item);
                         html += JSON.stringify(genCellValueByElement(getTypeByCellElement(item), item)) + ",";
-                        textPlain += cellText + " ";
+                        textPlain += cellText + ((cellElements[index + 1] && item.nextElementSibling && item.nextElementSibling.isSameNode(cellElements[index + 1])) ? "\t" : "\n\n");
                     });
-                    textPlain = textPlain.substring(0, textPlain.length - 1);
+                    textPlain = textPlain.substring(0, textPlain.length - 2);
                     html = html.substring(0, html.length - 1) + "]";
                 }
             } else {
@@ -1606,6 +1607,28 @@ export class WYSIWYG {
             } else {
                 beforeContextmenuRange = undefined;
             }
+            /// #if BROWSER && !MOBILE
+            if (protyle.breadcrumb) {
+                const indentElement = protyle.breadcrumb.element.parentElement.querySelector('[data-type="indent"]');
+                if (indentElement && getSelection().rangeCount > 0) {
+                    setTimeout(() => {
+                        const newRange = getSelection().getRangeAt(0);
+                        const blockElement = hasClosestBlock(newRange.startContainer);
+                        if (!blockElement) {
+                            return;
+                        }
+                        const outdentElement = protyle.breadcrumb.element.parentElement.querySelector('[data-type="outdent"]');
+                        if (blockElement.parentElement.classList.contains("li")) {
+                            indentElement.removeAttribute("disabled");
+                            outdentElement.removeAttribute("disabled");
+                        } else {
+                            indentElement.setAttribute("disabled", "true");
+                            outdentElement.setAttribute("disabled", "true");
+                        }
+                    }, 520);
+                }
+            }
+            /// #endif
         });
 
         let preventGetTopHTML = false;
@@ -1822,6 +1845,19 @@ export class WYSIWYG {
                     this.setEmptyOutline(protyle, nodeElement);
                     if (range.toString() === "") {
                         countSelectWord(range, protyle.block.rootID);
+                    }
+                    if (protyle.breadcrumb) {
+                        const indentElement = protyle.breadcrumb.element.parentElement.querySelector('[data-type="indent"]');
+                        if (indentElement) {
+                            const outdentElement = protyle.breadcrumb.element.parentElement.querySelector('[data-type="outdent"]');
+                            if (nodeElement.parentElement.classList.contains("li")) {
+                                indentElement.removeAttribute("disabled");
+                                outdentElement.removeAttribute("disabled");
+                            } else {
+                                indentElement.setAttribute("disabled", "true");
+                                outdentElement.setAttribute("disabled", "true");
+                            }
+                        }
                     }
                 }
                 event.stopPropagation();
@@ -2283,6 +2319,35 @@ export class WYSIWYG {
                 // 需等待 range 更新再次进行渲染
                 if (protyle.options.render.breadcrumb) {
                     protyle.breadcrumb.render(protyle);
+                }
+                return;
+            }
+
+            const emojiElement = hasTopClosestByClassName(event.target, "emoji");
+            if (!event.shiftKey && !ctrlIsPressed && emojiElement) {
+                const nodeElement = hasClosestBlock(emojiElement);
+                if (nodeElement) {
+                    const emojiRect = emojiElement.getBoundingClientRect();
+                    openEmojiPanel("", "av", {
+                        x: emojiRect.left,
+                        y: emojiRect.bottom,
+                        h: emojiRect.height,
+                        w: emojiRect.width
+                    }, (unicode) => {
+                        emojiElement.insertAdjacentHTML("afterend", "<wbr>");
+                        const oldHTML = nodeElement.outerHTML;
+                        let emojiHTML;
+                        if (unicode.indexOf(".") > -1) {
+                            const emojiList = unicode.split(".");
+                            emojiHTML = `<img alt="${emojiList[0]}" class="emoji" src="/emojis/${unicode}" title="${emojiList[0]}">`;
+                        } else {
+                            emojiHTML = unicode2Emoji(unicode);
+                        }
+                        emojiElement.outerHTML = emojiHTML;
+                        hideElements(["dialog"]);
+                        updateTransaction(protyle, nodeElement.getAttribute("data-node-id"), nodeElement.outerHTML, oldHTML);
+                        focusByWbr(nodeElement, range);
+                    });
                 }
                 return;
             }
