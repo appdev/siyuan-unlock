@@ -29,8 +29,8 @@ apkdv/siyuan-unlock \  # 使用的镜像源名称
 <a title="Releases" target="_blank" href="https://github.com/siyuan-note/siyuan/releases"><img src="https://img.shields.io/github/release/siyuan-note/siyuan.svg?style=flat-square&color=9CF"></a>
 <a title="Downloads" target="_blank" href="https://github.com/siyuan-note/siyuan/releases"><img src="https://img.shields.io/github/downloads/siyuan-note/siyuan/total.svg?style=flat-square&color=blueviolet"></a>
 <br>
-<a title="Docker Pulls" target="_blank" href="https://hub.docker.com/r/b3log/siyuan"><img src="https://img.shields.io/docker/pulls/b3log/siyuan.svg?style=flat-square&color=green"></a>
-<a title="Docker Image Size" target="_blank" href="https://hub.docker.com/r/b3log/siyuan"><img src="https://img.shields.io/docker/image-size/b3log/siyuan.svg?style=flat-square&color=ff96b4"></a>
+<a title="Docker Pulls" target="_blank" href="https://hub.docker.com/r/apkdv/siyuan-unlock"><img src="https://img.shields.io/docker/pulls/apkdv/siyuan-unlock.svg?style=flat-square&color=green"></a>
+<a title="Docker Image Size" target="_blank" href="https://hub.docker.com/r/apkdv/siyuan-unlock"><img src="https://img.shields.io/docker/image-size/apkdv/siyuan-unlock.svg?style=flat-square&color=ff96b4"></a>
 <a title="Hits" target="_blank" href="https://github.com/siyuan-note/siyuan"><img src="https://hits.b3log.org/siyuan-note/siyuan.svg"></a>
 <br>
 <a title="AGPLv3" target="_blank" href="https://www.gnu.org/licenses/agpl-3.0.txt"><img src="http://img.shields.io/badge/license-AGPLv3-orange.svg?style=flat-square"></a>
@@ -54,10 +54,6 @@ apkdv/siyuan-unlock \  # 使用的镜像源名称
 思源笔记是一款隐私优先的个人知识管理系统，支持细粒度块级引用和 Markdown 所见即所得。
 
 ![feature0.png](https://b3logfile.com/file/2024/01/feature0-1orBRlI.png)
-
-欢迎到[思源笔记官方讨论区](https://ld246.com/domain/siyuan)了解更多。同时也欢迎关注 B3log 开源社区微信公众号 `B3log开源`：
-
-![b3logos.jpg](https://b3logfile.com/file/2020/08/b3logos-032af045.jpg)
 
 ## 🔮 特性
 
@@ -110,7 +106,7 @@ apkdv/siyuan-unlock \  # 使用的镜像源名称
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=siyuan-note/siyuan&type=Date)](https://star-history.com/#siyuan-note/siyuan&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=appdev/siyuan-unlock&type=Date)](https://star-history.com/#appdev/siyuan-unlock&Date)
 
 ## 🗺️ 路线图
 
@@ -121,15 +117,6 @@ apkdv/siyuan-unlock \  # 使用的镜像源名称
 
 桌面端和移动端建议优先考虑通过应用市场安装，这样以后升级版本时可以一键更新。
 
-### 应用市场
-
-* [App Store](https://apps.apple.com/cn/app/siyuan/id1583226508)
-* [Google Play](https://play.google.com/store/apps/details?id=org.b3log.siyuan)
-* [Microsoft Store](https://www.microsoft.com/store/apps/9P7HPMXP73K4)
-* [华为应用市场](https://appgallery.huawei.com/app/C105558879)
-* [小米应用商店](https://app.mi.com/details?id=org.b3log.siyuan)
-* [酷安](https://www.coolapk.com/apk/292664)
-
 ### Docker 部署
 
 <details>
@@ -139,8 +126,8 @@ apkdv/siyuan-unlock \  # 使用的镜像源名称
 
 在服务器上伺服思源最简单的方案是通过 Docker 部署。
 
-* 镜像名称 `b3log/siyuan`
-* [镜像地址](https://hub.docker.com/r/b3log/siyuan)
+* 镜像名称 `apkdv/siyuan-unlock`
+* [镜像地址](https://hub.docker.com/r/apkdv/siyuan-unlock)
 
 #### 文件结构
 
@@ -153,7 +140,7 @@ apkdv/siyuan-unlock \  # 使用的镜像源名称
 
 #### 启动入口
 
-构建 Docker 镜像时设置了入口：`ENTRYPOINT [ "/opt/siyuan/kernel" ]`，使用 `docker run b3log/siyuan` 并带参即可启动：
+构建 Docker 镜像时设置了入口：`ENTRYPOINT [ "/opt/siyuan/kernel" ]`，使用 `docker run apkdv/siyuan-unlock` 并带参即可启动：
 
 * `--workspace`：指定工作空间文件夹路径，在宿主机上通过 `-v` 挂载到容器中
 * `--accessAuthCode`：指定访问授权码
@@ -161,7 +148,7 @@ apkdv/siyuan-unlock \  # 使用的镜像源名称
 更多的参数可参考 `--help`。下面是一条启动命令示例：
 
 ```
-docker run -d -v workspace_dir_host:workspace_dir_container -p 6806:6806 b3log/siyuan --workspace=workspace_dir_container --accessAuthCode=xxx
+docker run -d -v workspace_dir_host:workspace_dir_container -p 6806:6806 apkdv/siyuan-unlock --workspace=workspace_dir_container --accessAuthCode=xxx
 ```
 
 * `workspace_dir_host`：宿主机上的工作空间文件夹路径
@@ -171,7 +158,7 @@ docker run -d -v workspace_dir_host:workspace_dir_container -p 6806:6806 b3log/s
 为了简化，建议将 workspace 文件夹路径在宿主机和容器上配置为一致的，比如将 `workspace_dir_host` 和 `workspace_dir_container` 都配置为 `/siyuan/workspace`，对应的启动命令示例：
 
 ```
-docker run -d -v /siyuan/workspace:/siyuan/workspace -p 6806:6806 -u 1000:1000 b3log/siyuan --workspace=/siyuan/workspace/ --accessAuthCode=xxx
+docker run -d -v /siyuan/workspace:/siyuan/workspace -p 6806:6806 -u 1000:1000 apkdv/siyuan-unlock --workspace=/siyuan/workspace/ --accessAuthCode=xxx
 ```
 
 Alternatively, see below for an example Docker Compose file:
@@ -180,7 +167,7 @@ Alternatively, see below for an example Docker Compose file:
 version: "3.9"
 services:
   main:
-    image: b3log/siyuan
+    image: apkdv/siyuan-unlock
     command: ['--workspace=/siyuan/workspace/', '--accessAuthCode=${AuthCode}']
     user: '1000:1000'
     ports:
