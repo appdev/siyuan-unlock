@@ -23,7 +23,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
-import android.util.Log;
 import android.webkit.JavascriptInterface;
 
 import com.blankj.utilcode.util.BarUtils;
@@ -34,7 +33,7 @@ import com.zackratos.ultimatebarx.ultimatebarx.java.UltimateBarX;
  * JavaScript 接口.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.1.2.1, Feb 9, 2023
+ * @version 1.1.3.0, Feb 3, 2024
  * @since 1.0.0
  */
 public final class JSAndroid {
@@ -149,6 +148,11 @@ public final class JSAndroid {
             if (7 > str.length()) {
                 // https://stackoverflow.com/questions/10230331/how-to-convert-3-digit-html-hex-colors-to-6-digit-flex-hex-colors
                 str = str.replaceAll("#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])", "#$1$1$2$2$3$3");
+            }
+            if (9 == str.length() && '#' == str.charAt(0)) {
+                // The status bar color on Android is incorrect https://github.com/siyuan-note/siyuan/issues/10278
+                // 将 #RRGGBBAA 转换为 #AARRGGBB
+                str = "#" + str.substring(7, 9) + str.substring(1, 7);
             }
             return Color.parseColor(str);
         } catch (final Exception e) {

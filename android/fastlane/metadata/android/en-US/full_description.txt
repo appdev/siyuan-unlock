@@ -1,0 +1,50 @@
+SiYuan is a privacy-first personal knowledge management system, support fine-grained block-level reference and Markdown WYSIWYG.
+
+<h3>Features</h3>
+Most features are free, even for commercial use.
+<ul>
+<li>Content block
+<ul>
+<li>Block-level reference and two-way links</li>
+<li>Custom attributes</li>
+<li>SQL query embed</li>
+<li>Protocol <code>siyuan://</code></li>
+</ul>
+</li>
+<li>Editor
+<ul>
+<li>Block-style</li>
+<li>Markdown WYSIWYG</li>
+<li>List outline</li>
+<li>Block zoom-in</li>
+<li>Block horizontal layout</li>
+<li>Million-word large document editing</li>
+<li>Mathematical formulas, charts, flowcharts, Gantt charts, timing charts, staffs, etc.</li>
+<li>Web clipping</li>
+<li>PDF Annotation link</li>
+</ul>
+</li>
+<li>Export
+<ul>
+<li>Block ref and embed</li>
+<li>Standard Markdown with assets</li>
+<li>PDF, Word and HTML</li>
+<li>Copy to WeChat MP, Zhihu and Yuque</li>
+</ul>
+</li>
+<li>Database
+<ul>
+<li>Table view</li>
+</ul>
+</li>
+<li>Spaced repetition</li>
+<li>Multi-tab, drag and drop to split screen</li>
+<li>Template snippet</li>
+<li>JavaScript/CSS snippet</li>
+<li>Android/iOS APP</li>
+<li>Docker deployment</li>
+<li>API</li>
+<li>Community marketplace</li>
+</ul>
+
+Some features are only available to paid members, for more details please refer to Pricing.

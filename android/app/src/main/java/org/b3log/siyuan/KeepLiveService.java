@@ -37,7 +37,7 @@ import java.util.Random;
  * 保活服务.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.0.1.1, Feb 17, 2023
+ * @version 1.0.1.2, Feb 7, 2024
  * @since 1.0.0
  */
 public class KeepLiveService extends Service {
@@ -49,11 +49,15 @@ public class KeepLiveService extends Service {
 
     @Override
     public void onCreate() {
-        super.onCreate();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startMyOwnForeground();
-        } else {
-            startForeground(1, new Notification());
+        try {
+            super.onCreate();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startMyOwnForeground();
+            } else {
+                startForeground(1, new Notification());
+            }
+        } catch (final Throwable e) {
+            Utils.LogError("keeplive", "Start foreground service failed", e);
         }
     }
 

@@ -1,0 +1,49 @@
+思源笔记是一款隐私优先的个人知识管理系统，支持细粒度块级引用和 Markdown 所见即所得。
+
+<h3>特性</h3>
+大部分功能是免费的，即使是在商业环境下使用
+<ul>
+<li>内容块
+<ul>
+<li>块级引用和双向链接</li>
+<li>自定义属性</li>
+<li>SQL 查询嵌入</li>
+<li>协议 <code>siyuan://</code></li>
+</ul>
+</li>
+<li>编辑器
+<ul>
+<li>Block 风格</li>
+<li>Markdown 所见即所得</li>
+<li>列表大纲</li>
+<li>块缩放聚焦</li>
+<li>块横向排版</li>
+<li>百万字大文档编辑</li>
+<li>数学公式、图表、流程图、甘特图、时序图、五线谱等</li>
+<li>网页剪藏</li>
+<li>PDF 标注双链</li>
+</ul>
+</li>
+<li>导出
+<ul>
+<li>引用块和嵌入块</li>
+<li>带 assets 文件夹的标准 Markdown</li>
+<li>PDF、Word 和 HTML</li>
+<li>复制到微信公众号、知乎和语雀</li>
+</ul>
+</li>
+<li>数据库
+<ul>
+<li>表格视图</li>
+</ul>
+</li>
+<li>间隔重复</li>
+<li>模板片段</li>
+<li>JavaScript/CSS 代码片段</li>
+<li>Android/iOS APP</li>
+<li>Docker 部署</li>
+<li>API</li>
+<li>社区集市</li>
+</ul>
+
+部分功能需要付费会员才能使用，更多细节请参考定价。
