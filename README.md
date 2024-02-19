@@ -205,7 +205,6 @@ services:
 
 ### 安装包
 
-* [B3log](https://github.com/appdev/siyuan-unlock/releases)
 * [GitHub](https://github.com/siyuan-note/siyuan/releases)
 
 ### 内部预览版
