@@ -47,7 +47,7 @@ jobs:
           echo "release_title=$(git show --format=%s --no-patch | head -1)"
           echo "release_version=$(TZ=Asia/Shanghai date +'v%Y%m%d%H%M')"
           echo "release_body<<$EOF"
-          echo "$changelog"
+          echo ${{ env.release_body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
