@@ -1,5 +1,9 @@
 name: CD For SiYuan
 
+on:
+  push:
+  workflow_dispatch:
+
 jobs:
 
   create_release:
