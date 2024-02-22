@@ -2,6 +2,8 @@ name: CD For SiYuan
 
 on:
   push:
+    tags:
+      - 'v*' # Match any tag starting with 'v'
   workflow_dispatch:
 
 jobs:
