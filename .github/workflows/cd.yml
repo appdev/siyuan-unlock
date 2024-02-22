@@ -53,6 +53,9 @@ jobs:
         with:
           cmd: 'jq .version app/package.json -r'
 
+      - name: Show my version
+        run: 'echo "version ${{ steps.version.outputs.value }}"'
+
       - name: Create Release
         id: create_release
         uses: ncipollo/release-action@v1
