@@ -54,7 +54,7 @@ jobs:
           cmd: 'jq .version app/package.json -r'
 
       - name: Show my version
-        run: 'echo "version ${{ steps.version.outputs.value }}"'
+        run: 'echo "version ${{ GITHUB_OUTPUT }}"'
 
       - name: Create Release
         id: create_release
