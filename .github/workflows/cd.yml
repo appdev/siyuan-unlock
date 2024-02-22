@@ -44,7 +44,8 @@ jobs:
           echo "release_body<<$EOF" >> $GITHUB_ENV
           echo "$changelog" >> $GITHUB_ENV
           echo "$EOF" >> $GITHUB_ENV
-          echo "version ${{ $GITHUB_OUTPUT }}"
+          echo "release_title=$(git show --format=%s --no-patch | head -1)"
+          echo "release_version=$(TZ=Asia/Shanghai date +'v%Y%m%d%H%M')"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
