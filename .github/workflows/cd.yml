@@ -44,7 +44,7 @@ jobs:
           echo "release_body<<$EOF" >> $GITHUB_ENV
           echo "$changelog" >> $GITHUB_ENV
           echo "$EOF" >> $GITHUB_ENV
-          echo "version ${{ GITHUB_OUTPUT }}"
+          echo "version ${{ $GITHUB_OUTPUT }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
