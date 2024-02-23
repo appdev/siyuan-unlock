@@ -37,7 +37,7 @@ jobs:
       - name: Gather Release Information
         id: release_info
         run: |
-          echo "release_title=$(git show --format=%s --no-patch | head -1)" >> $GITHUB_OUTPUT
+          echo "release_title=$(steps.version.outputs.value)" >> $GITHUB_OUTPUT
           echo "release_version=$(TZ=Asia/Shanghai date +'v%Y%m%d%H%M')" >> $GITHUB_OUTPUT
           changelog=$(python scripts/parse-changelog.py -t ${{ github.ref }} -b ${{ steps.thislatestR.outputs.release }} appdev/siyuan-unlock)
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
