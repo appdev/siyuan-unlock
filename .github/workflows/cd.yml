@@ -44,11 +44,12 @@ jobs:
           echo "release_body<<$EOF" >> $GITHUB_ENV
           echo "$changelog" >> $GITHUB_ENV
           echo "$EOF" >> $GITHUB_ENV
-          echo "$changelog"
+          echo scripts/parse-changelog.py
           echo ${{ env.release_body }}
+          echo ${{ github.repository }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
+
       - name: Extract version from package.json
         uses: sergeysova/jq-action@v2
         id: version
