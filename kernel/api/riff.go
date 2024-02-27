@@ -27,6 +27,31 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
+func batchSetRiffCardsDueTime(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	var cardDues []*model.SetFlashcardDueTime
+	for _, cardDueArg := range arg["cardDues"].([]interface{}) {
+		cardDue := cardDueArg.(map[string]interface{})
+		cardDues = append(cardDues, &model.SetFlashcardDueTime{
+			ID:  cardDue["id"].(string),
+			Due: cardDue["due"].(string),
+		})
+	}
+
+	err := model.SetFlashcardsDueTime(cardDues)
+	if nil != err {
+		ret.Code = -1
+		ret.Msg = err.Error()
+	}
+}
+
 func resetRiffCards(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
@@ -61,7 +86,11 @@ func getNotebookRiffCards(c *gin.Context) {
 
 	notebookID := arg["id"].(string)
 	page := int(arg["page"].(float64))
-	blockIDs, total, pageCount := model.GetNotebookFlashcards(notebookID, page)
+	pageSize := 20
+	if nil != arg["pageSize"] {
+		pageSize = int(arg["pageSize"].(float64))
+	}
+	blockIDs, total, pageCount := model.GetNotebookFlashcards(notebookID, page, pageSize)
 	ret.Data = map[string]interface{}{
 		"blocks":    blockIDs,
 		"total":     total,
@@ -80,7 +109,11 @@ func getTreeRiffCards(c *gin.Context) {
 
 	rootID := arg["id"].(string)
 	page := int(arg["page"].(float64))
-	blockIDs, total, pageCount := model.GetTreeFlashcards(rootID, page)
+	pageSize := 20
+	if nil != arg["pageSize"] {
+		pageSize = int(arg["pageSize"].(float64))
+	}
+	blockIDs, total, pageCount := model.GetTreeFlashcards(rootID, page, pageSize)
 	ret.Data = map[string]interface{}{
 		"blocks":    blockIDs,
 		"total":     total,
@@ -99,7 +132,11 @@ func getRiffCards(c *gin.Context) {
 
 	deckID := arg["id"].(string)
 	page := int(arg["page"].(float64))
-	blocks, total, pageCount := model.GetDeckFlashcards(deckID, page)
+	pageSize := 20
+	if nil != arg["pageSize"] {
+		pageSize = int(arg["pageSize"].(float64))
+	}
+	blocks, total, pageCount := model.GetDeckFlashcards(deckID, page, pageSize)
 	ret.Data = map[string]interface{}{
 		"blocks":    blocks,
 		"total":     total,

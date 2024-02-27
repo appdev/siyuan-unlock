@@ -9,13 +9,13 @@ require (
 	github.com/88250/clipboard v0.1.5
 	github.com/88250/epub v0.0.0-20230830085737-c19055cd1f48
 	github.com/88250/gulu v1.2.3-0.20231209020950-b7b6994e395c
-	github.com/88250/lute v1.7.7-0.20240220070639-6c7e1adfa651
+	github.com/88250/lute v1.7.7-0.20240225141140-2acd83bfa5d5
 	github.com/88250/pdfcpu v0.3.14-0.20230401044135-c7369a99720c
 	github.com/88250/vitess-sqlparser v0.0.0-20210205111146-56a2ded2aba1
 	github.com/ClarkThan/ahocorasick v0.0.0-20231011042242-30d1ef1347f4
 	github.com/ConradIrwin/font v0.0.0-20210318200717-ce8d41cc0732
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/PuerkitoBio/goquery v1.8.1
+	github.com/PuerkitoBio/goquery v1.9.0
 	github.com/Xuanwo/go-locale v1.1.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be
@@ -49,7 +49,7 @@ require (
 	github.com/radovskyb/watcher v1.0.7
 	github.com/rqlite/sql v0.0.0-20240102050638-e741e9f54197
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
-	github.com/sashabaranov/go-openai v1.19.4
+	github.com/sashabaranov/go-openai v1.20.0
 	github.com/shirou/gopsutil/v3 v3.24.1
 	github.com/siyuan-note/dejavu v0.0.0-20240218075321-a488f36181cc
 	github.com/siyuan-note/encryption v0.0.0-20231219001248-1e028a4d13b4
@@ -57,13 +57,13 @@ require (
 	github.com/siyuan-note/filelock v0.0.0-20240128091141-94d7bb3e0772
 	github.com/siyuan-note/httpclient v0.0.0-20240218075040-36250ac08e54
 	github.com/siyuan-note/logging v0.0.0-20231208035918-61f884c854f0
-	github.com/siyuan-note/riff v0.0.0-20231226152006-8833f8b9a6c1
+	github.com/siyuan-note/riff v0.0.0-20240224132914-ccd13f66ed24
 	github.com/spf13/cast v1.6.0
 	github.com/steambap/captcha v1.4.1
 	github.com/studio-b12/gowebdav v0.9.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	github.com/xrash/smetrics v0.0.0-20231213231151-1d8dd44e695e
-	github.com/xuri/excelize/v2 v2.8.0
+	github.com/xuri/excelize/v2 v2.8.1
 	golang.org/x/image v0.15.0
 	golang.org/x/mobile v0.0.0-20230901161150-52620a4a7557
 	golang.org/x/mod v0.15.0
@@ -80,13 +80,13 @@ require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/asaskevich/EventBus v0.0.0-20200907212545-49d423059eef // indirect
-	github.com/aws/aws-sdk-go v1.50.20 // indirect
-	github.com/bytedance/sonic v1.11.0 // indirect
+	github.com/aws/aws-sdk-go v1.50.25 // indirect
+	github.com/bytedance/sonic v1.11.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.1 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
-	github.com/dlclark/regexp2 v1.10.0 // indirect
+	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/fatih/set v0.2.1 // indirect
 	github.com/gigawattio/window v0.0.0-20180317192513-0f5467e35573 // indirect
@@ -98,7 +98,7 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/glog v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20240207164012-fb44976bdcd5 // indirect
+	github.com/google/pprof v0.0.0-20240225044709-fd706174c886 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/gorilla/context v1.1.2 // indirect
@@ -114,8 +114,8 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jolestar/go-commons-pool/v2 v2.1.2 // indirect
 	github.com/juju/errors v1.0.0 // indirect
-	github.com/klauspost/compress v1.17.6 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
+	github.com/klauspost/compress v1.17.7 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/levigross/exp-html v0.0.0-20120902181939-8df60c69a8f5 // indirect
 	github.com/lufia/plan9stats v0.0.0-20231016141302-07b5767bb0ed // indirect
@@ -131,11 +131,11 @@ require (
 	github.com/otiai10/gosseract/v2 v2.4.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
+	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/qiniu/go-sdk/v7 v7.19.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/quic-go v0.41.0 // indirect
-	github.com/refraction-networking/utls v1.6.2 // indirect
+	github.com/refraction-networking/utls v1.6.3 // indirect
 	github.com/restic/chunker v0.4.0 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
 	github.com/richardlehane/msoleps v1.0.3 // indirect
@@ -156,7 +156,7 @@ require (
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/crypto v0.19.0 // indirect
-	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
+	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect

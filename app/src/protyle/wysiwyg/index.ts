@@ -1295,7 +1295,7 @@ export class WYSIWYG {
                     }
                 }
                 const nextElement = getNextBlock(selectElements[selectElements.length - 1]);
-                removeBlock(protyle, nodeElement, range);
+                removeBlock(protyle, nodeElement, range, "remove");
                 if (nextElement) {
                     // Ctrl+X 剪切后光标应跳到下一行行首 https://github.com/siyuan-note/siyuan/issues/5485
                     focusBlock(nextElement);
@@ -2289,7 +2289,7 @@ export class WYSIWYG {
                                 actionElement.parentElement.setAttribute("updated", dayjs().format("YYYYMMDDHHmmss"));
                                 updateTransaction(protyle, actionId, actionElement.parentElement.outerHTML, html);
                             }
-                        } else {
+                        } else if (window.siyuan.config.editor.listItemDotNumberClickFocus) {
                             if (protyle.block.showAll && protyle.block.id === actionId) {
                                 enterBack(protyle, actionId);
                             } else {

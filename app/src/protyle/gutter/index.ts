@@ -3,7 +3,7 @@ import {
     hasClosestByAttribute,
     hasClosestByClassName,
     hasClosestByMatchTag,
-    hasClosestByTag
+    hasClosestByTag, hasTopClosestByClassName
 } from "../util/hasClosest";
 import {getIconByType} from "../../editor/getIcon";
 import {enterBack, iframeMenu, setFold, tableMenu, videoMenu, zoomOut} from "../../menus/protyle";
@@ -312,7 +312,8 @@ export class Gutter {
                     window.siyuan.menus.menu.fullscreen();
                 } else {
                     window.siyuan.menus.menu.popup({x: gutterRect.left, y: gutterRect.bottom, isLeft: true});
-                    window.siyuan.menus.menu.element.setAttribute("data-from", hasClosestByClassName(protyle.element, "block__edit") ? "popover" : "app");
+                    const popoverElement = hasTopClosestByClassName(protyle.element, "block__popover", true);
+                    window.siyuan.menus.menu.element.setAttribute("data-from", popoverElement ? popoverElement.dataset.level + "popover" : "app");
                     focusByRange(protyle.toolbar.range);
                 }
             }
@@ -343,7 +344,8 @@ export class Gutter {
                 } else if (buttonElement.dataset.type !== "NodeAttributeViewRow") {
                     this.renderMenu(protyle, buttonElement);
                     window.siyuan.menus.menu.popup({x: gutterRect.left, y: gutterRect.bottom, isLeft: true});
-                    window.siyuan.menus.menu.element.setAttribute("data-from", hasClosestByClassName(protyle.element, "block__edit") ? "popover" : "app");
+                    const popoverElement = hasTopClosestByClassName(protyle.element, "block__popover", true);
+                    window.siyuan.menus.menu.element.setAttribute("data-from", popoverElement ? popoverElement.dataset.level + "popover" : "app");
                 }
             }
             event.preventDefault();
@@ -769,7 +771,7 @@ export class Gutter {
                     });
                     writeText(protyle.lute.BlockDOM2StdMd(html).trimEnd());
                     protyle.breadcrumb?.hide();
-                    removeBlock(protyle, selectsElement[0], getEditorRange(selectsElement[0]));
+                    removeBlock(protyle, selectsElement[0], getEditorRange(selectsElement[0]), "remove");
                 } else {
                     focusByRange(getEditorRange(selectsElement[0]));
                     document.execCommand("cut");
@@ -790,7 +792,7 @@ export class Gutter {
             label: window.siyuan.languages.addToDatabase,
             icon: "iconDatabase",
             click: () => {
-                openSearchAV("", this.element, (listItemElement) => {
+                openSearchAV("", selectsElement[0] as HTMLElement, (listItemElement) => {
                     const sourceIds: string[] = [];
                     selectsElement.forEach(item => {
                         sourceIds.push(item.getAttribute("data-node-id"));
@@ -815,7 +817,7 @@ export class Gutter {
             accelerator: "⌫",
             click: () => {
                 protyle.breadcrumb?.hide();
-                removeBlock(protyle, selectsElement[0], getEditorRange(selectsElement[0]));
+                removeBlock(protyle, selectsElement[0], getEditorRange(selectsElement[0]), "Backspace");
             }
         }).element);
 
@@ -1220,7 +1222,7 @@ export class Gutter {
                 click: () => {
                     if (isNotEditBlock(nodeElement)) {
                         writeText(protyle.lute.BlockDOM2StdMd(removeEmbed(nodeElement)).trimEnd());
-                        removeBlock(protyle, nodeElement, getEditorRange(nodeElement));
+                        removeBlock(protyle, nodeElement, getEditorRange(nodeElement), "remove");
                         protyle.breadcrumb?.hide();
                     } else {
                         focusByRange(getEditorRange(nodeElement));
@@ -1242,7 +1244,7 @@ export class Gutter {
                 label: window.siyuan.languages.addToDatabase,
                 icon: "iconDatabase",
                 click: () => {
-                    openSearchAV("", this.element, (listItemElement) => {
+                    openSearchAV("", nodeElement as HTMLElement, (listItemElement) => {
                         const sourceIds: string[] = [nodeElement.getAttribute("data-node-id")];
                         const avID = listItemElement.dataset.avId;
                         transaction(protyle, [{
@@ -1264,7 +1266,7 @@ export class Gutter {
                 accelerator: "⌫",
                 click: () => {
                     protyle.breadcrumb?.hide();
-                    removeBlock(protyle, nodeElement, getEditorRange(nodeElement));
+                    removeBlock(protyle, nodeElement, getEditorRange(nodeElement), "Backspace");
                 }
             }).element);
         }

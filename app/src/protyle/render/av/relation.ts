@@ -1,8 +1,8 @@
 import {Menu} from "../../../plugin/Menu";
-import {hasClosestByClassName} from "../../util/hasClosest";
+import {hasClosestByClassName, hasTopClosestByClassName} from "../../util/hasClosest";
 import {upDownHint} from "../../../util/upDownHint";
 import {fetchPost} from "../../../util/fetch";
-import {escapeHtml} from "../../../util/escape";
+import {escapeGreat, escapeHtml} from "../../../util/escape";
 import {transaction} from "../../wysiwyg/transaction";
 import {updateCellsValue} from "./cell";
 import {updateAttrViewCellAnimation} from "./action";
@@ -23,7 +23,7 @@ const genSearchList = (element: Element, keyword: string, avId: string, cb?: () 
         <div class="b3-list-item__first">
             <span class="b3-list-item__text">${escapeHtml(item.avName || window.siyuan.languages.title)}</span>
         </div>
-        <div class="b3-list-item__meta b3-list-item__showall">${escapeHtml(item.hPath)}</div>
+        <div class="b3-list-item__meta b3-list-item__showall">${escapeGreat(item.hPath)}</div>
     </div>
     <svg aria-label="${window.siyuan.languages.thisDatabase}" style="margin: 0 0 0 4px" class="b3-list-item__hinticon ariaLabel${item.avID === avId ? "" : " fn__none"}"><use xlink:href="#iconInfo"></use></svg>
 </div>`;
@@ -51,7 +51,7 @@ export const openSearchAV = (avId: string, target: HTMLElement, cb?: (element: H
     menu.addItem({
         iconHTML: "",
         type: "empty",
-        label: `<div class="fn__flex-column" style = "min-width: 260px;max-width:420px;max-height: 50vh">
+        label: `<div class="fn__flex-column b3-menu__filter">
     <input class="b3-text-field fn__flex-shrink"/>
     <div class="fn__hr"></div>
     <div class="b3-list fn__flex-1 b3-list--background">
@@ -115,6 +115,8 @@ export const openSearchAV = (avId: string, target: HTMLElement, cb?: (element: H
         }
     });
     menu.element.querySelector(".b3-menu__items").setAttribute("style", "overflow: initial");
+    const popoverElement = hasTopClosestByClassName(target, "block__popover", true);
+    menu.element.setAttribute("data-from", popoverElement ? popoverElement.dataset.level + "popover" : "app");
 };
 
 export const updateRelation = (options: {
@@ -248,37 +250,30 @@ export const bindRelationEvent = (options: {
     cellElements: HTMLElement[]
 }) => {
     const hasIds = options.menuElement.firstElementChild.getAttribute("data-cell-ids").split(",");
-    fetchPost("/api/av/renderAttributeView", {
+    fetchPost("/api/av/getAttributeViewPrimaryKeyValues", {
         id: options.menuElement.firstElementChild.getAttribute("data-av-id"),
     }, response => {
-        const avData = response.data as IAV;
-        let cellIndex = 0;
-        avData.view.columns.find((item, index) => {
-            if (item.type === "block") {
-                cellIndex = index;
-                return true;
-            }
-        });
+        const cells = response.data.rows.values as IAVCellValue[];
         let html = "";
         let selectHTML = "";
         hasIds.forEach(hasId => {
             if (hasId) {
-                avData.view.rows.find((item) => {
-                    if (item.id === hasId) {
-                        selectHTML += genSelectItemHTML("selected", item.id, item.cells[cellIndex].value.isDetached, item.cells[cellIndex].value.block.content || "Untitled");
+                cells.find((item) => {
+                    if (item.block.id === hasId) {
+                        selectHTML += genSelectItemHTML("selected", item.block.id, item.isDetached, item.block.content || "Untitled");
                         return true;
                     }
                 });
             }
         });
-        avData.view.rows.forEach((item) => {
-            if (!hasIds.includes(item.id)) {
-                html += genSelectItemHTML("unselect", item.id, item.cells[cellIndex].value.isDetached, item.cells[cellIndex].value.block.content || "Untitled");
+        cells.forEach((item) => {
+            if (!hasIds.includes(item.block.id)) {
+                html += genSelectItemHTML("unselect", item.block.id, item.isDetached, item.block.content || "Untitled");
             }
         });
         options.menuElement.innerHTML = `<div class="fn__flex-column">
 <div class="b3-menu__item fn__flex-column" data-type="nobg">
-    <div class="b3-menu__label">${avData.name}</div>
+    <div class="b3-menu__label">${response.data.name}</div>
     <input class="b3-text-field fn__flex-shrink"/>
 </div>
 <div class="fn__hr"></div>
