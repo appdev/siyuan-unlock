@@ -102,20 +102,11 @@ apkdv/siyuan-unlock \  # 使用的镜像源名称
 * [chrome](https://github.com/siyuan-note/siyuan-chrome)：Chrome 扩展
 * [lute](https://github.com/88250/lute)：结构化的编辑器引擎，支持 Go 和 JavaScript
 * [ios](https://github.com/siyuan-note/siyuan-ios): iOS APP
-* [android](https://github.com/siyuan-note/siyuan-android): Android APP
+* [android](https://github.com/appdev/siyuan-unlock/releases): Android APP
 
 ## 🌟 Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=appdev/siyuan-unlock&type=Date)](https://star-history.com/#appdev/siyuan-unlock&Date)
-
-## 🗺️ 路线图
-
-* [思源笔记开发计划和进度](https://github.com/orgs/siyuan-note/projects/1)
-* [思源笔记版本变更和公告](CHANGELOG.md)
-
-## 🚀 下载安装
-
-桌面端和移动端建议优先考虑通过应用市场安装，这样以后升级版本时可以一键更新。
 
 ### Docker 部署
 
@@ -207,19 +198,6 @@ services:
 
 * [GitHub](https://github.com/siyuan-note/siyuan/releases)
 
-### 内部预览版
-
-我们会在有重大更新前发布内部预览版，请访问 [https://github.com/siyuan-note/insider](https://github.com/siyuan-note/insider)。
-
-## 🏘️ 社区
-
-* [中文讨论区](https://ld246.com/domain/siyuan)
-* [用户社区汇总](https://ld246.com/article/1640266171309)
-* [Awesome SiYuan](https://github.com/siyuan-note/awesome)
-
-## 🛠️ 开发指南
-
-见：[开发指南](https://github.com/siyuan-note/siyuan/blob/master/.github/CONTRIBUTING_zh_CN.md)。
 
 ## ❓ 常见问题和解答
 
@@ -300,24 +278,8 @@ services:
     4. 云端使用新的同步目录，旧的同步目录已经无法使用，可以删除
     5. 已有的云端快照已经无法使用，可以删除
 
-### 使用需要付费吗？
-
-大部分功能是免费的，即使是在商业环境下使用。
-
-会员特权需要付费后才能使用，请参考[定价](https://b3log.org/siyuan/pricing.html)。
-
-如果你没有会员特权需求但又想支持开发，欢迎进行捐赠：[靠爱发电 - 链滴](https://ld246.com/sponsor)
-
 ## 🙏 鸣谢
 
 思源的诞生离不开众多的开源项目和贡献者，请参考项目源代码 kernel/go.mod、app/package.json 和项目首页。
 
 思源的成长离不开用户的反馈和宣传推广，感谢所有人对思源的帮助 ❤️
-
-### 贡献者列表
-
-欢迎加入我们，一起为思源贡献代码。
-
-<a href="https://github.com/siyuan-note/siyuan/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=siyuan-note/siyuan" />
-</a>
