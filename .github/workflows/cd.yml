@@ -86,13 +86,6 @@ jobs:
             electron_args: "dist-linux"
             goos: "linux"
             goarch: "amd64"
-            suffix: "linux.AppImage"
-          - os: ubuntu-20.04
-            kernel_path: "../app/kernel-linux/SiYuan-Kernel"
-            build_args: "-s -w -X github.com/appdev/siyuan-unlock/kernel/util.Mode=prod"
-            electron_args: "dist-linux"
-            goos: "linux"
-            goarch: "amd64"
             suffix: "linux.tar.gz"
           - os: macos-latest
             kernel_path: "../app/kernel-darwin/SiYuan-Kernel"
@@ -217,6 +210,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create_release.outputs.upload_url }}
-        asset_name: siyuan-${{ steps.version.outputs.value }}-${{ matrix.config.suffix }}
+        asset_name: siyuan-unlock-${{ needs.create_release.outputs.version }}-${{ matrix.config.suffix }}
         asset_path: ${{ github.workspace }}/go/src/github.com/appdev/siyuan-unlock/app/build/siyuan-${{ needs.create_release.outputs.version }}-${{ matrix.config.suffix }}
         asset_content_type: application/octet-stream

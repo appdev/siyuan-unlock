@@ -1,0 +1,85 @@
+name: CD For SiYuan Unlock Android
+
+on:
+  push:
+    tags:
+      - 'v' #
+  workflow_dispatch:
+
+jobs:
+  create_release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_version: ${{ steps.release_info.outputs.release_version }}
+      version: ${{ steps.version.outputs.value }}
+
+  BuildRelease:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.21"
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Signing properties
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          touch signing.properties
+          echo keystore.password="$SIGNING_STORE_PASSWORD" > signing.properties
+          echo key.alias="$SIGNING_KEY_ALIAS" >> signing.properties
+          echo key.password="$SIGNING_KEY_PASSWORD" >> signing.properties
+          
+          echo "cat signing.properties"
+          cat signing.properties
+
+      - name: Release Build
+        if: success()
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: --no-daemon app:assembleMetaRelease
+
+      - name: Set current tag
+        id: current_tag
+        run: echo ::set-output name=tag::$(git describe --tags --abbrev=0)
+
+      - name: Tag Repo
+        uses: richardsimko/update-tag@v1
+        with:
+          tag: ${{ steps.current_tag.outputs.tag }}
+          tag_name: ${{ steps.current_tag.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_name: siyuan-unlock-${{ needs.create_release.outputs.version }}.apk
+          asset_path: ${{ github.workspace }}/go/src/github.com/appdev/siyuan-unlock/app/build/siyuan-unlock-${{ needs.create_release.outputs.version }}.apk
+          asset_content_type: application/octet-stream
+
