@@ -26,27 +26,28 @@ export const getDefaultOperatorByType = (type: TAVCol) => {
 const toggleEmpty = (element: HTMLElement, operator: string, type: TAVCol) => {
     const menuElement = hasClosestByClassName(element, "b3-menu");
     if (menuElement) {
-        menuElement.querySelectorAll("input, .b3-chip").forEach((inputElement, index) => {
+        if (["date", "updated", "created"].includes(type)) {
+            const filterElement = menuElement.querySelector('.b3-menu__item div[data-type="filter1"]');
+            const filter2Element = filterElement.nextElementSibling;
+            if (operator === "Is between") {
+                filter2Element.classList.remove("fn__none");
+                filterElement.classList.remove("fn__none");
+            } else if (operator === "Is empty" || operator === "Is not empty") {
+                filter2Element.classList.add("fn__none");
+                filterElement.classList.add("fn__none");
+            } else {
+                filterElement.classList.remove("fn__none");
+                filter2Element.classList.add("fn__none");
+            }
+            return;
+        }
+        menuElement.querySelectorAll("input, .b3-chip").forEach((inputElement) => {
             const menuItemElement = hasClosestByClassName(inputElement, "b3-menu__item");
             if (menuItemElement) {
-                if (["date", "updated", "created"].includes(type)) {
-                    if (operator === "Is between") {
-                        menuItemElement.classList.remove("fn__none");
-                    } else if (operator === "Is empty" || operator === "Is not empty") {
-                        menuItemElement.classList.add("fn__none");
-                    } else {
-                        if (index === 0) {
-                            menuItemElement.classList.remove("fn__none");
-                        } else {
-                            menuItemElement.classList.add("fn__none");
-                        }
-                    }
+                if (operator !== "Is empty" && operator !== "Is not empty") {
+                    menuItemElement.classList.remove("fn__none");
                 } else {
-                    if (operator !== "Is empty" && operator !== "Is not empty") {
-                        menuItemElement.classList.remove("fn__none");
-                    } else {
-                        menuItemElement.classList.add("fn__none");
-                    }
+                    menuItemElement.classList.add("fn__none");
                 }
             }
         });
@@ -64,27 +65,46 @@ export const setFilter = async (options: {
     if (rectTarget.height === 0) {
         rectTarget = options.protyle.wysiwyg.element.querySelector(`[data-col-id="${options.target.dataset.colId}"]`).getBoundingClientRect();
     }
+    const blockID = options.blockElement.getAttribute("data-node-id");
     const menu = new Menu("set-filter-" + options.filter.column, () => {
         const oldFilters = JSON.parse(JSON.stringify(options.data.view.filters));
-        const selectElement = window.siyuan.menus.menu.element.querySelector(".b3-select") as HTMLSelectElement;
-        const operator = selectElement.value as TAVFilterOperator;
-        if (!selectElement || !operator) {
+        const selectElement = menu.element.querySelector(".b3-select") as HTMLSelectElement;
+        const newFilter: IAVFilter = {
+            column: options.filter.column,
+            value: undefined,
+            operator: selectElement.value as TAVFilterOperator
+        };
+        if (!selectElement || !newFilter.operator) {
             return;
         }
         let hasMatch = false;
-        let cellValue: IAVCellValue;
         if (textElements.length > 0) {
             if (["date", "updated", "created"].includes(filterType)) {
-                cellValue = genCellValue(filterType, {
-                    isNotEmpty2: textElements[1].value !== "",
-                    isNotEmpty: textElements[0].value !== "",
-                    content: textElements[0].value ? new Date(textElements[0].value + " 00:00").getTime() : null,
-                    content2: textElements[1].value ? new Date(textElements[1].value + " 00:00").getTime() : null,
-                    hasEndDate: operator === "Is between",
-                    isNotTime: true,
-                });
+                const typeElement = menu.element.querySelector('.b3-select[data-type="dateType"]') as HTMLSelectElement;
+                const directElements = menu.element.querySelectorAll('.b3-select[data-type="dataDirection"]') as NodeListOf<HTMLSelectElement>;
+                if (typeElement.value === "custom") {
+                    newFilter.relativeDate = {
+                        count: parseInt((directElements[0].parentElement.querySelector(".b3-text-field") as HTMLInputElement).value || "1"),
+                        unit: parseInt((directElements[0].parentElement.lastElementChild as HTMLSelectElement).value),
+                        direction: parseInt(directElements[0].value)
+                    };
+                    newFilter.relativeDate2 = {
+                        count: parseInt((directElements[1].parentElement.querySelector(".b3-text-field") as HTMLInputElement).value || "1"),
+                        unit: parseInt((directElements[1].parentElement.lastElementChild as HTMLSelectElement).value),
+                        direction: parseInt(directElements[1].value)
+                    };
+                } else {
+                    newFilter.value = genCellValue(filterType, {
+                        isNotEmpty2: textElements[1].value !== "",
+                        isNotEmpty: textElements[0].value !== "",
+                        content: textElements[0].value ? new Date(textElements[0].value + " 00:00").getTime() : null,
+                        content2: textElements[1].value ? new Date(textElements[1].value + " 00:00").getTime() : null,
+                        hasEndDate: newFilter.operator === "Is between",
+                        isNotTime: true,
+                    });
+                }
             } else {
-                cellValue = genCellValue(filterType, textElements[0].value);
+                newFilter.value = genCellValue(filterType, textElements[0].value);
             }
         } else if (filterType === "select" || filterType === "mSelect") {
             const mSelect: {
@@ -100,19 +120,15 @@ export const setFilter = async (options: {
                     });
                 }
             });
-            cellValue = genCellValue(filterType, mSelect);
+            newFilter.value = genCellValue(filterType, mSelect);
         } else if (filterType === "checkbox") {
-            cellValue = genCellValue(filterType, {
-                checked: operator === "Is true"
+            newFilter.value = genCellValue(filterType, {
+                checked: newFilter.operator === "Is true"
             });
         } else {
-            cellValue = genCellValue(filterType, undefined);
+            newFilter.value = genCellValue(filterType, undefined);
         }
-        const newFilter: IAVFilter = {
-            column: options.filter.column,
-            value: cellValue,
-            operator
-        };
+
         let isSame = false;
         options.data.view.filters.find((filter, index) => {
             if (filter.column === options.filter.column) {
@@ -138,11 +154,13 @@ export const setFilter = async (options: {
         transaction(options.protyle, [{
             action: "setAttrViewFilters",
             avID: options.data.id,
-            data: options.data.view.filters
+            data: options.data.view.filters,
+            blockID
         }], [{
             action: "setAttrViewFilters",
             avID: options.data.id,
-            data: oldFilters
+            data: oldFilters,
+            blockID
         }]);
         const menuElement = hasClosestByClassName(options.target, "b3-menu");
         if (menuElement) {
@@ -320,15 +338,63 @@ export const setFilter = async (options: {
         });
     } else if (["date", "updated", "created"].includes(filterType)) {
         const dateValue = options.filter.value ? options.filter.value[filterType as "date"] : null;
+        const showToday = !options.filter.relativeDate?.direction;
+        const showToday2 = !options.filter.relativeDate2?.direction;
         menu.addItem({
             iconHTML: "",
             type: "readonly",
-            label: `<input style="margin: 4px 0" value="${(dateValue.isNotEmpty || filterType !== "date") ? dayjs(dateValue.content).format("YYYY-MM-DD") : ""}" type="date" max="9999-12-31" class="b3-text-field fn__size200">`
-        });
-        menu.addItem({
-            iconHTML: "",
-            type: "readonly",
-            label: `<input style="margin: 4px 0" value="${dateValue.isNotEmpty2 ? dayjs(dateValue.content2).format("YYYY-MM-DD") : ""}" type="date" max="9999-12-31" class="b3-text-field fn__size200">`
+            label: `<div data-type="filter1">
+    <div class="fn__size200">
+        <select class="b3-select fn__block" data-type="dateType">
+            <option value="time"${!options.filter.relativeDate ? " selected" : ""}>${window.siyuan.languages.includeTime}</option>
+            <option value="custom"${options.filter.relativeDate ? " selected" : ""}>${window.siyuan.languages.relativeToToday}</option>
+        </select>
+    </div>
+    <div class="fn__hr"></div>
+    <div class="fn__size200 ${options.filter.relativeDate ? "fn__none" : ""}">
+        <input value="${(dateValue && (dateValue.isNotEmpty || filterType !== "date")) ? dayjs(dateValue.content).format("YYYY-MM-DD") : ""}" type="date" max="9999-12-31" class="b3-text-field fn__block">
+    </div>
+    <div class="fn__flex fn__size200 ${options.filter.relativeDate ? "" : "fn__none"}">
+        <select class="b3-select" data-type="dataDirection">
+            <option value="-1"${options.filter.relativeDate?.direction === -1 ? " selected" : ""}>${window.siyuan.languages.pastDate}</option>
+            <option value="1"${options.filter.relativeDate?.direction === 1 ? " selected" : ""}>${window.siyuan.languages.nextDate}</option>
+            <option value="0"${showToday ? " selected" : ""}>${window.siyuan.languages.current}</option>
+        </select>
+        <span class="fn__space"></span>
+        <input type="number" min="1" step="1" value="${options.filter.relativeDate?.count || 1}" class="b3-text-field fn__flex-1${showToday ? " fn__none" : ""}"/>
+        <span class="fn__space${showToday ? " fn__none" : ""}"></span>
+        <select class="b3-select fn__flex-1">
+            <option value="0"${options.filter.relativeDate?.unit === 0 ? " selected" : ""}>${window.siyuan.languages.day}</option>
+            <option value="1"${(!options.filter.relativeDate || options.filter.relativeDate?.unit === 1) ? " selected" : ""}>${window.siyuan.languages.week}</option>
+            <option value="2"${options.filter.relativeDate?.unit === 2 ? " selected" : ""}>${window.siyuan.languages.month}</option>
+            <option value="3"${options.filter.relativeDate?.unit === 3 ? " selected" : ""}>${window.siyuan.languages.year}</option>
+        </select>
+    </div>
+    <div class="fn__hr--small"></div>
+</div>
+<div data-type="filter2 fn__none">
+    <div class="fn__hr--small"></div>
+    <div class="fn__size200 ${options.filter.relativeDate2 ? "fn__none" : ""}">
+        <input value="${(dateValue && dateValue.isNotEmpty2) ? dayjs(dateValue.content2).format("YYYY-MM-DD") : ""}" type="date" max="9999-12-31" class="b3-text-field fn__block">
+    </div>
+    <div class="fn__flex fn__size200 ${options.filter.relativeDate2 ? "" : "fn__none"}">
+        <select class="b3-select" data-type="dataDirection">
+            <option value="-1"${options.filter.relativeDate2?.direction === -1 ? " selected" : ""}>${window.siyuan.languages.pastDate}</option>
+            <option value="1"${options.filter.relativeDate2?.direction === 1 ? " selected" : ""}>${window.siyuan.languages.nextDate}</option>
+            <option value="0"${showToday2 ? " selected" : ""}>${window.siyuan.languages.current}</option>
+        </select>
+        <span class="fn__space"></span>
+        <input type="number" min="1" step="1" value="${options.filter.relativeDate2?.count || 1}" class="b3-text-field fn__flex-1${showToday2 ? " fn__none" : ""}"/>
+        <span class="fn__space${showToday2 ? " fn__none" : ""}"></span>
+        <select class="b3-select fn__flex-1">
+            <option value="0"${options.filter.relativeDate2?.unit === 0 ? " selected" : ""}>${window.siyuan.languages.day}</option>
+            <option value="1"${(!options.filter.relativeDate2 || options.filter.relativeDate2?.unit === 1) ? " selected" : ""}>${window.siyuan.languages.week}</option>
+            <option value="2"${options.filter.relativeDate2?.unit === 2 ? " selected" : ""}>${window.siyuan.languages.month}</option>
+            <option value="3"${options.filter.relativeDate2?.unit === 3 ? " selected" : ""}>${window.siyuan.languages.year}</option>
+        </select>
+    </div>
+    <div class="fn__hr--small"></div>
+</div>`
         });
     }
     menu.addItem({
@@ -345,11 +411,13 @@ export const setFilter = async (options: {
             transaction(options.protyle, [{
                 action: "setAttrViewFilters",
                 avID: options.data.id,
-                data: options.data.view.filters
+                data: options.data.view.filters,
+                blockID
             }], [{
                 action: "setAttrViewFilters",
                 avID: options.data.id,
-                data: oldFilters
+                data: oldFilters,
+                blockID
             }]);
             const menuElement = hasClosestByClassName(options.target, "b3-menu");
             if (menuElement) {
@@ -357,11 +425,43 @@ export const setFilter = async (options: {
             }
         }
     });
-    const selectElement = (window.siyuan.menus.menu.element.querySelector(".b3-select") as HTMLSelectElement);
+    const selectElement = (menu.element.querySelector(".b3-select") as HTMLSelectElement);
     selectElement.addEventListener("change", () => {
         toggleEmpty(selectElement, selectElement.value, filterType);
     });
-    const textElements: NodeListOf<HTMLInputElement> = window.siyuan.menus.menu.element.querySelectorAll(".b3-text-field");
+    const dateTypeElement = menu.element.querySelector('.b3-select[data-type="dateType"]') as HTMLSelectElement;
+    dateTypeElement?.addEventListener("change", () => {
+        const directionElements = menu.element.querySelectorAll('[data-type="dataDirection"]');
+        const customerElement = directionElements[0].parentElement;
+        const customer2Element = directionElements[1].parentElement;
+        const timeElement = customerElement.previousElementSibling;
+        const time2Element = customer2Element.previousElementSibling;
+        if (dateTypeElement.value === "custom") {
+            customerElement.classList.remove("fn__none");
+            customer2Element.classList.remove("fn__none");
+            timeElement.classList.add("fn__none");
+            time2Element.classList.add("fn__none");
+        } else {
+            customerElement.classList.add("fn__none");
+            customer2Element.classList.add("fn__none");
+            timeElement.classList.remove("fn__none");
+            time2Element.classList.remove("fn__none");
+        }
+    });
+    menu.element.querySelectorAll('.b3-select[data-type="dataDirection"]').forEach((item: HTMLSelectElement) => {
+        item.addEventListener("change", () => {
+            const countElement = item.nextElementSibling.nextElementSibling;
+            if (item.value === "0") {
+                countElement.classList.add("fn__none");
+                countElement.nextElementSibling.classList.add("fn__none");
+            } else {
+                countElement.classList.remove("fn__none");
+                countElement.nextElementSibling.classList.remove("fn__none");
+            }
+        });
+    });
+
+    const textElements: NodeListOf<HTMLInputElement> = menu.element.querySelectorAll(".b3-text-field");
     textElements.forEach(item => {
         item.addEventListener("keydown", (event: KeyboardEvent) => {
             if (event.isComposing) {
@@ -392,34 +492,31 @@ export const addFilter = (options: {
 }) => {
     const menu = new Menu("av-add-filter");
     options.data.view.columns.forEach((column) => {
-        let hasFilter = false;
-        options.data.view.filters.find((filter) => {
-            if (filter.column === column.id) {
-                hasFilter = true;
+        let filter: IAVFilter;
+        options.data.view.filters.find((item) => {
+            if (item.column === column.id) {
+                filter = item;
                 return true;
             }
         });
-        if (!hasFilter && column.type !== "mAsset") {
+        if (!filter && column.type !== "mAsset") {
             menu.addItem({
                 label: column.name,
                 iconHTML: column.icon ? unicode2Emoji(column.icon, "b3-menu__icon", true) : `<svg class="b3-menu__icon"><use xlink:href="#${getColIconByType(column.type)}"></use></svg>`,
                 click: () => {
                     const cellValue = genCellValue(column.type, "");
-                    options.data.view.filters.push({
+                    filter = {
                         column: column.id,
                         operator: getDefaultOperatorByType(column.type),
                         value: cellValue,
                         type: column.type
-                    });
+                    };
+                    options.data.view.filters.push(filter);
                     options.menuElement.innerHTML = getFiltersHTML(options.data.view);
                     setPosition(options.menuElement, options.tabRect.right - options.menuElement.clientWidth, options.tabRect.bottom, options.tabRect.height);
                     const filterElement = options.menuElement.querySelector(`[data-id="${column.id}"] .b3-chip`) as HTMLElement;
                     setFilter({
-                        filter: {
-                            operator: getDefaultOperatorByType(column.type),
-                            column: column.id,
-                            value: cellValue
-                        },
+                        filter,
                         protyle: options.protyle,
                         data: options.data,
                         target: filterElement,
@@ -451,17 +548,33 @@ export const getFiltersHTML = (data: IAVTable) => {
                     filterValue = ": " + window.siyuan.languages.unchecked;
                 } else if (filter.operator === "Is true") {
                     filterValue = ": " + window.siyuan.languages.checked;
-                } else if (filter.value?.date?.content) {
-                    if (filter.value?.date?.content2 && filter.operator === "Is between") {
-                        filterValue = ` ${window.siyuan.languages.filterOperatorIsBetween} ${dayjs(filter.value.date.content).format("YYYY-MM-DD")} ${dayjs(filter.value.date.content2).format("YYYY-MM-DD")}`;
+                } else if (filter.value?.date?.content || filter.relativeDate || filter.relativeDate2) {
+                    let dateValue = "";
+                    let dateValue2 = "";
+                    if (filter.relativeDate) {
+                        dateValue = `${window.siyuan.languages[["pastDate", "current", "nextDate"][filter.relativeDate.direction + 1]]}
+ ${filter.relativeDate.direction ? filter.relativeDate.count : ""}
+ ${window.siyuan.languages[["day", "week", "month", "year"][filter.relativeDate.unit]]}`;
+                        if (filter.relativeDate2) {
+                            dateValue2 = `${window.siyuan.languages[["pastDate", "current", "nextDate"][filter.relativeDate2.direction + 1]]}
+ ${filter.relativeDate2.direction ? filter.relativeDate2.count : ""}
+ ${window.siyuan.languages[["day", "week", "month", "year"][filter.relativeDate2.unit]]}`;
+                        }
+                    } else if (filter.value?.date?.content) {
+                        dateValue = dayjs(filter.value.date.content).format("YYYY-MM-DD");
+                        dateValue2 = dayjs(filter.value.date.content2).format("YYYY-MM-DD");
+                    }
+
+                    if (filter.operator === "Is between") {
+                        filterValue = ` ${window.siyuan.languages.filterOperatorIsBetween} ${dateValue} ${dateValue2}`;
                     } else if ("=" === filter.operator) {
-                        filterValue = `: ${dayjs(filter.value.date.content).format("YYYY-MM-DD")}`;
+                        filterValue = `: ${dateValue}`;
                     } else if ([">", "<"].includes(filter.operator)) {
-                        filterValue = ` ${filter.operator} ${dayjs(filter.value.date.content).format("YYYY-MM-DD")}`;
+                        filterValue = ` ${filter.operator} ${dateValue}`;
                     } else if (">=" === filter.operator) {
-                        filterValue = ` ≥ ${dayjs(filter.value.date.content).format("YYYY-MM-DD")}`;
+                        filterValue = ` ≥ ${dateValue}`;
                     } else if ("<=" === filter.operator) {
-                        filterValue = ` ≤ ${dayjs(filter.value.date.content).format("YYYY-MM-DD")}`;
+                        filterValue = ` ≤ ${dateValue}`;
                     }
                 } else if (filter.value?.mSelect?.length > 0) {
                     let selectContent = "";

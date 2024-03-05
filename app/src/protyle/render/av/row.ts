@@ -113,13 +113,6 @@ ${(item.getAttribute("data-block-id") || item.dataset.dtype === "block") ? ' dat
                     cellElement.innerHTML = renderCell(cellValue);
                     renderCellAttr(cellElement, cellValue);
                 });
-                response.data.sorts.forEach((item: IAVSort) => {
-                    const sideRowCellElement = sideRow.querySelector(`.av__cell[data-col-id="${item.column}"]`) as HTMLElement;
-                    const cellElement = currentRow.querySelector(`.av__cell[data-col-id="${item.column}"]`);
-                    const cellValue = genCellValueByElement(getTypeByCellElement(sideRowCellElement), sideRowCellElement);
-                    cellElement.innerHTML = renderCell(cellValue);
-                    renderCellAttr(cellElement, cellValue);
-                });
                 popTextCell(protyle, [currentRow.querySelector('.av__cell[data-detached="true"]')], "block");
             });
         } else {
@@ -176,14 +169,17 @@ const updatePageSize = (options: {
         return;
     }
     options.nodeElement.setAttribute("data-page-size", options.newPageSize);
+    const blockID = options.nodeElement.getAttribute("data-node-id");
     transaction(options.protyle, [{
         action: "setAttrViewPageSize",
         avID: options.avID,
         data: parseInt(options.newPageSize),
+        blockID
     }], [{
         action: "setAttrViewPageSize",
         data: parseInt(options.currentPageSize),
         avID: options.avID,
+        blockID
     }]);
     document.querySelector(".av__panel")?.remove();
 };
@@ -277,6 +273,7 @@ export const deleteRow = (blockElement: HTMLElement, protyle: IProtyle) => {
             previousID: item.previousElementSibling?.getAttribute("data-id") || "",
             srcIDs: [item.getAttribute("data-id")],
             isDetached: item.querySelector('.av__cell[data-detached="true"]') ? true : false,
+            blockID: blockElement.dataset.nodeId
         });
     });
     transaction(protyle, [{

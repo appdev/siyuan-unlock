@@ -51,6 +51,7 @@ type TOperation =
     | "setAttrViewPageSize"
     | "updateAttrViewColRelation"
     | "updateAttrViewColRollup"
+    | "hideAttrViewName"
 type TBazaarType = "templates" | "icons" | "widgets" | "themes" | "plugins"
 type TCardType = "doc" | "notebook" | "all"
 type TEventBus = "ws-main" | "sync-start" | "sync-end" | "sync-fail" |
@@ -147,7 +148,7 @@ interface Window {
     }
     mermaid: {
         initialize(options: any): void,
-        render(id: string, text: string): { svg:string }
+        render(id: string, text: string): { svg: string }
     };
     plantumlEncoder: {
         encode(options: string): string,
@@ -453,6 +454,7 @@ interface IScrollAttr {
 interface IOperation {
     action: TOperation, // move， delete 不需要传 data
     id?: string,
+    blockID?: string,
     isTwoWay?: boolean, // 是否双向关联
     backRelationKeyID?: string, // 双向关联的目标关联列 ID
     avID?: string,  // av
@@ -727,6 +729,7 @@ interface IConfig {
             apiProvider: string // OpenAI, Azure
             apiUserAgent: string
             apiBaseURL: string
+            apiVersion: string
             apiKey: string
             apiModel: string
             apiMaxTokens: number
@@ -1063,6 +1066,7 @@ interface IAVView {
     id: string
     type: string
     icon: string
+    hideAttrViewName: boolean
 }
 
 interface IAVTable extends IAVView {
@@ -1079,6 +1083,14 @@ interface IAVFilter {
     operator: TAVFilterOperator,
     value: IAVCellValue,
     type?: TAVCol   // 仅用于标识新增时的类型，用于区分 rollup
+    relativeDate?: relativeDate
+    relativeDate2?: relativeDate
+}
+
+interface relativeDate {
+    count: number   // 数量
+    unit: number    // 单位：0: 天、1: 周、2: 月、3: 年
+    direction: number   // 方向：-1: 前、0: 现在、1: 后
 }
 
 interface IAVSort {

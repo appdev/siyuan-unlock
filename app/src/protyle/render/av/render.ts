@@ -49,11 +49,11 @@ export const avRender = (element: Element, protyle: IProtyle, cb?: () => void, v
             }
             const created = protyle.options.history?.created;
             const snapshot = protyle.options.history?.snapshot;
-            let newViewID = "";
+            let newViewID = e.getAttribute(Constants.CUSTOM_SY_AV_VIEW) || "";
             if (typeof viewID === "string") {
                 newViewID = viewID;
-            } else if (typeof viewID === "undefined") {
-                newViewID = e.querySelector(".av__header .item--focus")?.getAttribute("data-id");
+                fetchPost("/api/av/setDatabaseBlockView", {id: e.dataset.nodeId, viewID});
+                e.setAttribute(Constants.CUSTOM_SY_AV_VIEW, newViewID);
             }
             fetchPost(created ? "/api/av/renderHistoryAttributeView" : (snapshot ? "/api/av/renderSnapshotAttributeView" : "/api/av/renderAttributeView"), {
                 id: e.getAttribute("data-av-id"),
@@ -149,11 +149,15 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
                     tableHTML += "<div></div></div>";
                 });
                 let tabHTML = "";
+                let viewData: IAVView;
                 response.data.views.forEach((item: IAVView) => {
                     tabHTML += `<div data-id="${item.id}" class="item${item.id === response.data.viewID ? " item--focus" : ""}">
     ${item.icon ? unicode2Emoji(item.icon, "item__graphic", true) : '<svg class="item__graphic"><use xlink:href="#iconTable"></use></svg>'}
     <span class="item__text">${item.name}</span>
 </div>`;
+                    if (item.id === response.data.viewID) {
+                        viewData = item;
+                    }
                 });
                 e.firstElementChild.outerHTML = `<div class="av__container" style="--av-background:${e.style.backgroundColor || "var(--b3-theme-background)"}">
     <div class="av__header">
@@ -169,6 +173,8 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
             <div class="fn__space"></div>
             <span data-type="av-switcher" class="block__icon${response.data.views.length > 0 ? "" : " fn__none"}">
                 <svg><use xlink:href="#iconDown"></use></svg>
+                <span class="fn__space"></span>
+                <small>${response.data.views.length}</small>
             </span>
             <div class="fn__space"></div>
             <span data-type="av-filter" class="block__icon${data.filters.length > 0 ? " block__icon--active" : ""}">
@@ -190,7 +196,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
             ${response.data.isMirror ? ` <span class="block__icon block__icon--show ariaLabel" aria-label="${window.siyuan.languages.mirrorTip}">
     <svg><use xlink:href="#iconSplitLR"></use></svg></span><div class="fn__space"></div>` : ""}
         </div>
-        <div contenteditable="${protyle.disabled ? "false" : "true"}" spellcheck="${window.siyuan.config.editor.spellcheck.toString()}" class="av__title" data-title="${response.data.name || ""}" data-tip="${window.siyuan.languages.title}">${response.data.name || ""}</div>
+        <div contenteditable="${protyle.disabled ? "false" : "true"}" spellcheck="${window.siyuan.config.editor.spellcheck.toString()}" class="av__title${viewData.hideAttrViewName ? " av__title--hide" : ""}" data-title="${response.data.name || ""}" data-tip="${window.siyuan.languages.title}">${response.data.name || ""}</div>
         <div class="av__counter fn__none"></div>
     </div>
     <div class="av__scroll">
@@ -301,8 +307,7 @@ export const refreshAV = (protyle: IProtyle, operation: IOperation) => {
                         // 更新属性面板
                         renderAVAttribute(attrElement.parentElement, attrElement.dataset.nodeId, protyle);
                     }
-                }, ["addAttrViewView", "duplicateAttrViewView"].includes(operation.action) ? operation.id :
-                    (operation.action === "removeAttrViewView" ? null : undefined));
+                });
             });
         }
     }, ["insertAttrViewBlock"].includes(operation.action) ? 2 : 100);

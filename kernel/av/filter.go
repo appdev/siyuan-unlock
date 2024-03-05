@@ -17,8 +17,9 @@
 package av
 
 import (
-	"github.com/siyuan-note/siyuan/kernel/util"
 	"strings"
+
+	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
 type Filterable interface {
@@ -26,34 +27,66 @@ type Filterable interface {
 }
 
 type ViewFilter struct {
-	Column   string         `json:"column"`
-	Operator FilterOperator `json:"operator"`
-	Value    *Value         `json:"value"`
+	Column        string         `json:"column"`
+	Operator      FilterOperator `json:"operator"`
+	Value         *Value         `json:"value"`
+	RelativeDate  *RelativeDate  `json:"relativeDate"`
+	RelativeDate2 *RelativeDate  `json:"relativeDate2"`
+}
+
+type RelativeDateUnit int
+
+const (
+	RelativeDateUnitDay = iota
+	RelativeDateUnitWeek
+	RelativeDateUnitMonth
+	RelativeDateUnitYear
+)
+
+type RelativeDateDirection int
+
+const (
+	RelativeDateDirectionBefore = -1
+	RelativeDateDirectionThis   = 0
+	RelativeDateDirectionAfter  = 1
+)
+
+type RelativeDate struct {
+	Count     int                   `json:"count"`     // 数量
+	Unit      RelativeDateUnit      `json:"unit"`      // 单位：0 天、1 周、2 月、3 年
+	Direction RelativeDateDirection `json:"direction"` // 方向：-1 前、0 这、1 后
 }
 
 type FilterOperator string
 
 const (
-	FilterOperatorIsEqual           FilterOperator = "="
-	FilterOperatorIsNotEqual        FilterOperator = "!="
-	FilterOperatorIsGreater         FilterOperator = ">"
-	FilterOperatorIsGreaterOrEqual  FilterOperator = ">="
-	FilterOperatorIsLess            FilterOperator = "<"
-	FilterOperatorIsLessOrEqual     FilterOperator = "<="
-	FilterOperatorContains          FilterOperator = "Contains"
-	FilterOperatorDoesNotContain    FilterOperator = "Does not contains"
-	FilterOperatorIsEmpty           FilterOperator = "Is empty"
-	FilterOperatorIsNotEmpty        FilterOperator = "Is not empty"
-	FilterOperatorStartsWith        FilterOperator = "Starts with"
-	FilterOperatorEndsWith          FilterOperator = "Ends with"
-	FilterOperatorIsBetween         FilterOperator = "Is between"
-	FilterOperatorIsRelativeToToday FilterOperator = "Is relative to today"
-	FilterOperatorIsTrue            FilterOperator = "Is true"
-	FilterOperatorIsFalse           FilterOperator = "Is false"
+	FilterOperatorIsEqual          FilterOperator = "="
+	FilterOperatorIsNotEqual       FilterOperator = "!="
+	FilterOperatorIsGreater        FilterOperator = ">"
+	FilterOperatorIsGreaterOrEqual FilterOperator = ">="
+	FilterOperatorIsLess           FilterOperator = "<"
+	FilterOperatorIsLessOrEqual    FilterOperator = "<="
+	FilterOperatorContains         FilterOperator = "Contains"
+	FilterOperatorDoesNotContain   FilterOperator = "Does not contains"
+	FilterOperatorIsEmpty          FilterOperator = "Is empty"
+	FilterOperatorIsNotEmpty       FilterOperator = "Is not empty"
+	FilterOperatorStartsWith       FilterOperator = "Starts with"
+	FilterOperatorEndsWith         FilterOperator = "Ends with"
+	FilterOperatorIsBetween        FilterOperator = "Is between"
+	FilterOperatorIsTrue           FilterOperator = "Is true"
+	FilterOperatorIsFalse          FilterOperator = "Is false"
 )
 
 func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
-	// Improve adding rows of the filtered database table view https://github.com/siyuan-note/siyuan/issues/10025
+	if nil != filter.Value && filter.Value.IsGenerated() {
+		// 自动生成类型的过滤条件不设置默认值
+		return nil
+	}
+
+	if nil == filter.Value && nil != filter.RelativeDate {
+		// 相对日期今天的动态日期不设置默认值
+		return nil
+	}
 
 	ret = filter.Value.Clone()
 	switch filter.Value.Type {

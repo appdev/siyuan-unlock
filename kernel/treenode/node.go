@@ -283,6 +283,9 @@ func NodeStaticContent(node *ast.Node, excludeTypes []string, includeTextMarkATi
 			buf.WriteByte(lex.ItemBackslash)
 		case ast.NodeBackslashContent:
 			buf.Write(n.Tokens)
+		case ast.NodeAudio, ast.NodeVideo:
+			buf.WriteString(GetNodeSrcTokens(n))
+			buf.WriteByte(' ')
 		}
 		lastSpace = false
 		return ast.WalkContinue
@@ -291,6 +294,34 @@ func NodeStaticContent(node *ast.Node, excludeTypes []string, includeTextMarkATi
 	// 这里不要 trim，否则无法搜索首尾空格
 	// Improve search and replace for spaces https://github.com/siyuan-note/siyuan/issues/10231
 	return buf.String()
+}
+
+func GetNodeSrcTokens(n *ast.Node) (ret string) {
+	if index := bytes.Index(n.Tokens, []byte("src=\"")); 0 < index {
+		src := n.Tokens[index+len("src=\""):]
+		if index = bytes.Index(src, []byte("\"")); 0 < index {
+			src = src[:bytes.Index(src, []byte("\""))]
+			if !IsRelativePath(src) {
+				return
+			}
+
+			ret = strings.TrimSpace(string(src))
+			return
+		}
+
+		logging.LogWarnf("src is missing the closing double quote in tree [%s] ", n.Box+n.Path)
+	}
+	return
+}
+
+func IsRelativePath(dest []byte) bool {
+	if 1 > len(dest) {
+		return false
+	}
+	if '/' == dest[0] {
+		return false
+	}
+	return !bytes.Contains(dest, []byte(":"))
 }
 
 func FirstLeafBlock(node *ast.Node) (ret *ast.Node) {
@@ -620,11 +651,12 @@ func getAttributeViewContent(avID string) (content string) {
 
 func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *av.Table, err error) {
 	ret = &av.Table{
-		ID:      view.ID,
-		Icon:    view.Icon,
-		Name:    view.Name,
-		Columns: []*av.TableColumn{},
-		Rows:    []*av.TableRow{},
+		ID:               view.ID,
+		Icon:             view.Icon,
+		Name:             view.Name,
+		HideAttrViewName: view.HideAttrViewName,
+		Columns:          []*av.TableColumn{},
+		Rows:             []*av.TableRow{},
 	}
 
 	// 组装列
@@ -944,7 +976,23 @@ func FillAttributeViewTableCellNilValue(tableCell *av.TableCell, rowID, colID st
 }
 
 func GetAttributeViewDefaultValue(valueID, keyID, blockID string, typ av.KeyType) (ret *av.Value) {
+	if "" == valueID {
+		valueID = ast.NewNodeID()
+	}
+
 	ret = &av.Value{ID: valueID, KeyID: keyID, BlockID: blockID, Type: typ}
+
+	createdStr := valueID[:len("20060102150405")]
+	created, parseErr := time.ParseInLocation("20060102150405", createdStr, time.Local)
+	if nil == parseErr {
+		ret.CreatedAt = created.UnixMilli()
+	} else {
+		ret.CreatedAt = time.Now().UnixMilli()
+	}
+	if 0 == ret.UpdatedAt {
+		ret.UpdatedAt = ret.CreatedAt
+	}
+
 	switch typ {
 	case av.KeyTypeText:
 		ret.Text = &av.ValueText{}

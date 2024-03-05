@@ -56,7 +56,7 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-func ExportAv2CSV(avID string) (zipPath string, err error) {
+func ExportAv2CSV(avID, blockID string) (zipPath string, err error) {
 	// Database block supports export as CSV https://github.com/siyuan-note/siyuan/issues/10072
 
 	attrView, err := av.ParseAttributeView(avID)
@@ -64,7 +64,12 @@ func ExportAv2CSV(avID string) (zipPath string, err error) {
 		return
 	}
 
-	view, err := attrView.GetCurrentView()
+	node, _, err := getNodeByBlockID(nil, blockID)
+	if nil == node {
+		return
+	}
+	viewID := node.IALAttr(av.NodeAttrView)
+	view, err := attrView.GetCurrentView(viewID)
 	if nil != err {
 		return
 	}
@@ -79,6 +84,10 @@ func ExportAv2CSV(avID string) (zipPath string, err error) {
 		logging.LogErrorf("render attribute view [%s] table failed: %s", avID, err)
 		return
 	}
+
+	// 遵循视图过滤和排序规则 Use filtering and sorting of current view settings when exporting database blocks https://github.com/siyuan-note/siyuan/issues/10474
+	table.FilterRows(attrView)
+	table.SortRows()
 
 	exportFolder := filepath.Join(util.TempDir, "export", "csv", name)
 	if err = os.MkdirAll(exportFolder, 0755); nil != err {
@@ -1620,7 +1629,7 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string) (
 				case av.KeyTypeMAsset: // 导出资源文件列 https://github.com/siyuan-note/siyuan/issues/9919
 					for _, value := range keyValues.Values {
 						for _, asset := range value.MAsset {
-							if !isRelativePath([]byte(asset.Content)) {
+							if !treenode.IsRelativePath([]byte(asset.Content)) {
 								continue
 							}
 
@@ -1929,7 +1938,8 @@ func processKaTexMacros(n *ast.Node) {
 	mathContent = escapeKaTexSupportedFunctions(mathContent)
 	usedMacros := extractUsedMacros(mathContent, &keys)
 	for _, usedMacro := range usedMacros {
-		expanded := resolveKaTexMacro(usedMacro, &macros, &keys)
+		depth := 1
+		expanded := resolveKaTexMacro(usedMacro, &macros, &keys, &depth)
 		expanded = unescapeKaTexSupportedFunctions(expanded)
 		mathContent = strings.ReplaceAll(mathContent, usedMacro, expanded)
 	}
@@ -2238,7 +2248,8 @@ func exportTree(tree *parse.Tree, wysiwyg, expandKaTexMacros, keepFold bool,
 			return ast.WalkContinue
 		}
 
-		view, err := attrView.GetCurrentView()
+		viewID := n.IALAttr(av.NodeAttrView)
+		view, err := attrView.GetCurrentView(viewID)
 		if nil != err {
 			logging.LogErrorf("get attribute view [%s] failed: %s", avID, err)
 			return ast.WalkContinue
@@ -2249,6 +2260,10 @@ func exportTree(tree *parse.Tree, wysiwyg, expandKaTexMacros, keepFold bool,
 			logging.LogErrorf("render attribute view [%s] table failed: %s", avID, err)
 			return ast.WalkContinue
 		}
+
+		// 遵循视图过滤和排序规则 Use filtering and sorting of current view settings when exporting database blocks https://github.com/siyuan-note/siyuan/issues/10474
+		table.FilterRows(attrView)
+		table.SortRows()
 
 		var aligns []int
 		for range table.Columns {

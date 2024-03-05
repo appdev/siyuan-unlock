@@ -138,9 +138,10 @@ type SelectOption struct {
 
 // View 描述了视图的结构。
 type View struct {
-	ID   string `json:"id"`   // 视图 ID
-	Icon string `json:"icon"` // 视图图标
-	Name string `json:"name"` // 视图名称
+	ID               string `json:"id"`               // 视图 ID
+	Icon             string `json:"icon"`             // 视图图标
+	Name             string `json:"name"`             // 视图名称
+	HideAttrViewName bool   `json:"hideAttrViewName"` // 是否隐藏属性视图名称
 
 	LayoutType LayoutType   `json:"type"`            // 当前布局类型
 	Table      *LayoutTable `json:"table,omitempty"` // 表格布局
@@ -268,7 +269,7 @@ func SaveAttributeView(av *AttributeView) (err error) {
 					}
 				}
 				if 0 == v.Block.Updated {
-					v.Block.Updated = now
+					v.Block.Updated = v.Block.Created
 				}
 			}
 		case KeyTypeNumber:
@@ -301,10 +302,24 @@ func SaveAttributeView(av *AttributeView) (err error) {
 					}
 				}
 			}
+
+			// 补全值的创建时间和更新时间
+			if "" == v.ID {
+				v.ID = ast.NewNodeID()
+			}
+			createdStr := v.ID[:len("20060102150405")]
+			created, parseErr := time.ParseInLocation("20060102150405", createdStr, time.Local)
+			if nil == parseErr {
+				v.CreatedAt = created.UnixMilli()
+			} else {
+				v.CreatedAt = now
+			}
+
+			if 0 == v.UpdatedAt {
+				v.UpdatedAt = v.CreatedAt
+			}
 		}
 	}
-
-	// 数据订正
 
 	// 值去重
 	blockValues := av.GetBlockKeyValues()
@@ -361,14 +376,26 @@ func (av *AttributeView) GetView(viewID string) (ret *View) {
 	return
 }
 
-func (av *AttributeView) GetCurrentView() (ret *View, err error) {
+func (av *AttributeView) GetCurrentView(viewID string) (ret *View, err error) {
+	if "" != viewID {
+		ret = av.GetView(viewID)
+		if nil != ret {
+			return
+		}
+	}
+
 	for _, v := range av.Views {
 		if v.ID == av.ViewID {
 			ret = v
 			return
 		}
 	}
-	err = ErrViewNotFound
+
+	if 1 > len(av.Views) {
+		err = ErrViewNotFound
+		return
+	}
+	ret = av.Views[0]
 	return
 }
 
@@ -509,5 +536,6 @@ var (
 )
 
 const (
-	NodeAttrNameAvs = "custom-avs" // 用于标记块所属的属性视图，逗号分隔 av id
+	NodeAttrNameAvs = "custom-avs"        // 用于标记块所属的属性视图，逗号分隔 av id
+	NodeAttrView    = "custom-sy-av-view" // 用于标记块所属的属性视图视图 view id Database block support specified view https://github.com/siyuan-note/siyuan/issues/10443
 )

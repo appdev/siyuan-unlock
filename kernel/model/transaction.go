@@ -277,6 +277,8 @@ func performTx(tx *Transaction) (ret *TxErr) {
 			ret = tx.doUpdateAttrViewColRelation(op)
 		case "updateAttrViewColRollup":
 			ret = tx.doUpdateAttrViewColRollup(op)
+		case "hideAttrViewName":
+			ret = tx.doHideAttrViewName(op)
 		}
 
 		if nil != ret {
@@ -1225,6 +1227,7 @@ type Operation struct {
 	NextID     string      `json:"nextID"`
 	RetData    interface{} `json:"retData"`
 	BlockIDs   []string    `json:"blockIDs"`
+	BlockID    string      `json:"blockID"`
 
 	DeckID string `json:"deckID"` // 用于添加/删除闪卡
 

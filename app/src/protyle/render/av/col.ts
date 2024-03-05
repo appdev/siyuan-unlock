@@ -10,6 +10,7 @@ import {openEmojiPanel, unicode2Emoji} from "../../../emoji";
 import {focusBlock} from "../../util/selection";
 import {toggleUpdateRelationBtn} from "./relation";
 import {bindRollupData, getRollupHTML} from "./rollup";
+import {Constants} from "../../../constants";
 
 export const duplicateCol = (options: {
     protyle: IProtyle,
@@ -18,6 +19,7 @@ export const duplicateCol = (options: {
     colId: string,
     newValue: string,
     icon: string
+    viewID: string
 }) => {
     const id = Lute.NewNodeID();
     const nameMatch = options.newValue.match(/^(.*) \((\d+)\)$/);
@@ -27,7 +29,10 @@ export const duplicateCol = (options: {
         options.newValue = `${options.newValue} (1)`;
     }
     if (["select", "mSelect", "rollup"].includes(options.type)) {
-        fetchPost("/api/av/renderAttributeView", {id: options.avID}, (response) => {
+        fetchPost("/api/av/renderAttributeView", {
+            id: options.avID,
+            viewID: options.viewID
+        }, (response) => {
             const data = response.data as IAV;
             let colOptions;
             data.view.columns.find((item) => {
@@ -112,12 +117,15 @@ export const getEditHTML = (options: {
     <span class="b3-menu__accelerator" style="margin-left: 0">${getColNameByType(colData.type)}</span>
     <svg class="b3-menu__icon b3-menu__icon--small"><use xlink:href="#iconRight"></use></svg>
 </button>`;
-    if (["mSelect", "select"].includes(colData.type) && colData.options && colData.options.length > 0) {
+    if (["mSelect", "select"].includes(colData.type)) {
         html += `<button class="b3-menu__separator"></button>
-<button class="b3-menu__item">
+<button class="b3-menu__item" data-type="nobg">
     <svg class="b3-menu__icon" style=""><use xlink:href="#iconAdd"></use></svg>
     <span class="b3-menu__label" style="padding: 4px;display: flex"><input data-type="addOption" class="b3-text-field fn__block fn__size200" type="text" placeholder="Enter ${window.siyuan.languages.addAttr}"></span>
 </button>`;
+        if (!colData.options) {
+            colData.options = [];
+        }
         colData.options.forEach(item => {
             html += `<button class="b3-menu__item${html ? "" : " b3-menu__item--current"}" draggable="true" data-name="${item.name}" data-color="${item.color}">
     <svg class="b3-menu__icon fn__grab"><use xlink:href="#iconDrag"></use></svg>
@@ -464,7 +472,7 @@ const addAttrViewColAnimation = (options: {
             previousElement.insertAdjacentHTML("afterend", html);
         });
     } else {
-        const nodeId= options.blockElement.getAttribute("data-node-id");
+        const nodeId = options.blockElement.getAttribute("data-node-id");
         options.blockElement.querySelector(".fn__hr").insertAdjacentHTML("beforebegin", `<div class="block__icons av__row" data-id="${nodeId}" data-col-id="${options.id}">
     <div class="block__icon" draggable="true"><svg><use xlink:href="#iconDrag"></use></svg></div>
     <div class="block__logo ariaLabel" data-type="editCol" data-position="parentW" aria-label="${getColNameByType(options.type)}">
@@ -493,6 +501,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
     const type = cellElement.getAttribute("data-dtype") as TAVCol;
     const colId = cellElement.getAttribute("data-col-id");
     const avID = blockElement.getAttribute("data-av-id");
+    const blockID = blockElement.getAttribute("data-node-id");
     const oldValue = cellElement.querySelector(".av__celltext").textContent.trim();
     const menu = new Menu("av-header-cell", () => {
         const newValue = (menu.element.querySelector(".b3-text-field") as HTMLInputElement).value;
@@ -595,11 +604,13 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                     data: [{
                         column: colId,
                         order: "ASC"
-                    }]
+                    }],
+                    blockID
                 }], [{
                     action: "setAttrViewSorts",
                     avID: response.data.id,
-                    data: response.data.view.sorts
+                    data: response.data.view.sorts,
+                    blockID
                 }]);
             });
         }
@@ -617,11 +628,13 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                     data: [{
                         column: colId,
                         order: "DESC"
-                    }]
+                    }],
+                    blockID
                 }], [{
                     action: "setAttrViewSorts",
                     avID: response.data.id,
-                    data: response.data.view.sorts
+                    data: response.data.view.sorts,
+                    blockID
                 }]);
             });
         }
@@ -699,12 +712,14 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                     action: "setAttrViewColHidden",
                     id: colId,
                     avID,
-                    data: true
+                    data: true,
+                    blockID
                 }], [{
                     action: "setAttrViewColHidden",
                     id: colId,
                     avID,
-                    data: false
+                    data: false,
+                    blockID
                 }]);
             }
         });
@@ -718,12 +733,14 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                 action: "setAttrViewColPin",
                 id: colId,
                 avID,
-                data: !isPin
+                data: !isPin,
+                blockID
             }], [{
                 action: "setAttrViewColPin",
                 id: colId,
                 avID,
-                data: isPin
+                data: isPin,
+                blockID
             }]);
             updateAttrViewCellAnimation(blockElement.querySelector(`.av__row--header .av__cell[data-col-id="${colId}"]`), undefined, {pin: !isPin});
         }
@@ -735,6 +752,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                 label: window.siyuan.languages.duplicate,
                 click() {
                     duplicateCol({
+                        viewID: blockElement.getAttribute(Constants.CUSTOM_SY_AV_VIEW),
                         protyle,
                         type,
                         avID,
@@ -776,12 +794,14 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                     action: "setAttrViewColWrap",
                     id: colId,
                     avID,
-                    data: inputElement.checked
+                    data: inputElement.checked,
+                    blockID
                 }], [{
                     action: "setAttrViewColWrap",
                     id: colId,
                     avID,
-                    data: !inputElement.checked
+                    data: !inputElement.checked,
+                    blockID
                 }]);
             });
         }

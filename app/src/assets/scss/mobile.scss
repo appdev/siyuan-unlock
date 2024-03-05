@@ -45,7 +45,6 @@
   }
 
   .b3-list-item {
-
     font-size: 16px;
     line-height: 40px;
 
@@ -63,7 +62,7 @@
     }
 
     &__toggle {
-      height: 24px;
+      height: 32px;
       padding: 4px;
     }
 
@@ -364,6 +363,8 @@
       box-shadow: inset 0 0 0 .6px var(--b3-theme-on-surface);
       border: 0;
       color: var(--b3-theme-on-background);
+      min-height: 50px;
+      text-align: left;
     }
 
     &-icon {
@@ -377,7 +378,6 @@
     }
 
     &-text {
-      line-height: 48px;
       margin-left: 6px;
     }
   }
