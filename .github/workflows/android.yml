@@ -3,7 +3,7 @@ name: CD For SiYuan Unlock Android
 on:
   push:
     tags:
-      - 'v' #
+      - 'android' #
   workflow_dispatch:
 
 jobs:
