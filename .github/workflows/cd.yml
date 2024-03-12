@@ -19,17 +19,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.10"
-      - run: pip install PyGithub
-
       - id: thislatestR
         uses: pozetroninc/github-action-get-latest-release@master
         with:
-          # owner: appdev
-          # repo: siyuan-unlock
+          owner: appdev
+          repo: siyuan-unlock
           repository: ${{ github.repository }}
           token: ${{ secrets.GITHUB_TOKEN }}
           excludes: prerelease, draft
