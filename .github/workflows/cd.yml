@@ -39,8 +39,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           name: ${{ needs.create_release.outputs.version }}
-          tag: ${{ steps.compute-tag.outputs.tagname }}
-          commit: ${{ steps.compute-tag.outputs.branch }}
+          tag: v103.0.3-10-g42302cd02
           body: ${{ env.release_body }}
           draft: false
           prerelease: true
