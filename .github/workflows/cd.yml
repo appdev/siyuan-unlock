@@ -39,6 +39,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           name: ${{ steps.release_info.outputs.release_version }}
+          tag: ${{ github.ref }}
           body: ${{ env.release_body }}
           draft: false
           prerelease: true
