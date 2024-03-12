@@ -102,6 +102,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        generate_msg_from_repo(args.repo, args.tag, args.lastestRelease)
+        generate_msg_from_repo(args.repo, "", args.lastestRelease)
     except AssertionError:
         print(args.tag)
