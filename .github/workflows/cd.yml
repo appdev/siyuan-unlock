@@ -38,8 +38,9 @@ jobs:
         id: create_release
         uses: ncipollo/release-action@v1
         with:
-          name: ${{ steps.release_info.outputs.release_version }}
-          tag: ${{ github.ref }}
+          name: ${{ needs.create_release.outputs.version }}
+          tag: ${{ steps.compute-tag.outputs.tagname }}
+          commit: ${{ steps.compute-tag.outputs.branch }}
           body: ${{ env.release_body }}
           draft: false
           prerelease: true
