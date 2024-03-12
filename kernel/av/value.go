@@ -58,6 +58,10 @@ type Value struct {
 }
 
 func (value *Value) String() string {
+	if nil == value {
+		return ""
+	}
+
 	switch value.Type {
 	case KeyTypeBlock:
 		if nil == value.Block {
@@ -78,7 +82,8 @@ func (value *Value) String() string {
 		if nil == value.Date {
 			return ""
 		}
-		return value.Date.FormattedContent
+		formatted := NewFormattedValueDate(value.Date.Content, value.Date.Content2, DateFormatNone, value.Date.IsNotTime, value.Date.HasEndDate)
+		return formatted.FormattedContent
 	case KeyTypeSelect:
 		if 1 > len(value.MSelect) {
 			return ""
@@ -114,7 +119,7 @@ func (value *Value) String() string {
 		}
 		var ret []string
 		for _, v := range value.MAsset {
-			ret = append(ret, v.Content)
+			ret = append(ret, v.Name+" "+v.Content)
 		}
 		return strings.Join(ret, " ")
 	case KeyTypeTemplate:
@@ -141,16 +146,16 @@ func (value *Value) String() string {
 		}
 		return ""
 	case KeyTypeRelation:
-		if 1 > len(value.Relation.Contents) {
+		if nil == value.Relation || 1 > len(value.Relation.Contents) {
 			return ""
 		}
 		var ret []string
 		for _, v := range value.Relation.Contents {
-			ret = append(ret, v)
+			ret = append(ret, v.String())
 		}
 		return strings.TrimSpace(strings.Join(ret, ", "))
 	case KeyTypeRollup:
-		if nil == value.Rollup || nil == value.Rollup.Contents {
+		if nil == value.Rollup || 1 > len(value.Rollup.Contents) {
 			return ""
 		}
 		var ret []string
@@ -184,13 +189,12 @@ func (value *Value) Clone() (ret *Value) {
 }
 
 func (value *Value) IsEdited() bool {
-	if 1709454120000 > value.CreatedAt {
+	if 1709740800000 > value.CreatedAt {
 		// 说明是旧数据，认为都是编辑过的
 		return true
 	}
 
-	if value.IsGenerated() {
-		// 所有生成的数据都认为是编辑过的
+	if KeyTypeUpdated == value.Type || KeyTypeCreated == value.Type {
 		return true
 	}
 
@@ -202,7 +206,7 @@ func (value *Value) IsEdited() bool {
 }
 
 func (value *Value) IsGenerated() bool {
-	return KeyTypeTemplate == value.Type || KeyTypeRollup == value.Type || KeyTypeUpdated == value.Type || KeyTypeCreated == value.Type
+	return KeyTypeUpdated == value.Type || KeyTypeCreated == value.Type
 }
 
 func (value *Value) IsEmpty() bool {
@@ -276,8 +280,82 @@ func (value *Value) IsEmpty() bool {
 	case KeyTypeRollup:
 		return 1 > len(value.Rollup.Contents)
 	}
-
 	return false
+}
+
+func (value *Value) SetValByType(typ KeyType, val interface{}) {
+	switch typ {
+	case KeyTypeBlock:
+		value.Block = val.(*ValueBlock)
+	case KeyTypeText:
+		value.Text = val.(*ValueText)
+	case KeyTypeNumber:
+		value.Number = val.(*ValueNumber)
+	case KeyTypeDate:
+		value.Date = val.(*ValueDate)
+	case KeyTypeSelect:
+		value.MSelect = val.([]*ValueSelect)
+	case KeyTypeMSelect:
+		value.MSelect = val.([]*ValueSelect)
+	case KeyTypeURL:
+		value.URL = val.(*ValueURL)
+	case KeyTypeEmail:
+		value.Email = val.(*ValueEmail)
+	case KeyTypePhone:
+		value.Phone = val.(*ValuePhone)
+	case KeyTypeMAsset:
+		value.MAsset = val.([]*ValueAsset)
+	case KeyTypeTemplate:
+		value.Template = val.(*ValueTemplate)
+	case KeyTypeCreated:
+		value.Created = val.(*ValueCreated)
+	case KeyTypeUpdated:
+		value.Updated = val.(*ValueUpdated)
+	case KeyTypeCheckbox:
+		value.Checkbox = val.(*ValueCheckbox)
+	case KeyTypeRelation:
+		value.Relation = val.(*ValueRelation)
+	case KeyTypeRollup:
+		value.Rollup = val.(*ValueRollup)
+	}
+}
+
+func (value *Value) GetValByType(typ KeyType) (ret interface{}) {
+	switch typ {
+	case KeyTypeBlock:
+		return value.Block
+	case KeyTypeText:
+		return value.Text
+	case KeyTypeNumber:
+		return value.Number
+	case KeyTypeDate:
+		return value.Date
+	case KeyTypeSelect:
+		return value.MSelect
+	case KeyTypeMSelect:
+		return value.MSelect
+	case KeyTypeURL:
+		return value.URL
+	case KeyTypeEmail:
+		return value.Email
+	case KeyTypePhone:
+		return value.Phone
+	case KeyTypeMAsset:
+		return value.MAsset
+	case KeyTypeTemplate:
+		return value.Template
+	case KeyTypeCreated:
+		return value.Created
+	case KeyTypeUpdated:
+		return value.Updated
+	case KeyTypeCheckbox:
+		return value.Checkbox
+	case KeyTypeRelation:
+		return value.Relation
+	case KeyTypeRollup:
+		return value.Rollup
+	}
+	return
 }
 
 type ValueBlock struct {
@@ -574,8 +652,8 @@ type ValueCheckbox struct {
 }
 
 type ValueRelation struct {
-	Contents []string `json:"contents"`
 	BlockIDs []string `json:"blockIDs"`
+	Contents []*Value `json:"contents"`
 }
 
 type ValueRollup struct {

@@ -49,6 +49,19 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
         return true;
     }
 
+    const searchIconElement = hasClosestByAttribute(event.target, "data-type", "av-search-icon");
+    if (searchIconElement) {
+        const searchElement = blockElement.querySelector('input[data-type="av-search"]') as HTMLInputElement;
+        searchElement.style.width = "128px";
+        searchElement.style.paddingLeft = "";
+        searchElement.style.paddingRight = "";
+        searchElement.focus();
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+    }
+
+
     if (protyle.disabled) {
         return false;
     }
@@ -75,18 +88,28 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
         } else if (type === "av-add-more") {
             const avID = blockElement.getAttribute("data-av-id");
             const srcIDs = [Lute.NewNodeID()];
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "insertAttrViewBlock",
                 avID,
                 srcIDs,
                 isDetached: true,
                 blockID: blockElement.dataset.nodeId,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockElement.dataset.nodeId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewBlock",
                 srcIDs,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockElement.dataset.nodeId,
+                data: blockElement.getAttribute("updated")
             }]);
             insertAttrViewBlockAnimation(protyle, blockElement, srcIDs, undefined, avID);
+            blockElement.setAttribute("updated", newUpdated);
             event.preventDefault();
             event.stopPropagation();
             return true;
@@ -145,6 +168,7 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
             const avID = blockElement.getAttribute("data-av-id");
             const srcIDs = [Lute.NewNodeID()];
             const previousID = blockElement.querySelector(".av__row--util").previousElementSibling.getAttribute("data-id") || "";
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "insertAttrViewBlock",
                 avID,
@@ -152,12 +176,21 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
                 srcIDs,
                 isDetached: true,
                 blockID: blockElement.dataset.nodeId,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockElement.dataset.nodeId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewBlock",
                 srcIDs,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockElement.dataset.nodeId,
+                data: blockElement.getAttribute("updated")
             }]);
             insertAttrViewBlockAnimation(protyle, blockElement, srcIDs, previousID, avID);
+            blockElement.setAttribute("updated", newUpdated);
             event.preventDefault();
             event.stopPropagation();
             return true;

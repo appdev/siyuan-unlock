@@ -30,6 +30,7 @@ import {bindRelationEvent, getRelationHTML, openSearchAV, setRelationCell, updat
 import {bindRollupData, getRollupHTML, goSearchRollupCol} from "./rollup";
 import {updateCellsValue} from "./cell";
 import {openCalcMenu} from "./calc";
+import * as dayjs from "dayjs";
 
 export const openMenuPanel = (options: {
     protyle: IProtyle,
@@ -110,6 +111,7 @@ export const openMenuPanel = (options: {
     <div class="b3-menu">${html}</div>
 </div>`);
         avPanelElement = document.querySelector(".av__panel");
+        let closeCB: () => void;
         const menuElement = avPanelElement.lastElementChild as HTMLElement;
         const tabRect = options.blockElement.querySelector(`.av__views, .av__row[data-col-id="${options.colId}"] > .block__logo`)?.getBoundingClientRect();
         if (["select", "date", "asset", "relation", "rollup"].includes(options.type)) {
@@ -117,7 +119,7 @@ export const openMenuPanel = (options: {
             if (options.type === "select") {
                 bindSelectEvent(options.protyle, data, menuElement, options.cellElements, options.blockElement);
             } else if (options.type === "date") {
-                bindDateEvent({
+                closeCB = bindDateEvent({
                     protyle: options.protyle,
                     data,
                     menuElement,
@@ -365,7 +367,24 @@ export const openMenuPanel = (options: {
                     targetElement.after(sourceElement);
                 }
                 targetElement.classList.remove("dragover__bottom", "dragover__top");
-                setRelationCell(options.protyle, options.blockElement as HTMLElement, sourceElement.parentElement, options.cellElements);
+                const blockIDs: string[] = [];
+                const contents: IAVCellValue[] = [];
+                targetElement.parentElement.querySelectorAll(".fn__grab").forEach(item => {
+                    const dateElement = item.nextElementSibling as HTMLElement;
+                    blockIDs.push(dateElement.dataset.id);
+                    contents.push({
+                        isDetached: !dateElement.style.color,
+                        type: "block",
+                        block: {
+                            content: dateElement.textContent,
+                            id: dateElement.dataset.id
+                        }
+                    });
+                });
+                updateCellsValue(options.protyle, options.blockElement as HTMLElement, {
+                    blockIDs,
+                    contents,
+                }, options.cellElements);
                 return;
             }
 
@@ -447,6 +466,7 @@ export const openMenuPanel = (options: {
                         // 过滤面板先关闭过滤条件
                         window.siyuan.menus.menu.remove();
                     } else {
+                        closeCB?.();
                         avPanelElement.remove();
                         focusBlock(options.blockElement);
                     }
@@ -572,7 +592,7 @@ export const openMenuPanel = (options: {
                     window.siyuan.menus.menu.remove();
                     const oldFilters = Object.assign([], data.view.filters);
                     data.view.filters.find((item: IAVFilter, index: number) => {
-                        if (item.column === target.parentElement.dataset.id) {
+                        if (item.column === target.parentElement.dataset.id && item.value.type === target.parentElement.dataset.filterType) {
                             data.view.filters.splice(index, 1);
                             return true;
                         }
@@ -595,7 +615,7 @@ export const openMenuPanel = (options: {
                     break;
                 } else if (type === "setFilter") {
                     data.view.filters.find((item: IAVFilter) => {
-                        if (item.column === target.parentElement.parentElement.dataset.id) {
+                        if (item.column === target.parentElement.parentElement.dataset.id && item.value.type === target.parentElement.parentElement.dataset.filterType) {
                             setFilter({
                                 filter: item,
                                 protyle: options.protyle,
@@ -991,6 +1011,7 @@ export const openMenuPanel = (options: {
                     const colId = menuElement.querySelector(".b3-menu__item").getAttribute("data-col-id");
                     const colData = data.view.columns.find((item: IAVColumn) => item.id === colId);
                     duplicateCol({
+                        blockElement: options.blockElement,
                         protyle: options.protyle,
                         type: colData.type,
                         avID,
@@ -1012,10 +1033,15 @@ export const openMenuPanel = (options: {
                             return true;
                         }
                     });
+                    const newUpdated = dayjs().format("YYYYMMDDHHmmss");
                     transaction(options.protyle, [{
                         action: "removeAttrViewCol",
                         id: colId,
                         avID,
+                    }, {
+                        action: "doUpdateUpdated",
+                        id: blockID,
+                        data: newUpdated,
                     }], [{
                         action: "addAttrViewCol",
                         name: colData.name,
@@ -1023,8 +1049,13 @@ export const openMenuPanel = (options: {
                         type: colData.type,
                         id: colId,
                         previousID
+                    }, {
+                        action: "doUpdateUpdated",
+                        id: blockID,
+                        data: options.blockElement.getAttribute("updated")
                     }]);
                     removeAttrViewColAnimation(options.blockElement, colId);
+                    options.blockElement.setAttribute("updated", newUpdated);
                     avPanelElement.remove();
                     event.preventDefault();
                     event.stopPropagation();

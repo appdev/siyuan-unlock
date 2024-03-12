@@ -67,6 +67,7 @@ import {getSavePath, newFileBySelect} from "../../util/newFile";
 import {removeSearchMark} from "../toolbar/util";
 import {avKeydown} from "../render/av/keydown";
 import {checkFold} from "../../util/noRelyPCFunction";
+import {AIActions} from "../../ai/actions";
 
 export const getContentByInlineHTML = (range: Range, cb: (content: string) => void) => {
     let html = "";
@@ -84,7 +85,7 @@ export const getContentByInlineHTML = (range: Range, cb: (content: string) => vo
 
 export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
     editorElement.addEventListener("keydown", (event: KeyboardEvent & { target: HTMLElement }) => {
-        if (event.target.localName === "protyle-html") {
+        if (event.target.localName === "protyle-html" || event.target.localName === "input") {
             event.stopPropagation();
             return;
         }
@@ -1401,6 +1402,17 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                 selectsElement = [nodeElement];
             }
             duplicateBlock(selectsElement, protyle);
+            return;
+        }
+
+        if (!event.repeat && matchHotKey(window.siyuan.config.keymap.editor.general.ai.custom, event)) {
+            event.preventDefault();
+            event.stopPropagation();
+            let selectsElement: HTMLElement[] = Array.from(protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select"));
+            if (selectsElement.length === 0) {
+                selectsElement = [nodeElement];
+            }
+            AIActions(selectsElement, protyle);
             return;
         }
 

@@ -24,10 +24,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/88250/gulu"
 	"github.com/88250/lute/ast"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/util"
@@ -211,6 +213,26 @@ func NewAttributeView(id string) (ret *AttributeView) {
 	return
 }
 
+func GetAttributeViewName(avID string) (ret string, err error) {
+	avJSONPath := GetAttributeViewDataPath(avID)
+	if !filelock.IsExist(avJSONPath) {
+		return
+	}
+
+	data, err := filelock.ReadFile(avJSONPath)
+	if nil != err {
+		logging.LogErrorf("read attribute view [%s] failed: %s", avID, err)
+		return
+	}
+
+	val := jsoniter.Get(data, "name")
+	if nil == val || val.ValueType() == jsoniter.InvalidValue {
+		return
+	}
+	ret = val.ToString()
+	return
+}
+
 func IsAttributeViewExist(avID string) bool {
 	avJSONPath := GetAttributeViewDataPath(avID)
 	return filelock.IsExist(avJSONPath)
@@ -231,8 +253,60 @@ func ParseAttributeView(avID string) (ret *AttributeView, err error) {
 
 	ret = &AttributeView{}
 	if err = gulu.JSON.UnmarshalJSON(data, ret); nil != err {
-		logging.LogErrorf("unmarshal attribute view [%s] failed: %s", avID, err)
-		return
+		if strings.Contains(err.Error(), ".relation.contents of type av.Value") {
+			mapAv := map[string]interface{}{}
+			if err = gulu.JSON.UnmarshalJSON(data, &mapAv); nil != err {
+				logging.LogErrorf("unmarshal attribute view [%s] failed: %s", avID, err)
+				return
+			}
+
+			// v3.0.3 兼容之前旧版本，将 relation.contents[""] 转换为 null
+			keyValues := mapAv["keyValues"]
+			keyValuesMap := keyValues.([]interface{})
+			for _, kv := range keyValuesMap {
+				kvMap := kv.(map[string]interface{})
+				if values := kvMap["values"]; nil != values {
+					valuesMap := values.([]interface{})
+					for _, v := range valuesMap {
+						if vMap := v.(map[string]interface{}); nil != vMap["relation"] {
+							vMap["relation"].(map[string]interface{})["contents"] = nil
+						}
+					}
+				}
+			}
+
+			views := mapAv["views"]
+			viewsMap := views.([]interface{})
+			for _, view := range viewsMap {
+				if table := view.(map[string]interface{})["table"]; nil != table {
+					tableMap := table.(map[string]interface{})
+					if filters := tableMap["filters"]; nil != filters {
+						filtersMap := filters.([]interface{})
+						for _, f := range filtersMap {
+							if fMap := f.(map[string]interface{}); nil != fMap["value"] {
+								if valueMap := fMap["value"].(map[string]interface{}); nil != valueMap["relation"] {
+									valueMap["relation"].(map[string]interface{})["contents"] = nil
+								}
+							}
+						}
+					}
+				}
+			}
+
+			data, err = gulu.JSON.MarshalJSON(mapAv)
+			if nil != err {
+				logging.LogErrorf("marshal attribute view [%s] failed: %s", avID, err)
+				return
+			}
+
+			if err = gulu.JSON.UnmarshalJSON(data, ret); nil != err {
+				logging.LogErrorf("unmarshal attribute view [%s] failed: %s", avID, err)
+				return
+			}
+		} else {
+			logging.LogErrorf("unmarshal attribute view [%s] failed: %s", avID, err)
+			return
+		}
 	}
 	return
 }
@@ -290,6 +364,30 @@ func SaveAttributeView(av *AttributeView) (err error) {
 					v.KeyID = kv.Key.ID
 				}
 
+				// 校验日期 IsNotEmpty
+				if KeyTypeDate == kv.Key.Type {
+					if nil != v.Date && 0 != v.Date.Content && !v.Date.IsNotEmpty {
+						v.Date.IsNotEmpty = true
+					}
+				}
+
+				// 校验数字 IsNotEmpty
+				if KeyTypeNumber == kv.Key.Type {
+					if nil != v.Number && 0 != v.Number.Content && !v.Number.IsNotEmpty {
+						v.Number.IsNotEmpty = true
+					}
+				}
+
+				// 清空关联实际值
+				if KeyTypeRelation == kv.Key.Type {
+					v.Relation.Contents = nil
+				}
+
+				// 清空汇总实际值
+				if KeyTypeRollup == kv.Key.Type {
+					v.Rollup.Contents = nil
+				}
+
 				for _, view := range av.Views {
 					switch view.LayoutType {
 					case LayoutTypeTable:
@@ -307,16 +405,34 @@ func SaveAttributeView(av *AttributeView) (err error) {
 			if "" == v.ID {
 				v.ID = ast.NewNodeID()
 			}
-			createdStr := v.ID[:len("20060102150405")]
-			created, parseErr := time.ParseInLocation("20060102150405", createdStr, time.Local)
-			if nil == parseErr {
-				v.CreatedAt = created.UnixMilli()
-			} else {
-				v.CreatedAt = now
+
+			if 0 == v.CreatedAt {
+				createdStr := v.ID[:len("20060102150405")]
+				created, parseErr := time.ParseInLocation("20060102150405", createdStr, time.Local)
+				if nil == parseErr {
+					v.CreatedAt = created.UnixMilli()
+				} else {
+					v.CreatedAt = now
+				}
 			}
 
 			if 0 == v.UpdatedAt {
 				v.UpdatedAt = v.CreatedAt
+			}
+		}
+	}
+
+	// 补全过滤器 Value
+	for _, view := range av.Views {
+		if nil != view.Table {
+			for _, f := range view.Table.Filters {
+				if nil != f.Value {
+					continue
+				}
+
+				if k, _ := av.GetKey(f.Column); nil != k {
+					f.Value = &Value{Type: k.Type}
+				}
 			}
 		}
 	}
@@ -352,7 +468,12 @@ func SaveAttributeView(av *AttributeView) (err error) {
 		}
 	}
 
-	data, err := gulu.JSON.MarshalJSON(av)
+	var data []byte
+	if util.UseSingleLineSave {
+		data, err = gulu.JSON.MarshalJSON(av)
+	} else {
+		data, err = gulu.JSON.MarshalIndentJSON(av, "", "\t")
+	}
 	if nil != err {
 		logging.LogErrorf("marshal attribute view [%s] failed: %s", av.ID, err)
 		return
@@ -538,4 +659,6 @@ var (
 const (
 	NodeAttrNameAvs = "custom-avs"        // 用于标记块所属的属性视图，逗号分隔 av id
 	NodeAttrView    = "custom-sy-av-view" // 用于标记块所属的属性视图视图 view id Database block support specified view https://github.com/siyuan-note/siyuan/issues/10443
+
+	NodeAttrViewNames = "av-names" // 用于临时标记块所属的属性视图名称，空格分隔
 )

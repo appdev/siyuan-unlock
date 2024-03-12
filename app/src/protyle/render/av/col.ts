@@ -11,6 +11,7 @@ import {focusBlock} from "../../util/selection";
 import {toggleUpdateRelationBtn} from "./relation";
 import {bindRollupData, getRollupHTML} from "./rollup";
 import {Constants} from "../../../constants";
+import * as dayjs from "dayjs";
 
 export const duplicateCol = (options: {
     protyle: IProtyle,
@@ -19,7 +20,8 @@ export const duplicateCol = (options: {
     colId: string,
     newValue: string,
     icon: string
-    viewID: string
+    viewID: string,
+    blockElement: Element
 }) => {
     const id = Lute.NewNodeID();
     const nameMatch = options.newValue.match(/^(.*) \((\d+)\)$/);
@@ -28,6 +30,8 @@ export const duplicateCol = (options: {
     } else {
         options.newValue = `${options.newValue} (1)`;
     }
+    const newUpdated = dayjs().format("YYYYMMDDHHmmss");
+    const blockId = options.blockElement.getAttribute("data-node-id");
     if (["select", "mSelect", "rollup"].includes(options.type)) {
         fetchPost("/api/av/renderAttributeView", {
             id: options.avID,
@@ -54,10 +58,18 @@ export const duplicateCol = (options: {
                 id,
                 avID: options.avID,
                 data: colOptions
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID: options.avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: options.blockElement.getAttribute("updated")
             }]);
         });
     } else {
@@ -69,14 +81,22 @@ export const duplicateCol = (options: {
             data: options.icon,
             id,
             previousID: options.colId,
+        }, {
+            action: "doUpdateUpdated",
+            id: blockId,
+            data: newUpdated,
         }], [{
             action: "removeAttrViewCol",
             id,
             avID: options.avID,
+        }, {
+            action: "doUpdateUpdated",
+            id: blockId,
+            data: options.blockElement.getAttribute("updated")
         }]);
     }
     addAttrViewColAnimation({
-        blockElement: options.protyle.wysiwyg.element.querySelector(`[data-av-id="${options.avID}"]`),
+        blockElement: options.blockElement,
         protyle: options.protyle,
         type: options.type,
         name: options.newValue,
@@ -84,6 +104,7 @@ export const duplicateCol = (options: {
         previousID: options.colId,
         id
     });
+    options.blockElement.setAttribute("updated", newUpdated);
 };
 
 export const getEditHTML = (options: {
@@ -650,7 +671,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                     const avData = response.data as IAV;
                     let filter: IAVFilter;
                     avData.view.filters.find((item) => {
-                        if (item.column === colId) {
+                        if (item.column === colId && item.value.type === type) {
                             filter = item;
                             return true;
                         }
@@ -660,7 +681,6 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                             column: colId,
                             operator: getDefaultOperatorByType(type),
                             value: genCellValue(type, ""),
-                            type,
                         };
                         avData.view.filters.push(filter);
                     }
@@ -752,6 +772,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                 label: window.siyuan.languages.duplicate,
                 click() {
                     duplicateCol({
+                        blockElement,
                         viewID: blockElement.getAttribute(Constants.CUSTOM_SY_AV_VIEW),
                         protyle,
                         type,
@@ -767,10 +788,15 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
             icon: "iconTrashcan",
             label: window.siyuan.languages.delete,
             click() {
+                const newUpdated = dayjs().format("YYYYMMDDHHmmss");
                 transaction(protyle, [{
                     action: "removeAttrViewCol",
                     id: colId,
                     avID,
+                }, {
+                    action: "doUpdateUpdated",
+                    id: blockID,
+                    data: newUpdated,
                 }], [{
                     action: "addAttrViewCol",
                     name: oldValue,
@@ -778,8 +804,13 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                     type: type,
                     id: colId,
                     previousID: cellElement.previousElementSibling?.getAttribute("data-col-id") || "",
+                }, {
+                    action: "doUpdateUpdated",
+                    id: blockID,
+                    data: blockElement.getAttribute("updated")
                 }]);
                 removeAttrViewColAnimation(blockElement, colId);
+                blockElement.setAttribute("updated", newUpdated);
             }
         });
         menu.addSeparator();
@@ -833,11 +864,13 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
     if (typeof previousID === "undefined") {
         previousID = Array.from(blockElement.querySelectorAll(".av__row--header .av__cell")).pop().getAttribute("data-col-id");
     }
+    const blockId = blockElement.getAttribute("data-node-id");
     menu.addItem({
         icon: "iconAlignLeft",
         label: window.siyuan.languages.text,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.text,
@@ -845,10 +878,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "text",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -858,6 +899,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -865,6 +907,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.number,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.number,
@@ -872,10 +915,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "number",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -885,6 +936,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -892,6 +944,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.select,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.select,
@@ -899,10 +952,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "select",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -912,6 +973,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -919,6 +981,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.multiSelect,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.multiSelect,
@@ -926,10 +989,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "mSelect",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -939,6 +1010,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -946,6 +1018,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.date,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.date,
@@ -953,10 +1026,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "date",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -966,6 +1047,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -973,6 +1055,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.assets,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.assets,
@@ -980,10 +1063,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "mAsset",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -993,6 +1084,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1000,6 +1092,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.checkbox,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.checkbox,
@@ -1007,10 +1100,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "checkbox",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1020,6 +1121,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1027,6 +1129,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.link,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.link,
@@ -1034,10 +1137,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "url",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1047,6 +1158,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1054,6 +1166,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.email,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.email,
@@ -1061,10 +1174,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "email",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1074,6 +1195,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1081,6 +1203,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.phone,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.phone,
@@ -1088,10 +1211,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "phone",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1101,6 +1232,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1108,6 +1240,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.template,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.template,
@@ -1115,10 +1248,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "template",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1128,6 +1269,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1135,6 +1277,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.relation,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.relation,
@@ -1142,10 +1285,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "relation",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1155,6 +1306,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1162,6 +1314,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.rollup,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.rollup,
@@ -1169,10 +1322,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "rollup",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1182,6 +1343,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1189,6 +1351,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.createdTime,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.createdTime,
@@ -1196,10 +1359,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "created",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1209,6 +1380,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     menu.addItem({
@@ -1216,6 +1388,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
         label: window.siyuan.languages.updatedTime,
         click() {
             const id = Lute.NewNodeID();
+            const newUpdated = dayjs().format("YYYYMMDDHHmmss");
             transaction(protyle, [{
                 action: "addAttrViewCol",
                 name: window.siyuan.languages.updatedTime,
@@ -1223,10 +1396,18 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 type: "updated",
                 id,
                 previousID
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: newUpdated,
             }], [{
                 action: "removeAttrViewCol",
                 id,
                 avID,
+            }, {
+                action: "doUpdateUpdated",
+                id: blockId,
+                data: blockElement.getAttribute("updated")
             }]);
             addAttrViewColAnimation({
                 blockElement: blockElement,
@@ -1236,6 +1417,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
                 id,
                 previousID
             });
+            blockElement.setAttribute("updated", newUpdated);
         }
     });
     return menu;

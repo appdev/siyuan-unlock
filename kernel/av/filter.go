@@ -17,8 +17,6 @@
 package av
 
 import (
-	"strings"
-
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
@@ -77,29 +75,49 @@ const (
 	FilterOperatorIsFalse          FilterOperator = "Is false"
 )
 
-func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
-	if nil != filter.Value && filter.Value.IsGenerated() {
-		// 自动生成类型的过滤条件不设置默认值
-		return nil
+func (filter *ViewFilter) GetAffectValue(key *Key, defaultVal *Value) (ret *Value) {
+	if nil != filter.Value {
+		if KeyTypeRelation == filter.Value.Type || KeyTypeTemplate == filter.Value.Type || KeyTypeRollup == filter.Value.Type || KeyTypeUpdated == filter.Value.Type || KeyTypeCreated == filter.Value.Type {
+			// 所有生成的数据都不设置默认值
+			return nil
+		}
 	}
 
-	if nil == filter.Value && nil != filter.RelativeDate {
-		// 相对日期今天的动态日期不设置默认值
+	if nil == filter.Value {
+		if nil != filter.RelativeDate {
+			// 相对日期今天的动态日期不设置默认值
+			return nil
+		}
+		// 两个值都空的情况下也不设置默认值
 		return nil
 	}
 
 	ret = filter.Value.Clone()
+	ret.CreatedAt = util.CurrentTimeMillis()
+	ret.UpdatedAt = ret.CreatedAt + 1000
+
+	if nil != defaultVal {
+		// 如果有默认值则优先使用默认值
+		clonedDefaultVal := defaultVal.Clone()
+		defaultRawVal := clonedDefaultVal.GetValByType(filter.Value.Type)
+		if nil != defaultRawVal {
+			ret.SetValByType(filter.Value.Type, defaultRawVal)
+			return
+		}
+	}
+	// 没有默认值则使用过滤条件的值
+
 	switch filter.Value.Type {
 	case KeyTypeBlock:
 		switch filter.Operator {
 		case FilterOperatorIsEqual:
 			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: filter.Value.Block.Content}
 		case FilterOperatorIsNotEqual:
-			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: strings.TrimSpace(filter.Value.Block.Content + " Untitled")}
+			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: ""}
 		case FilterOperatorContains:
 			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: filter.Value.Block.Content}
 		case FilterOperatorDoesNotContain:
-			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: strings.ReplaceAll("Untitled", filter.Value.Block.Content, "")}
+			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: ""}
 		case FilterOperatorStartsWith:
 			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: filter.Value.Block.Content}
 		case FilterOperatorEndsWith:
@@ -107,18 +125,18 @@ func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
 		case FilterOperatorIsEmpty:
 			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: ""}
 		case FilterOperatorIsNotEmpty:
-			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: "Untitled"}
+			ret.Block = &ValueBlock{ID: filter.Value.Block.ID, Content: ""}
 		}
 	case KeyTypeText:
 		switch filter.Operator {
 		case FilterOperatorIsEqual:
 			ret.Text = &ValueText{Content: filter.Value.Text.Content}
 		case FilterOperatorIsNotEqual:
-			ret.Text = &ValueText{Content: strings.TrimSpace(filter.Value.Text.Content + " Untitled")}
+			ret.Text = &ValueText{Content: ""}
 		case FilterOperatorContains:
 			ret.Text = &ValueText{Content: filter.Value.Text.Content}
 		case FilterOperatorDoesNotContain:
-			ret.Text = &ValueText{Content: strings.ReplaceAll("Untitled", filter.Value.Text.Content, "")}
+			ret.Text = &ValueText{Content: ""}
 		case FilterOperatorStartsWith:
 			ret.Text = &ValueText{Content: filter.Value.Text.Content}
 		case FilterOperatorEndsWith:
@@ -126,7 +144,7 @@ func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
 		case FilterOperatorIsEmpty:
 			ret.Text = &ValueText{Content: ""}
 		case FilterOperatorIsNotEmpty:
-			ret.Text = &ValueText{Content: "Untitled"}
+			ret.Text = &ValueText{Content: ""}
 		}
 	case KeyTypeNumber:
 		switch filter.Operator {
@@ -172,32 +190,21 @@ func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
 		case FilterOperatorIsNotEmpty:
 			ret.Date = &ValueDate{Content: util.CurrentTimeMillis(), IsNotEmpty: true}
 		}
-	case KeyTypeSelect:
+	case KeyTypeSelect, KeyTypeMSelect:
 		switch filter.Operator {
 		case FilterOperatorIsEqual:
-			if 0 < len(filter.Value.MSelect) {
-				ret.MSelect = []*ValueSelect{{Content: filter.Value.MSelect[0].Content, Color: filter.Value.MSelect[0].Color}}
+			valueSelect := &ValueSelect{Content: "", Color: "1"}
+			if 0 < len(key.Options) {
+				valueSelect.Color = key.Options[0].Color
 			}
+			if 0 < len(filter.Value.MSelect) {
+				valueSelect.Content = filter.Value.MSelect[0].Content
+				valueSelect.Color = filter.Value.MSelect[0].Color
+			}
+			ret.MSelect = []*ValueSelect{valueSelect}
 		case FilterOperatorIsNotEqual:
 			if 0 < len(filter.Value.MSelect) {
-				ret.MSelect = []*ValueSelect{{Content: filter.Value.MSelect[0].Content + " Untitled", Color: "1"}}
-			}
-		case FilterOperatorIsEmpty:
-			ret.MSelect = []*ValueSelect{}
-		case FilterOperatorIsNotEmpty:
-			if 0 < len(key.Options) {
-				ret.MSelect = []*ValueSelect{{Content: key.Options[0].Name, Color: key.Options[0].Color}}
-			}
-		}
-	case KeyTypeMSelect:
-		switch filter.Operator {
-		case FilterOperatorIsEqual, FilterOperatorContains:
-			if 0 < len(filter.Value.MSelect) {
-				ret.MSelect = []*ValueSelect{{Content: filter.Value.MSelect[0].Content, Color: filter.Value.MSelect[0].Color}}
-			}
-		case FilterOperatorIsNotEqual, FilterOperatorDoesNotContain:
-			if 0 < len(filter.Value.MSelect) {
-				ret.MSelect = []*ValueSelect{{Content: filter.Value.MSelect[0].Content + " Untitled", Color: "1"}}
+				ret.MSelect = []*ValueSelect{}
 			}
 		case FilterOperatorIsEmpty:
 			ret.MSelect = []*ValueSelect{}
@@ -211,30 +218,30 @@ func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
 		case FilterOperatorIsEqual:
 			ret.URL = &ValueURL{Content: filter.Value.URL.Content}
 		case FilterOperatorIsNotEqual:
-			ret.URL = &ValueURL{Content: filter.Value.URL.Content + " Untitled"}
+			ret.URL = &ValueURL{Content: filter.Value.URL.Content}
 		case FilterOperatorContains:
 			ret.URL = &ValueURL{Content: filter.Value.URL.Content}
 		case FilterOperatorDoesNotContain:
-			ret.URL = &ValueURL{Content: strings.ReplaceAll("Untitled", filter.Value.URL.Content, "")}
+			ret.URL = &ValueURL{Content: ""}
 		case FilterOperatorStartsWith:
 			ret.URL = &ValueURL{Content: filter.Value.URL.Content}
 		case FilterOperatorEndsWith:
 			ret.URL = &ValueURL{Content: filter.Value.URL.Content}
 		case FilterOperatorIsEmpty:
-			ret.URL = &ValueURL{Content: ""}
+			ret.URL = &ValueURL{}
 		case FilterOperatorIsNotEmpty:
-			ret.URL = &ValueURL{Content: "Untitled"}
+			ret.URL = &ValueURL{}
 		}
 	case KeyTypeEmail:
 		switch filter.Operator {
 		case FilterOperatorIsEqual:
 			ret.Email = &ValueEmail{Content: filter.Value.Email.Content}
 		case FilterOperatorIsNotEqual:
-			ret.Email = &ValueEmail{Content: filter.Value.Email.Content + " Untitled"}
+			ret.Email = &ValueEmail{Content: filter.Value.Email.Content}
 		case FilterOperatorContains:
 			ret.Email = &ValueEmail{Content: filter.Value.Email.Content}
 		case FilterOperatorDoesNotContain:
-			ret.Email = &ValueEmail{Content: strings.ReplaceAll("Untitled", filter.Value.Email.Content, "")}
+			ret.Email = &ValueEmail{Content: ""}
 		case FilterOperatorStartsWith:
 			ret.Email = &ValueEmail{Content: filter.Value.Email.Content}
 		case FilterOperatorEndsWith:
@@ -242,18 +249,18 @@ func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
 		case FilterOperatorIsEmpty:
 			ret.Email = &ValueEmail{Content: ""}
 		case FilterOperatorIsNotEmpty:
-			ret.Email = &ValueEmail{Content: "Untitled"}
+			ret.Email = &ValueEmail{Content: ""}
 		}
 	case KeyTypePhone:
 		switch filter.Operator {
 		case FilterOperatorIsEqual:
 			ret.Phone = &ValuePhone{Content: filter.Value.Phone.Content}
 		case FilterOperatorIsNotEqual:
-			ret.Phone = &ValuePhone{Content: filter.Value.Phone.Content + " Untitled"}
+			ret.Phone = &ValuePhone{Content: filter.Value.Phone.Content + ""}
 		case FilterOperatorContains:
 			ret.Phone = &ValuePhone{Content: filter.Value.Phone.Content}
 		case FilterOperatorDoesNotContain:
-			ret.Phone = &ValuePhone{Content: strings.ReplaceAll("Untitled", filter.Value.Phone.Content, "")}
+			ret.Phone = &ValuePhone{Content: ""}
 		case FilterOperatorStartsWith:
 			ret.Phone = &ValuePhone{Content: filter.Value.Phone.Content}
 		case FilterOperatorEndsWith:
@@ -261,7 +268,7 @@ func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
 		case FilterOperatorIsEmpty:
 			ret.Phone = &ValuePhone{Content: ""}
 		case FilterOperatorIsNotEmpty:
-			ret.Phone = &ValuePhone{Content: "Untitled"}
+			ret.Phone = &ValuePhone{Content: ""}
 		}
 	case KeyTypeMAsset:
 		switch filter.Operator {
@@ -289,7 +296,7 @@ func (filter *ViewFilter) GetAffectValue(key *Key) (ret *Value) {
 			}
 		case FilterOperatorDoesNotContain:
 		case FilterOperatorIsEmpty:
-			ret.Relation = &ValueRelation{Contents: []string{}}
+			ret.Relation = &ValueRelation{Contents: []*Value{}}
 		case FilterOperatorIsNotEmpty:
 		}
 	}

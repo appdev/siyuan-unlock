@@ -225,6 +225,7 @@ export class Gutter {
                     const avID = blockElement.getAttribute("data-av-id");
                     const srcIDs = [Lute.NewNodeID()];
                     const previousID = event.altKey ? (rowElement.previousElementSibling.getAttribute("data-id") || "") : buttonElement.dataset.rowId;
+                    const newUpdated = dayjs().format("YYYYMMDDHHmmss");
                     transaction(protyle, [{
                         action: "insertAttrViewBlock",
                         avID,
@@ -232,12 +233,21 @@ export class Gutter {
                         srcIDs,
                         isDetached: true,
                         blockID: id,
+                    }, {
+                        action: "doUpdateUpdated",
+                        id,
+                        data: newUpdated,
                     }], [{
                         action: "removeAttrViewBlock",
                         srcIDs,
                         avID,
+                    }, {
+                        action: "doUpdateUpdated",
+                        id,
+                        data: blockElement.getAttribute("updated")
                     }]);
                     insertAttrViewBlockAnimation(protyle, blockElement, srcIDs, previousID, avID);
+                    blockElement.setAttribute("updated", newUpdated);
                 } else {
                     avContextmenu(protyle, rowElement as HTMLElement, {
                         x: gutterRect.left,
@@ -714,7 +724,14 @@ export class Gutter {
             }
         }
         if (!protyle.disabled) {
-            AIActions(selectsElement, protyle);
+            window.siyuan.menus.menu.append(new MenuItem({
+                icon: "iconSparkles",
+                label: window.siyuan.languages.ai,
+                accelerator: window.siyuan.config.keymap.editor.general.ai.custom,
+                click() {
+                    AIActions(selectsElement, protyle);
+                }
+            }).element);
         }
         const copyMenu: IMenu[] = [{
             label: window.siyuan.languages.copy,
@@ -791,6 +808,7 @@ export class Gutter {
         }).element);
         window.siyuan.menus.menu.append(new MenuItem({
             label: window.siyuan.languages.addToDatabase,
+            accelerator: window.siyuan.config.keymap.general.addToDatabase.custom,
             icon: "iconDatabase",
             click: () => {
                 openSearchAV("", selectsElement[0] as HTMLElement, (listItemElement) => {
@@ -805,6 +823,10 @@ export class Gutter {
                         srcIDs: sourceIds,
                         isDetached: false,
                         blockID: listItemElement.dataset.blockId
+                    }, {
+                        action: "doUpdateUpdated",
+                        id: listItemElement.dataset.blockId,
+                        data: dayjs().format("YYYYMMDDHHmmss"),
                     }], [{
                         action: "removeAttrViewBlock",
                         srcIDs: sourceIds,
@@ -1175,7 +1197,14 @@ export class Gutter {
             }).element);
         }
         if (!protyle.disabled && !nodeElement.classList.contains("hr")) {
-            AIActions([nodeElement], protyle);
+            window.siyuan.menus.menu.append(new MenuItem({
+                icon: "iconSparkles",
+                label: window.siyuan.languages.ai,
+                accelerator: window.siyuan.config.keymap.editor.general.ai.custom,
+                click() {
+                    AIActions([nodeElement], protyle);
+                }
+            }).element);
         }
         const copyMenu = (copySubMenu(id, true, nodeElement) as IMenu[]).concat([{
             label: window.siyuan.languages.copy,
@@ -1244,6 +1273,7 @@ export class Gutter {
             }).element);
             window.siyuan.menus.menu.append(new MenuItem({
                 label: window.siyuan.languages.addToDatabase,
+                accelerator: window.siyuan.config.keymap.general.addToDatabase.custom,
                 icon: "iconDatabase",
                 click: () => {
                     openSearchAV("", nodeElement as HTMLElement, (listItemElement) => {
@@ -1255,6 +1285,10 @@ export class Gutter {
                             srcIDs: sourceIds,
                             isDetached: false,
                             blockID: listItemElement.dataset.blockId
+                        }, {
+                            action: "doUpdateUpdated",
+                            id: listItemElement.dataset.blockId,
+                            data: dayjs().format("YYYYMMDDHHmmss"),
                         }], [{
                             action: "removeAttrViewBlock",
                             srcIDs: sourceIds,

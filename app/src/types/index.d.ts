@@ -218,6 +218,7 @@ interface ICard {
     cardID: string
     blockID: string
     nextDues: IObject
+    state: number   // 0：新卡
 }
 
 interface ICardData {
@@ -1082,7 +1083,6 @@ interface IAVFilter {
     column: string,
     operator: TAVFilterOperator,
     value: IAVCellValue,
-    type?: TAVCol   // 仅用于标识新增时的类型，用于区分 rollup
     relativeDate?: relativeDate
     relativeDate2?: relativeDate
 }
@@ -1168,7 +1168,7 @@ interface IAVCellValue {
     }
     relation?: {
         blockIDs: string[]
-        contents?: string[]
+        contents?: IAVCellValue[]
     }
     rollup?: {
         contents?: IAVCellValue[]

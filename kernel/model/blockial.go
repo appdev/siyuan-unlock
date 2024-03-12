@@ -53,7 +53,7 @@ func SetBlockReminder(id string, timed string) (err error) {
 	}
 
 	attrs := GetBlockAttrs(id) // 获取属性是会等待树写入
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		return
 	}
@@ -110,7 +110,7 @@ func BatchSetBlockAttrs(blockAttrs []map[string]interface{}) (err error) {
 		}
 
 		if nil == trees[bt.RootID] {
-			tree, e := loadTreeByBlockID(id)
+			tree, e := LoadTreeByBlockID(id)
 			if nil != e {
 				return e
 			}
@@ -160,7 +160,7 @@ func SetBlockAttrs(id string, nameValues map[string]string) (err error) {
 
 	WaitForWritingFiles()
 
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		return err
 	}
@@ -227,12 +227,6 @@ func setNodeAttrs0(node *ast.Node, nameValues map[string]string) (oldAttrs map[s
 	}
 
 	for name, value := range nameValues {
-		if strings.HasPrefix(name, "custom-av") {
-			// 属性视图设置的属性值可以为空
-			node.SetIALAttr(name, value)
-			continue
-		}
-
 		if "" == strings.TrimSpace(value) {
 			node.RemoveIALAttr(name)
 		} else {
@@ -254,7 +248,7 @@ func pushBroadcastAttrTransactions(oldAttrs map[string]string, node *ast.Node) {
 }
 
 func ResetBlockAttrs(id string, nameValues map[string]string) (err error) {
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		return err
 	}
@@ -302,7 +296,7 @@ func GetBlockAttrs(id string) (ret map[string]string) {
 
 	WaitForWritingFiles()
 
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		return
 	}
@@ -327,7 +321,7 @@ func GetBlockAttrsWithoutWaitWriting(id string) (ret map[string]string) {
 		return
 	}
 
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		return
 	}

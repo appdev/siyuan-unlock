@@ -805,7 +805,7 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 				for _, blockID := range relVal.Relation.BlockIDs {
 					destVal := destAv.GetValue(rollupKey.Rollup.KeyID, blockID)
 					if nil == destVal {
-						destVal = GetAttributeViewDefaultValue(ast.NewNodeID(), rollupKey.Rollup.KeyID, blockID, destKey.Type)
+						continue
 					}
 					if av.KeyTypeNumber == destKey.Type {
 						destVal.Number.Format = destKey.NumberFormat
@@ -827,9 +827,9 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 				if nil != relKey && nil != relKey.Relation {
 					destAv, _ := av.ParseAttributeView(relKey.Relation.AvID)
 					if nil != destAv {
-						blocks := map[string]string{}
+						blocks := map[string]*av.Value{}
 						for _, blockValue := range destAv.GetBlockKeyValues().Values {
-							blocks[blockValue.BlockID] = blockValue.Block.Content
+							blocks[blockValue.BlockID] = blockValue
 						}
 						for _, blockID := range cell.Value.Relation.BlockIDs {
 							cell.Value.Relation.Contents = append(cell.Value.Relation.Contents, blocks[blockID])
@@ -896,7 +896,7 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 						ial = map[string]string{}
 					}
 				}
-				content := renderTemplateCol(ial, cell.Value.Template.Content, keyValues)
+				content := renderTemplateCol(ial, keyValues, cell.Value.Template.Content)
 				cell.Value.Template.Content = content
 			}
 		}
@@ -1028,7 +1028,7 @@ func GetAttributeViewDefaultValue(valueID, keyID, blockID string, typ av.KeyType
 	return
 }
 
-func renderTemplateCol(ial map[string]string, tplContent string, rowValues []*av.KeyValues) string {
+func renderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplContent string) string {
 	if "" == ial["id"] {
 		block := getRowBlockValue(rowValues)
 		ial["id"] = block.Block.ID
@@ -1073,6 +1073,7 @@ func renderTemplateCol(ial map[string]string, tplContent string, rowValues []*av
 			dataModel["updated"] = time.Now()
 		}
 	}
+
 	for _, rowValue := range rowValues {
 		if 0 < len(rowValue.Values) {
 			v := rowValue.Values[0]
@@ -1085,6 +1086,7 @@ func renderTemplateCol(ial map[string]string, tplContent string, rowValues []*av
 			}
 		}
 	}
+
 	if err := tpl.Execute(buf, dataModel); nil != err {
 		logging.LogWarnf("execute template [%s] failed: %s", tplContent, err)
 	}
