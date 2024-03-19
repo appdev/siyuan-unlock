@@ -93,15 +93,15 @@ def generate_msg(desc_mapping):
 
 
 if __name__ == "__main__":
-#     parser = ArgumentParser(
-#         description="Automaticly generate information from issues by tag."
-#     )
-#     parser.add_argument("-t", "--tag", help="the tag to filter issues.")
-#     parser.add_argument("-b", "--lastestRelease", help="lastest Release")
-#     parser.add_argument("repo", help="The repository name")
-#     args = parser.parse_args()
-#
-#     try:
-#         generate_msg_from_repo(args.repo, args.tag, args.lastestRelease)
-#     except AssertionError:
-#         print(args.tag)
+    parser = ArgumentParser(
+        description="Automaticly generate information from issues by tag."
+    )
+    parser.add_argument("-t", "--tag", help="the tag to filter issues.")
+    parser.add_argument("-b", "--lastestRelease", help="lastest Release")
+    parser.add_argument("repo", help="The repository name")
+    args = parser.parse_args()
+
+    try:
+        generate_msg_from_repo(args.repo, args.tag, args.lastestRelease)
+    except AssertionError:
+        print(args.tag)
