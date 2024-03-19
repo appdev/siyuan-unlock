@@ -1,4 +1,10 @@
 {
+  "setDueTime": "Establecer tiempo de vencimiento",
+  "showCardDay": "¿Después de cuántos días deseas mostrar la tarjeta?",
+  "forgetCount": "Olvídate de contar",
+  "lastReviewTime": "Última hora de revisión",
+  "cardStatus": "Estado de la tarjeta",
+  "noSupportTip": "Esta función no admite el uso de paquetes de tarjetas",
   "insertRowTip": "Las filas recién agregadas se han filtrado y se pueden ver cancelando el filtrado/búsqueda/clasificación",
   "insertRowTip2": "Las filas nuevas no participan en la clasificación",
   "insertPhoto": "Toma una foto e insértala",
@@ -1307,7 +1313,7 @@
     "102": "Procesamiento completado",
     "103": "El paquete de instalación de la actualización se ha descargado automáticamente en segundo plano. Al salir, se le preguntará si desea instalar la nueva versión",
     "104": "El paquete de instalación de la actualización no se pudo descargar, verifique la conexión de red",
-    "105": "El repositorio de datos corruptos se ha restablecido automáticamente",
+    "105": "TODO",
     "106": "La longitud máxima está limitada a 512 caracteres",
     "107": "Documento movido [%s]",
     "108": "La sincronizaci\u00f3n de datos encontr\u00f3 en conflictos, puede ver el contenido del conflicto generado en [Historial de datos]",
@@ -1358,7 +1364,7 @@
     "153": "Archivos descargados %d, fragmentos %d, bytes recibidos %s",
     "154": "La nube solo admite copias de seguridad de hasta 12 instantáneas",
     "155": "El directorio de sincronización de la nube se ha restablecido a [main]",
-    "156": "Error en la autenticación de acceso, actualice la página",
+    "156": "Error de autenticación de acceso; actualice o vuelva a abrir",
     "157": "No se reconoce la clave, confirme que la cadena de clave copiada es correcta",
     "158": "Indexando repositorio de datos, datos para caminar %s",
     "159": "Indexando repositorio de datos, obteniendo el último archivo %v/%v",
@@ -1435,6 +1441,7 @@
     "230": "Eliminando índices de verificación sin referencia del almacenamiento en la nube...",
     "231": "Eliminar objetos de datos no referenciados en el almacenamiento en la nube...",
     "232": "Se ha eliminado el almacenamiento de datos en la nube. Se han eliminado [%d] instantáneas y [%d] objetos de datos, y se ha liberado un total de [%s] espacio en disco",
-    "233": "Cerrando la guía del usuario..."
+    "233": "Cerrando la guía del usuario...",
+    "234": "[%d/%d] Actualizado [%d] de rutas legibles del documento [%s]"
   }
 }

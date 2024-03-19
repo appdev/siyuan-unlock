@@ -509,7 +509,7 @@ type Flashcard struct {
 	Lapses     int                    `json:"lapses"`
 	Reps       int                    `json:"reps"`
 	State      riff.State             `json:"state"`
-	LastReview time.Time              `json:"lastReview"`
+	LastReview int64                  `json:"lastReview"`
 	NextDues   map[riff.Rating]string `json:"nextDues"`
 }
 
@@ -526,7 +526,7 @@ func newFlashcard(card riff.Card, deckID string, now time.Time) *Flashcard {
 		Lapses:     card.GetLapses(),
 		Reps:       card.GetReps(),
 		State:      card.GetState(),
-		LastReview: card.GetLastReview(),
+		LastReview: card.GetLastReview().UnixMilli(),
 		NextDues:   nextDues,
 	}
 }
@@ -702,6 +702,12 @@ func getDueFlashcards(deckID string, reviewedCardIDs []string) (ret []*Flashcard
 func getAllDueFlashcards(reviewedCardIDs []string) (ret []*Flashcard, unreviewedCount, unreviewedNewCardCount, unreviewedOldCardCount int) {
 	now := time.Now()
 	for _, deck := range Decks {
+		if deck.ID != builtinDeckID {
+			// Alt+0 闪卡复习入口不再返回卡包闪卡
+			// Alt+0 flashcard review entry no longer returns to card deck flashcards https://github.com/siyuan-note/siyuan/issues/10635
+			continue
+		}
+
 		cards, unreviewedCnt, unreviewedNewCardCnt, unreviewedOldCardCnt := getDeckDueCards(deck, reviewedCardIDs, nil, Conf.Flashcard.NewCardLimit, Conf.Flashcard.ReviewCardLimit, Conf.Flashcard.ReviewMode)
 		unreviewedCount += unreviewedCnt
 		unreviewedNewCardCount += unreviewedNewCardCnt

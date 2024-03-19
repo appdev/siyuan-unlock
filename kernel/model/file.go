@@ -1238,6 +1238,16 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback interface{}) 
 
 	pathsBoxes := getBoxesByPaths(fromPaths)
 
+	if 1 == len(fromPaths) {
+		// 移动到自己的父文档下的情况相当于不移动，直接返回
+		if fromBox := pathsBoxes[fromPaths[0]]; nil != fromBox && fromBox.ID == toBoxID {
+			parentDir := path.Dir(fromPaths[0])
+			if ("/" == toPath && "/" == parentDir) || (parentDir+".sy" == toPath) {
+				return
+			}
+		}
+	}
+
 	// 检查路径深度是否超过限制
 	for fromPath, fromBox := range pathsBoxes {
 		childDepth := util.GetChildDocDepth(filepath.Join(util.DataDir, fromBox.ID, fromPath))
@@ -1247,8 +1257,12 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback interface{}) 
 		}
 	}
 
-	// A progress layer appears when moving more than 16 documents at once https://github.com/siyuan-note/siyuan/issues/9356
-	needShowProgress := 16 < len(fromPaths)
+	// A progress layer appears when moving more than 64 documents at once https://github.com/siyuan-note/siyuan/issues/9356
+	subDocsCount := 0
+	for fromPath, fromBox := range pathsBoxes {
+		subDocsCount += countSubDocs(fromBox.ID, fromPath)
+	}
+	needShowProgress := 64 < subDocsCount
 	if needShowProgress {
 		defer util.PushClearProgress()
 	}
@@ -1269,6 +1283,23 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback interface{}) 
 	}
 	cache.ClearDocsIAL()
 	IncSync()
+	return
+}
+
+func countSubDocs(box, p string) (ret int) {
+	p = strings.TrimSuffix(p, ".sy")
+	_ = filepath.Walk(filepath.Join(util.DataDir, box, p), func(path string, info os.FileInfo, err error) error {
+		if nil != err {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, ".sy") {
+			ret++
+		}
+		return nil
+	})
 	return
 }
 

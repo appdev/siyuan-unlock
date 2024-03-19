@@ -728,7 +728,7 @@ export const contentMenu = (protyle: IProtyle, nodeElement: Element) => {
             selectAll(protyle, nodeElement, range);
         }
     }).element);
-    if (nodeElement.classList.contains("table")) {
+    if (nodeElement.classList.contains("table") && !protyle.disabled) {
         const cellElement = hasClosestByMatchTag(range.startContainer, "TD") || hasClosestByMatchTag(range.startContainer, "TH");
         if (cellElement) {
             window.siyuan.menus.menu.append(new MenuItem({
@@ -1466,11 +1466,15 @@ export const iframeMenu = (protyle: IProtyle, nodeElement: Element) => {
                         page: "1",
                         high_quality: "1",
                         as_wide: "1",
-                        allowfullscreen: "true"
+                        allowfullscreen: "true",
+                        autoplay: "0"
                     };
                     // `//player.bilibili.com/player.html?aid=895154192&bvid=BV1NP4y1M72N&cid=562898119&page=1`
                     // `https://www.bilibili.com/video/BV1ys411472E?t=3.4&p=4`
                     new URL(value.startsWith("http") ? value : "https:" + value).search.split("&").forEach((item, index) => {
+                        if (!item) {
+                            return;
+                        }
                         if (index === 0) {
                             item = item.substr(1);
                         }

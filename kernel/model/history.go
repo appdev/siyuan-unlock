@@ -335,6 +335,7 @@ type History struct {
 type HistoryItem struct {
 	Title string `json:"title"`
 	Path  string `json:"path"`
+	Op    string `json:"op"`
 }
 
 const fileHistoryPageSize = 32
@@ -463,6 +464,7 @@ func GetNotebookHistory() (ret []*History, err error) {
 			Items: []*HistoryItem{{
 				Title: c.Name,
 				Path:  filepath.Dir(filepath.Dir(historyNotebookConf)),
+				Op:    HistoryOpDelete,
 			}},
 		})
 	}
@@ -732,6 +734,7 @@ func fromSQLHistories(sqlHistories []*sql.History) (ret []*HistoryItem) {
 		item := &HistoryItem{
 			Title: sqlHistory.Title,
 			Path:  filepath.Join(util.HistoryDir, sqlHistory.Path),
+			Op:    sqlHistory.Op,
 		}
 		if HistoryTypeAsset == sqlHistory.Type {
 			item.Path = filepath.ToSlash(strings.TrimPrefix(item.Path, util.WorkspaceDir))

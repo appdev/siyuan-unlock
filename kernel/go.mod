@@ -9,7 +9,7 @@ require (
 	github.com/88250/clipboard v0.1.5
 	github.com/88250/epub v0.0.0-20230830085737-c19055cd1f48
 	github.com/88250/gulu v1.2.3-0.20231209020950-b7b6994e395c
-	github.com/88250/lute v1.7.7-0.20240308125612-93a1f4e75895
+	github.com/88250/lute v1.7.7-0.20240317033923-b5d564e25df7
 	github.com/88250/pdfcpu v0.3.14-0.20230401044135-c7369a99720c
 	github.com/88250/vitess-sqlparser v0.0.0-20210205111146-56a2ded2aba1
 	github.com/ClarkThan/ahocorasick v0.0.0-20231011042242-30d1ef1347f4
@@ -35,7 +35,7 @@ require (
 	github.com/goccy/go-json v0.10.2
 	github.com/gofrs/flock v0.8.1
 	github.com/gorilla/websocket v1.5.1
-	github.com/imroc/req/v3 v3.43.0
+	github.com/imroc/req/v3 v3.43.1
 	github.com/jinzhu/copier v0.4.0
 	github.com/json-iterator/go v1.1.12
 	github.com/klippa-app/go-pdfium v1.11.0
@@ -43,7 +43,7 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/mssola/useragent v1.0.0
 	github.com/olahol/melody v1.1.4
-	github.com/open-spaced-repetition/go-fsrs v1.1.0
+	github.com/open-spaced-repetition/go-fsrs v1.2.0
 	github.com/panjf2000/ants/v2 v2.9.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/radovskyb/watcher v1.0.7
@@ -51,13 +51,13 @@ require (
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/sashabaranov/go-openai v1.20.2
 	github.com/shirou/gopsutil/v3 v3.24.2
-	github.com/siyuan-note/dejavu v0.0.0-20240218075321-a488f36181cc
+	github.com/siyuan-note/dejavu v0.0.0-20240312083319-7cf60efe5c66
 	github.com/siyuan-note/encryption v0.0.0-20231219001248-1e028a4d13b4
-	github.com/siyuan-note/eventbus v0.0.0-20240124091459-8e1b37a55255
+	github.com/siyuan-note/eventbus v0.0.0-20240318125243-801c98e8f025
 	github.com/siyuan-note/filelock v0.0.0-20240128091141-94d7bb3e0772
-	github.com/siyuan-note/httpclient v0.0.0-20240306121400-b3af777a1f1b
+	github.com/siyuan-note/httpclient v0.0.0-20240312073515-af29be1cfb4e
 	github.com/siyuan-note/logging v0.0.0-20231208035918-61f884c854f0
-	github.com/siyuan-note/riff v0.0.0-20240305012846-494c7fb46c45
+	github.com/siyuan-note/riff v0.0.0-20240315100323-cc554b704bcc
 	github.com/spf13/cast v1.6.0
 	github.com/steambap/captcha v1.4.1
 	github.com/studio-b12/gowebdav v0.9.0
@@ -156,7 +156,7 @@ require (
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
+	golang.org/x/exp v0.0.0-20240314144324-c7f7c6466f7f // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect

@@ -13,19 +13,39 @@ import {escapeHtml} from "../util/escape";
 /// #if !MOBILE
 import {openFile} from "../editor/util";
 /// #endif
+import * as dayjs from "dayjs";
 import {getDisplayName, movePathTo} from "../util/pathName";
 import {App} from "../index";
 import {resize} from "../protyle/util/resize";
 import {setStorageVal} from "../protyle/util/compatibility";
 import {focusByRange} from "../protyle/util/selection";
 import {updateCardHV} from "./util";
+import {showMessage} from "../dialog/message";
+import {Menu} from "../plugin/Menu";
+import {transaction} from "../protyle/wysiwyg/transaction";
 
-const genCardCount = (unreviewedNewCardCount: number, unreviewedOldCardCount: number, index = 1) => {
-    return `<span class="ft__error">${index}</span>
-<span class="fn__space"></span>/<span class="fn__space"></span>
-<span class="ariaLabel ft__primary" aria-label="${window.siyuan.languages.flashcardNewCard}">${unreviewedNewCardCount}</span>
+const genCardCount = (cardsData: ICardData, allIndex = 0) => {
+    let newIndex = 0;
+    let oldIndex = 0;
+    cardsData.cards.forEach((item, index) => {
+        if (index > allIndex) {
+            return;
+        }
+        if (item.state === 0) {
+            newIndex++;
+        } else {
+            oldIndex++;
+        }
+    });
+    return `<span class="ariaLabel" aria-label="${window.siyuan.languages.flashcardNewCard}">
+    <span class="ft__error">${newIndex}</span> /
+    <span class="ariaLabel ft__primary" aria-label="${window.siyuan.languages.flashcardNewCard}">${cardsData.unreviewedNewCardCount}</span>
+</span>
 <span class="fn__space"></span>+<span class="fn__space"></span>
-<span class="ariaLabel ft__success" aria-label="${window.siyuan.languages.flashcardReviewCard}">${unreviewedOldCardCount}</span>`;
+<span class="ariaLabel" aria-label="${window.siyuan.languages.flashcardReviewCard}">
+    <span class="ft__error">${oldIndex}</span> /
+    <span class="ft__success">${cardsData.unreviewedOldCardCount}</span>
+</span>`;
 };
 
 export const genCardHTML = (options: {
@@ -39,8 +59,9 @@ export const genCardHTML = (options: {
     iconsHTML = `<div class="toolbar toolbar--border">
     <svg class="toolbar__icon"><use xlink:href="#iconRiffCard"></use></svg>
     <span class="fn__flex-1 fn__flex-center toolbar__text">${window.siyuan.languages.riffCard}</span>
-    <div data-type="count" class="${options.cardsData.cards.length === 0 ? "fn__none" : "fn__flex"}">${genCardCount(options.cardsData.unreviewedNewCardCount, options.cardsData.unreviewedOldCardCount)}</span></div>
+    <div data-type="count" class="${options.cardsData.cards.length === 0 ? "fn__none" : "fn__flex"}">${genCardCount(options.cardsData)}</span></div>
     <svg class="toolbar__icon" data-id="${options.id || ""}" data-cardtype="${options.cardType}" data-type="filter"><use xlink:href="#iconFilter"></use></svg>
+    <svg class="toolbar__icon" data-type="more"><use xlink:href="#iconMore"></use></svg>
     <svg class="toolbar__icon" data-type="close"><use xlink:href="#iconCloseRound"></use></svg>
 </div>`;
     /// #else
@@ -49,7 +70,7 @@ export const genCardHTML = (options: {
             <svg class="block__logoicon"><use xlink:href="#iconRiffCard"></use></svg>${window.siyuan.languages.riffCard}
         </div>`}
         <span class="fn__flex-1 resize__move" style="min-height: 100%"></span>
-        <div data-type="count" class="ft__on-surface ft__smaller fn__flex-center${options.cardsData.cards.length === 0 ? " fn__none" : " fn__flex"}">${genCardCount(options.cardsData.unreviewedNewCardCount, options.cardsData.unreviewedOldCardCount)}</span></div>
+        <div data-type="count" class="ft__on-surface ft__smaller fn__flex-center${options.cardsData.cards.length === 0 ? " fn__none" : " fn__flex"}">${genCardCount(options.cardsData)}</span></div>
         <div class="fn__space"></div>
         <button data-id="${options.id || ""}" data-cardtype="${options.cardType}" data-type="filter" class="block__icon block__icon--show">
             <svg><use xlink:href="#iconFilter"></use></svg>
@@ -57,6 +78,10 @@ export const genCardHTML = (options: {
         <div class="fn__space"></div>
         <div data-type="fullscreen" class="b3-tooltips b3-tooltips__sw block__icon block__icon--show" aria-label="${window.siyuan.languages.fullscreen}">
             <svg><use xlink:href="#iconFullscreen"></use></svg>
+        </div>
+        <div class="fn__space"></div>
+        <div data-type="more" class="b3-tooltips b3-tooltips__sw block__icon block__icon--show" aria-label="${window.siyuan.languages.more}">
+            <svg><use xlink:href="#iconMore"></use></svg>
         </div>
         <div class="fn__space${options.isTab ? " fn__none" : ""}"></div>
         <div data-type="sticktab" class="b3-tooltips b3-tooltips__sw block__icon block__icon--show${options.isTab ? " fn__none" : ""}" aria-label="${window.siyuan.languages.openInNewTab}">
@@ -175,22 +200,22 @@ export const bindCardEvent = async (options: {
         });
     }
     options.element.setAttribute("data-key", Constants.DIALOG_OPENCARD);
-    const countElement = options.element.querySelector('[data-type="count"]');
-    countElement.firstElementChild.innerHTML = (index + 1).toString();
     const actionElements = options.element.querySelectorAll(".card__action");
     if (options.index === 0) {
         actionElements[0].firstElementChild.setAttribute("disabled", "disabled");
     } else {
         actionElements[0].firstElementChild.removeAttribute("disabled");
     }
+    const countElement = options.element.querySelector('[data-type="count"]');
     const filterElement = options.element.querySelector('[data-type="filter"]');
     const fetchNewRound = () => {
         const currentCardType = filterElement.getAttribute("data-cardtype");
+        const docId = filterElement.getAttribute("data-id");
         fetchPost(currentCardType === "all" ? "/api/riff/getRiffDueCards" :
             (currentCardType === "doc" ? "/api/riff/getTreeRiffDueCards" : "/api/riff/getNotebookRiffDueCards"), {
-            rootID: filterElement.getAttribute("data-id"),
-            deckID: filterElement.getAttribute("data-id"),
-            notebook: filterElement.getAttribute("data-id"),
+            rootID: docId,
+            deckID: docId,
+            notebook: docId,
         }, async (treeCards) => {
             index = 0;
             options.cardsData = treeCards.data;
@@ -211,9 +236,12 @@ export const bindCardEvent = async (options: {
         });
     };
 
+    countElement.innerHTML = genCardCount(options.cardsData, index);
     options.element.addEventListener("click", (event: MouseEvent) => {
         const target = event.target as HTMLElement;
         let type = "";
+        const currentCard = options.cardsData.cards[index];
+        const docId = filterElement.getAttribute("data-id");
         if (typeof event.detail === "string") {
             if (["1", "j", "a"].includes(event.detail)) {
                 type = "1";
@@ -242,6 +270,150 @@ export const bindCardEvent = async (options: {
                 event.preventDefault();
                 return;
             }
+            const moreElement = hasClosestByAttribute(target, "data-type", "more");
+            if (moreElement) {
+                event.stopPropagation();
+                event.preventDefault();
+                if (filterElement.getAttribute("data-cardtype") === "all" && filterElement.getAttribute("data-id")) {
+                    showMessage(window.siyuan.languages.noSupportTip);
+                    return;
+                }
+                const menu = new Menu();
+                menu.addItem({
+                    icon: "iconClock",
+                    label: window.siyuan.languages.setDueTime,
+                    click() {
+                        const timedialog = new Dialog({
+                            title: window.siyuan.languages.setDueTime,
+                            content: `<div class="b3-dialog__content">
+    <div class="b3-label__text">${window.siyuan.languages.showCardDay}</div>
+    <div class="fn__hr"></div>
+    <input class="b3-text-field fn__block" value="1" type="number" step="1" min="1">
+</div>
+<div class="b3-dialog__action">
+    <button class="b3-button b3-button--cancel">${window.siyuan.languages.cancel}</button><div class="fn__space"></div>
+    <button class="b3-button b3-button--text">${window.siyuan.languages.confirm}</button>
+</div>`,
+                            width: isMobile() ? "92vw" : "520px",
+                        });
+                        const inputElement = timedialog.element.querySelector("input") as HTMLInputElement;
+                        const btnsElement = timedialog.element.querySelectorAll(".b3-button");
+                        timedialog.bindInput(inputElement, () => {
+                            (btnsElement[1] as HTMLButtonElement).click();
+                        });
+                        inputElement.focus();
+                        inputElement.select();
+                        btnsElement[0].addEventListener("click", () => {
+                            timedialog.destroy();
+                        });
+                        btnsElement[1].addEventListener("click", () => {
+                            fetchPost("/api/riff/batchSetRiffCardsDueTime", {
+                                cardDues: [{
+                                    id: currentCard.cardID,
+                                    due: dayjs().day(parseInt(inputElement.value)).format("YYYYMMDDHHmmss")
+                                }]
+                            }, () => {
+                                actionElements[0].classList.add("fn__none");
+                                actionElements[1].classList.remove("fn__none");
+                                if (currentCard.state === 0) {
+                                    options.cardsData.unreviewedNewCardCount--;
+                                } else {
+                                    options.cardsData.unreviewedOldCardCount--;
+                                }
+                                options.element.dispatchEvent(new CustomEvent("click", {detail: "0"}));
+                                options.cardsData.cards.splice(index, 1);
+                                index--;
+                                timedialog.destroy();
+                            });
+                        });
+                    }
+                });
+                if (currentCard.state !== 0) {
+                    menu.addItem({
+                        icon: "iconRefresh",
+                        label: window.siyuan.languages.reset,
+                        click() {
+                            fetchPost("/api/riff/resetRiffCards", {
+                                type: filterElement.getAttribute("data-cardtype"),
+                                id: docId,
+                                deckID: Constants.QUICK_DECK_ID,
+                                blockIDs: [currentCard.blockID],
+                            }, () => {
+                                const minLang = window.siyuan.languages._time["1m"].replace("%s", "");
+                                currentCard.lapses = 0;
+                                currentCard.lastReview = -62135596800000;
+                                currentCard.reps = 0;
+                                currentCard.state = 0;
+                                currentCard.nextDues = {
+                                    1: minLang,
+                                    2: minLang.replace("1", "5"),
+                                    3: minLang.replace("1", "10"),
+                                    4: window.siyuan.languages._time["1d"].replace("%s", "").replace("1", "6")
+                                };
+                                actionElements[1].querySelectorAll(".b3-button").forEach((element, btnIndex) => {
+                                    element.previousElementSibling.textContent = currentCard.nextDues[btnIndex];
+                                });
+                                options.cardsData.unreviewedOldCardCount--;
+                                options.cardsData.unreviewedNewCardCount++;
+                                countElement.innerHTML = genCardCount(options.cardsData, index);
+                            });
+                        }
+                    });
+                }
+                menu.addItem({
+                    icon: "iconTrashcan",
+                    label: `${window.siyuan.languages.remove} <b>${window.siyuan.languages.riffCard}</b>`,
+                    click() {
+                        actionElements[0].classList.add("fn__none");
+                        actionElements[1].classList.remove("fn__none");
+                        if (currentCard.state === 0) {
+                            options.cardsData.unreviewedNewCardCount--;
+                        } else {
+                            options.cardsData.unreviewedOldCardCount--;
+                        }
+                        options.element.dispatchEvent(new CustomEvent("click", {detail: "0"}));
+                        transaction(undefined, [{
+                            action: "removeFlashcards",
+                            deckID: Constants.QUICK_DECK_ID,
+                            blockIDs: [currentCard.blockID]
+                        }]);
+                        options.cardsData.cards.splice(index, 1);
+                        index--;
+                    }
+                });
+                menu.addSeparator();
+                menu.addItem({
+                    iconHTML: "",
+                    type: "readonly",
+                    label: `<div class="fn__flex">
+    <div class="fn__flex-1">${window.siyuan.languages.forgetCount}</div>
+    <div class="fn__space"></div>
+    <div>${currentCard.lapses}</div>
+</div><div class="fn__flex">
+    <div class="fn__flex-1">${window.siyuan.languages.revisionCount}</div>
+    <div class="fn__space"></div>
+    <div>${currentCard.reps}</div>
+</div><div class="fn__flex">
+    <div class="fn__flex-1">${window.siyuan.languages.cardStatus}</div>
+    <div class="fn__space"></div>
+    <div class="${currentCard.state === 0 ? "ft__primary" : "ft__success"}">${currentCard.state === 0 ? window.siyuan.languages.flashcardNewCard : window.siyuan.languages.flashcardReviewCard}</div>
+</div><div class="fn__flex${currentCard.lastReview > 0 ? "" : " fn__none"}">
+    <div class="fn__flex-1">${window.siyuan.languages.lastReviewTime}</div>
+    <div class="fn__space"></div>
+    <div>${dayjs(currentCard.lastReview).format("YYYY-MM-DD")}</div>
+</div>`,
+                });
+                /// #if MOBILE
+                menu.fullscreen();
+                /// #else
+                const rect = target.getBoundingClientRect();
+                menu.open({
+                    x: rect.left,
+                    y: rect.bottom
+                });
+                /// #endif
+                return;
+            }
             /// #if !MOBILE
             const sticktabElement = hasClosestByAttribute(target, "data-type", "sticktab");
             if (sticktabElement) {
@@ -255,7 +427,7 @@ export const bindCardEvent = async (options: {
                             cardsData: options.cardsData,
                             index,
                             cardType: filterElement.getAttribute("data-cardtype") as TCardType,
-                            id: filterElement.getAttribute("data-id"),
+                            id: docId,
                             title: options.title
                         },
                         id: "siyuan-card"
@@ -352,7 +524,7 @@ export const bindCardEvent = async (options: {
                 type = buttonElement.getAttribute("data-type");
             }
         }
-        if (!type || !options.cardsData.cards[index]) {
+        if (!type || !currentCard) {
             return;
         }
         event.preventDefault();
@@ -365,10 +537,10 @@ export const bindCardEvent = async (options: {
                 editor.protyle.element.classList.remove("card__block--hidemark", "card__block--hideli", "card__block--hidesb", "card__block--hideh");
                 actionElements[0].classList.add("fn__none");
                 actionElements[1].querySelectorAll(".b3-button").forEach((element, btnIndex) => {
-                    element.previousElementSibling.textContent = options.cardsData.cards[index].nextDues[btnIndex];
+                    element.previousElementSibling.textContent = currentCard.nextDues[btnIndex];
                 });
                 actionElements[1].classList.remove("fn__none");
-                emitEvent(options.app, options.cardsData.cards[index], type);
+                emitEvent(options.app, currentCard, type);
                 return;
             }
         } else if (type === "-2") {    // 上一步
@@ -390,8 +562,8 @@ export const bindCardEvent = async (options: {
         }
         if (["1", "2", "3", "4", "-3"].includes(type) && actionElements[0].classList.contains("fn__none")) {
             fetchPost(type === "-3" ? "/api/riff/skipReviewRiffCard" : "/api/riff/reviewRiffCard", {
-                deckID: options.cardsData.cards[index].deckID,
-                cardID: options.cardsData.cards[index].cardID,
+                deckID: currentCard.deckID,
+                cardID: currentCard.cardID,
                 rating: parseInt(type),
                 reviewedCards: options.cardsData.cards
             }, () => {
@@ -408,9 +580,9 @@ export const bindCardEvent = async (options: {
                     const currentCardType = filterElement.getAttribute("data-cardtype");
                     fetchPost(currentCardType === "all" ? "/api/riff/getRiffDueCards" :
                         (currentCardType === "doc" ? "/api/riff/getTreeRiffDueCards" : "/api/riff/getNotebookRiffDueCards"), {
-                        rootID: filterElement.getAttribute("data-id"),
-                        deckID: filterElement.getAttribute("data-id"),
-                        notebook: filterElement.getAttribute("data-id"),
+                        rootID: docId,
+                        deckID: docId,
+                        notebook: docId,
                         reviewedCards: options.cardsData.cards
                     }, async (result) => {
                         emitEvent(options.app, options.cardsData.cards[index - 1], type);
@@ -555,7 +727,7 @@ const nextCard = (options: {
     options.actionElements[1].classList.add("fn__none");
     options.editor.protyle.element.classList.remove("fn__none");
     options.editor.protyle.element.nextElementSibling.classList.add("fn__none");
-    options.countElement.innerHTML = genCardCount(options.cardsData.unreviewedNewCardCount, options.cardsData.unreviewedOldCardCount, options.index + 1);
+    options.countElement.innerHTML = genCardCount(options.cardsData, options.index);
     options.countElement.classList.remove("fn__none");
     if (options.index === 0) {
         options.actionElements[0].firstElementChild.setAttribute("disabled", "disabled");

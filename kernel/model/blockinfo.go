@@ -253,7 +253,7 @@ func GetBlockIndex(id string) (ret int) {
 	}
 
 	rootChild := node
-	for ; nil == rootChild.Parent || ast.NodeDocument != rootChild.Parent.Type; rootChild = rootChild.Parent {
+	for ; nil != rootChild.Parent && ast.NodeDocument != rootChild.Parent.Type; rootChild = rootChild.Parent {
 	}
 
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
@@ -271,6 +271,42 @@ func GetBlockIndex(id string) (ret int) {
 		}
 		return ast.WalkContinue
 	})
+	return
+}
+
+func GetBlocksIndexes(ids []string) (ret map[string]int) {
+	ret = map[string]int{}
+	if 1 > len(ids) {
+		return
+	}
+
+	tree, _ := LoadTreeByBlockID(ids[0])
+	if nil == tree {
+		return
+	}
+
+	idx := 0
+	nodesIndexes := map[string]int{}
+	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering {
+			return ast.WalkContinue
+		}
+
+		if !n.IsChildBlockOf(tree.Root, 1) {
+			if n.IsBlock() {
+				nodesIndexes[n.ID] = idx
+			}
+			return ast.WalkContinue
+		}
+
+		idx++
+		nodesIndexes[n.ID] = idx
+		return ast.WalkContinue
+	})
+
+	for _, id := range ids {
+		ret[id] = nodesIndexes[id]
+	}
 	return
 }
 

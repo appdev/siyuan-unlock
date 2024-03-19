@@ -103,6 +103,14 @@ func NetImg2LocalAssets(rootID, originalURL string) (err error) {
 		}
 		if ast.NodeImage == n.Type {
 			linkDest := n.ChildByType(ast.NodeLinkDest)
+			linkText := n.ChildByType(ast.NodeLinkText)
+			if nil == linkText {
+				linkText = &ast.Node{Type: ast.NodeLinkText, Tokens: []byte("image")}
+				if openBracket := n.ChildByType(ast.NodeOpenBracket); nil != openBracket {
+					openBracket.InsertAfter(linkText)
+				}
+			}
+
 			dest := linkDest.Tokens
 			if util.IsAssetLinkDest(dest) {
 				return ast.WalkSkipChildren
@@ -122,8 +130,11 @@ func NetImg2LocalAssets(rootID, originalURL string) (err error) {
 				}
 
 				name := filepath.Base(u)
-				name = util.FilterFileName(name)
+				name = util.FilterUploadFileName(name)
 				name = util.TruncateLenFileName(name)
+				if 1 > len(bytes.TrimSpace(linkText.Tokens)) {
+					linkText.Tokens = []byte(name)
+				}
 				name = "net-img-" + name
 				name = util.AssetName(name)
 				writePath := filepath.Join(assetsDirPath, name)
@@ -137,7 +148,12 @@ func NetImg2LocalAssets(rootID, originalURL string) (err error) {
 				return ast.WalkSkipChildren
 			}
 
-			if bytes.HasPrefix(bytes.ToLower(dest), []byte("https://")) || bytes.HasPrefix(bytes.ToLower(dest), []byte("http://")) {
+			if bytes.HasPrefix(bytes.ToLower(dest), []byte("https://")) || bytes.HasPrefix(bytes.ToLower(dest), []byte("http://")) || bytes.HasPrefix(dest, []byte("//")) {
+				if bytes.HasPrefix(dest, []byte("//")) {
+					// `Convert network images to local` supports `//` https://github.com/siyuan-note/siyuan/issues/10598
+					dest = append([]byte("https:"), dest...)
+				}
+
 				u := string(dest)
 				if strings.Contains(u, "qpic.cn") {
 					// 改进 `网络图片转换为本地图片` 微信图片拉取 https://github.com/siyuan-note/siyuan/issues/5052
@@ -198,8 +214,11 @@ func NetImg2LocalAssets(rootID, originalURL string) (err error) {
 					}
 				}
 				name = strings.TrimSuffix(name, ext)
-				name = util.FilterFileName(name)
+				name = util.FilterUploadFileName(name)
 				name = util.TruncateLenFileName(name)
+				if 1 > len(bytes.TrimSpace(linkText.Tokens)) {
+					linkText.Tokens = []byte(name)
+				}
 				name = "net-img-" + name + "-" + ast.NewNodeID() + ext
 				writePath := filepath.Join(assetsDirPath, name)
 				if err = filelock.WriteFile(writePath, data); nil != err {
@@ -285,7 +304,7 @@ func NetAssets2LocalAssets(rootID string) (err error) {
 			}
 
 			name := filepath.Base(u)
-			name = util.FilterFileName(name)
+			name = util.FilterUploadFileName(name)
 			name = util.TruncateLenFileName(name)
 			name = "network-asset-" + name
 			name = util.AssetName(name)
@@ -306,7 +325,12 @@ func NetAssets2LocalAssets(rootID string) (err error) {
 			return ast.WalkContinue
 		}
 
-		if bytes.HasPrefix(bytes.ToLower(dest), []byte("https://")) || bytes.HasPrefix(bytes.ToLower(dest), []byte("http://")) {
+		if bytes.HasPrefix(bytes.ToLower(dest), []byte("https://")) || bytes.HasPrefix(bytes.ToLower(dest), []byte("http://")) || bytes.HasPrefix(dest, []byte("//")) {
+			if bytes.HasPrefix(dest, []byte("//")) {
+				// `Convert network images to local` supports `//` https://github.com/siyuan-note/siyuan/issues/10598
+				dest = append([]byte("https:"), dest...)
+			}
+
 			u := string(dest)
 			if strings.Contains(u, "qpic.cn") {
 				// 改进 `网络图片转换为本地图片` 微信图片拉取 https://github.com/siyuan-note/siyuan/issues/5052
@@ -375,7 +399,7 @@ func NetAssets2LocalAssets(rootID string) (err error) {
 				}
 			}
 			name = strings.TrimSuffix(name, ext)
-			name = util.FilterFileName(name)
+			name = util.FilterUploadFileName(name)
 			name = util.TruncateLenFileName(name)
 			name = "network-asset-" + name + "-" + ast.NewNodeID() + ext
 			writePath := filepath.Join(assetsDirPath, name)

@@ -218,7 +218,10 @@ interface ICard {
     cardID: string
     blockID: string
     nextDues: IObject
-    state: number   // 0：新卡
+    lapses: number  // 遗忘次数
+    lastReview: number  // 最后复习时间
+    reps: number  // 复习次数
+    state: number   // 卡片状态 0：新卡
 }
 
 interface ICardData {
@@ -468,6 +471,7 @@ interface IOperation {
     retData?: any
     nextID?: string // insert 专享
     isDetached?: boolean // insertAttrViewBlock 专享
+    ignoreFillFilter?: boolean // insertAttrViewBlock 专享
     srcIDs?: string[] // insertAttrViewBlock 专享
     name?: string // addAttrViewCol 专享
     type?: TAVCol // addAttrViewCol 专享

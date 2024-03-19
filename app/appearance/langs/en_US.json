@@ -1,4 +1,10 @@
 {
+  "setDueTime": "Set expiration time",
+  "showCardDay": "After how many days do you want to show the card?",
+  "forgetCount": "Forget to count",
+  "lastReviewTime": "Last review time",
+  "cardStatus": "Card status",
+  "noSupportTip": "This function does not support the use of card decks",
   "insertRowTip": "The newly added rows have been filtered and can be viewed by canceling filtering/searching/sorting",
   "insertRowTip2": "New rows do not participate in sorting",
   "insertPhoto": "Take a photo and insert it",
@@ -1307,7 +1313,7 @@
     "102": "Processing completed",
     "103": "The update installation package has been automatically downloaded in the background. When exiting, you will be asked whether to install the new version",
     "104": "The update installation package failed to download, please check the network connection",
-    "105": "Corrupted data repo have been automatically reset",
+    "105": "TODO",
     "106": "Maximum length is limited to 512 characters",
     "107": "Moved document [%s]",
     "108": "Data sync found conflicts, you can view the generated conflict content in [Data History]",
@@ -1358,7 +1364,7 @@
     "153": "Downloaded files %d, chunks %d, received bytes %s",
     "154": "The cloud can only support backup up to 12 snapshots",
     "155": "Cloud sync directory has been reset to [main]",
-    "156": "Access authentication failed, please refresh the page",
+    "156": "Access authentication failed, please refresh or reopen it",
     "157": "The key is not recognized, please confirm that the copied key string is correct",
     "158": "Indexing data repo, walking data %s",
     "159": "Indexing data repo, getting the latest file %v/%v",
@@ -1435,6 +1441,7 @@
     "230": "Deleting cloud storage unreferenced check indexes...",
     "231": "Deleting unreferenced data objects in cloud storage...",
     "232": "The cloud data storage has been purged. [%d] snapshots and [%d] data objects have been deleted, and a total of [%s] disk space has been released",
-    "233": "Closing user guide..."
+    "233": "Closing user guide...",
+    "234": "[%d/%d] Updated [%d] of readable paths of doc [%s]"
   }
 }
