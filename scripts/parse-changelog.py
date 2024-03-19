@@ -61,9 +61,9 @@ def find_milestone(repo, title, lastestRelease):
     version = pat.group(1)
     print(f'''
 <p>
-<a href="https://github.com/apkdv/siyuan-unlock/actions/workflows/cd.yml"><img src="https://img.shields.io/github/actions/workflow/status/apkdv/siyuan-unlock/cd.yml?event=push&label=cd.yml%20Action&logo=github" style="cursor:pointer;height: 30px;margin: 3px auto;"/></a>
-<a href="https://github.com/apkdv/siyuan-unlock/releases/{thisRelease}/"><img src="https://img.shields.io/github/downloads/apkdv/siyuan-unlock/{thisRelease}/total?logo=github" style="cursor:pointer;height: 30px;margin: 3px auto;"/></a>
-<img alt="GitHub commits difference between two branches/tags/commits" src="https://img.shields.io/github/commits-difference/apkdv/siyuan-unlock?base={lastestRelease}&head={thisRelease}&logo=git" style="cursor:pointer;height: 30px;margin: 3px auto;"/>
+<a href="https://github.com/appdev/siyuan-unlock/actions/workflows/cd.yml"><img src="https://img.shields.io/github/actions/workflow/status/appdev/siyuan-unlock/cd.yml?event=push&label=cd.yml%20Action&logo=github" style="cursor:pointer;height: 30px;margin: 3px auto;"/></a>
+<a href="https://github.com/appdev/siyuan-unlock/releases/{thisRelease}/"><img src="https://img.shields.io/github/downloads/appdev/siyuan-unlock/{thisRelease}/total?logo=github" style="cursor:pointer;height: 30px;margin: 3px auto;"/></a>
+<img alt="GitHub commits difference between two branches/tags/commits" src="https://img.shields.io/github/commits-difference/appdev/siyuan-unlock?base={lastestRelease}&head={thisRelease}&logo=git" style="cursor:pointer;height: 30px;margin: 3px auto;"/>
 </p>
 
 ''')
