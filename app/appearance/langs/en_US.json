@@ -1,4 +1,12 @@
 {
+  "removeCol": "Are you sure you want to delete the ${x} column in the database?",
+  "video": "Video",
+  "audio": "Audio",
+  "updateAll": "Update all",
+  "confirmUpdateAll": "Are you sure you want to update all?",
+  "confirmUpdate": "Are you sure you want to update?",
+  "insertRowBefore": "Insert rows ${x} above",
+  "insertRowAfter": "Insert rows ${x} below",
   "setDueTime": "Set expiration time",
   "showCardDay": "After how many days do you want to show the card?",
   "forgetCount": "Forget to count",
@@ -295,6 +303,10 @@
   "apiModelTip": "The <code class='fn__code'>model</code> parameter passed in when requesting the API is used to control the generated text style (the Deployment ID needs to be filled in when using the Azure OpenAI service)",
   "apiMaxTokens": "Maximum number of Tokens",
   "apiMaxTokensTip": "The <code class='fn__code'>max_tokens</code> parameter passed in when requesting the API is used to control the length of the generated text",
+  "apiTemperature": "Temperature",
+  "apiTemperatureTip": "The <code class='fn__code'>temperature</code> parameter passed in when requesting the API is used to control the randomness of the generated text",
+  "apiMaxContexts": "Maximum number of contexts",
+  "apiMaxContextsTip": "The maximum number of contexts passed in when requesting the API",
   "apiBaseURL": "API Base URL",
   "apiBaseURLTip": "The base address of the request, such as <code class='fn__code'>https://api.openai.com/v1</code>",
   "apiUserAgentTip": "The user agent that initiated the request, that is, the HTTP header <code class='fn__code'>User-Agent</code>",
@@ -309,14 +321,6 @@
   "aiContinueWrite": "Continue writing",
   "aiTranslate": "Translate",
   "aiExtractSummary": "Extract summary",
-  "aiTranslate_zh_Hans": "Simplified Chinese",
-  "aiTranslate_zh_Hant": "Traditional Chinese",
-  "aiTranslate_ja_JP": "Japanese",
-  "aiTranslate_ko_KR": "Korean",
-  "aiTranslate_en_US": "English",
-  "aiTranslate_es_ES": "Spanish",
-  "aiTranslate_fr_FR": "French",
-  "aiTranslate_de_DE": "German",
   "aiBrainStorm": "Brainstorm",
   "aiFixGrammarSpell": "Fix grammar, spelling and typos",
   "aiCustomAction": "Custom action...",
@@ -1205,7 +1209,8 @@
   },
   "_attrView": {
     "table": "Table",
-    "key": "Primary Key"
+    "key": "Primary Key",
+    "select": "Select"
   },
   "_kernel": {
     "0": "Query notebook failed",
@@ -1313,7 +1318,7 @@
     "102": "Processing completed",
     "103": "The update installation package has been automatically downloaded in the background. When exiting, you will be asked whether to install the new version",
     "104": "The update installation package failed to download, please check the network connection",
-    "105": "TODO",
+    "105": "Untitled",
     "106": "Maximum length is limited to 512 characters",
     "107": "Moved document [%s]",
     "108": "Data sync found conflicts, you can view the generated conflict content in [Data History]",
@@ -1442,6 +1447,10 @@
     "231": "Deleting unreferenced data objects in cloud storage...",
     "232": "The cloud data storage has been purged. [%d] snapshots and [%d] data objects have been deleted, and a total of [%s] disk space has been released",
     "233": "Closing user guide...",
-    "234": "[%d/%d] Updated [%d] of readable paths of doc [%s]"
+    "234": "[%d/%d] Updated [%d] of readable paths of doc [%s]",
+    "235": "[%d/%d] is updating the marketplace package...",
+    "236": "[%d/%d] is updating the marketplace package [%s]...",
+    "237": "[%d] marketplace packages have all been updated successfully",
+    "238": "Marketplace package [%s] update failed, please try again later"
   }
 }

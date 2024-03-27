@@ -340,6 +340,7 @@ export const popTextCell = (protyle: IProtyle, cellElements: HTMLElement[], type
         }
         if (!hasClosestByClassName(cellElements[0], "custom-attr")) {
             cellElements[0].classList.add("av__cell--select");
+            addDragFill(cellElements[0]);
         }
         return;
     }
@@ -379,6 +380,7 @@ export const popTextCell = (protyle: IProtyle, cellElements: HTMLElement[], type
                     protyle.toolbar.range.selectNodeContents(cellElements[0].lastChild);
                     focusByRange(protyle.toolbar.range);
                     cellElements[0].classList.add("av__cell--select");
+                    addDragFill(cellElements[0]);
                     hintRef(inputElement.value.substring(2), protyle, "av");
                     avMaskElement?.remove();
                     event.preventDefault();
@@ -453,6 +455,7 @@ const updateCellValueByInput = (protyle: IProtyle, type: TAVCol, blockElement: H
     if (cellElements[0] // 兼容新增行后台隐藏
         && !hasClosestByClassName(cellElements[0], "custom-attr")) {
         cellElements[0].classList.add("av__cell--select");
+        addDragFill(cellElements[0]);
     }
     //  单元格编辑中 ctrl+p 光标定位
     if (!document.querySelector(".b3-dialog")) {
@@ -470,7 +473,7 @@ export const updateCellsValue = (protyle: IProtyle, nodeElement: HTMLElement, va
     const avID = nodeElement.dataset.avId;
     const id = nodeElement.dataset.nodeId;
     let text = "";
-    const json: IAVCellValue[] = [];
+    const json: IAVCellValue[][] = [];
     let cellElements: Element[];
     if (cElements?.length > 0) {
         cellElements = cElements;
@@ -508,7 +511,10 @@ export const updateCellsValue = (protyle: IProtyle, nodeElement: HTMLElement, va
 
         text += getCellText(item) + ((cellElements[elementIndex + 1] && item.nextElementSibling && item.nextElementSibling.isSameNode(cellElements[elementIndex + 1])) ? "\t" : "\n\n");
         const oldValue = genCellValueByElement(type, item);
-        json.push(oldValue);
+        if (elementIndex === 0 || !cellElements[elementIndex - 1].isSameNode(item.previousElementSibling)) {
+           json.push([]);
+        }
+        json[json.length - 1].push(oldValue);
         // relation 为全部更新，以下类型为添加
         if (type === "mAsset") {
             if (Array.isArray(value)) {
@@ -607,7 +613,7 @@ export const renderCell = (cellValue: IAVCellValue) => {
             text = `<span class="av__celltext">${cellValue.block.content || ""}</span>
 <span class="b3-chip b3-chip--info b3-chip--small" data-type="block-more">${window.siyuan.languages.more}</span>`;
         } else {
-            text = `<span data-type="block-ref" data-id="${cellValue.block.id}" data-subtype="s" class="av__celltext av__celltext--ref">${cellValue.block.content || "Untitled"}</span>
+            text = `<span data-type="block-ref" data-id="${cellValue.block.id}" data-subtype="s" class="av__celltext av__celltext--ref">${cellValue.block.content || window.siyuan.languages.untitled}</span>
 <span class="b3-chip b3-chip--info b3-chip--small" data-type="block-more">${window.siyuan.languages.update}</span>`;
         }
     } else if (cellValue.type === "number") {
@@ -685,9 +691,9 @@ const renderRollup = (cellValue: IAVCellValue) => {
         }
     } else if (cellValue.type === "block") {
         if (cellValue?.isDetached) {
-            text = `<span class="av__celltext" data-id="${cellValue.block?.id}">${cellValue.block?.content || "Untitled"}</span>`;
+            text = `<span class="av__celltext" data-id="${cellValue.block?.id}">${cellValue.block?.content || window.siyuan.languages.untitled}</span>`;
         } else {
-            text = `<span data-type="block-ref" data-id="${cellValue.block?.id}" data-subtype="s" class="av__celltext av__celltext--ref">${cellValue.block?.content || "Untitled"}</span>`;
+            text = `<span data-type="block-ref" data-id="${cellValue.block?.id}" data-subtype="s" class="av__celltext av__celltext--ref">${cellValue.block?.content || window.siyuan.languages.untitled}</span>`;
         }
     } else if (cellValue.type === "number") {
         text = cellValue?.number.formattedContent || cellValue?.number.content.toString() || "";
@@ -818,4 +824,12 @@ export const dragFillCellsValue = (protyle: IProtyle, nodeElement: HTMLElement, 
     if (doOperations.length > 0) {
         transaction(protyle, doOperations, undoOperations);
     }
+};
+
+export const addDragFill = (cellElement: Element) => {
+    if (!cellElement) {
+        return;
+    }
+    cellElement.classList.add("av__cell--active");
+    cellElement.insertAdjacentHTML("beforeend", `<div aria-label="${window.siyuan.languages.dragFill}" class="av__drag-fill ariaLabel"></div>`);
 };

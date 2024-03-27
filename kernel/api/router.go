@@ -264,6 +264,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/asset/getImageOCRText", model.CheckAuth, model.CheckReadonly, getImageOCRText)
 	ginServer.Handle("POST", "/api/asset/setImageOCRText", model.CheckAuth, model.CheckReadonly, setImageOCRText)
 	ginServer.Handle("POST", "/api/asset/fullReindexAssetContent", model.CheckAuth, model.CheckReadonly, fullReindexAssetContent)
+	ginServer.Handle("POST", "/api/asset/statAsset", model.CheckAuth, statAsset)
 
 	ginServer.Handle("POST", "/api/export/batchExportMd", model.CheckAuth, batchExportMd)
 	ginServer.Handle("POST", "/api/export/exportMd", model.CheckAuth, exportMd)
@@ -351,6 +352,8 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/bazaar/installBazaarTheme", model.CheckAuth, model.CheckReadonly, installBazaarTheme)
 	ginServer.Handle("POST", "/api/bazaar/uninstallBazaarTheme", model.CheckAuth, model.CheckReadonly, uninstallBazaarTheme)
 	ginServer.Handle("POST", "/api/bazaar/getBazaarPackageREAME", model.CheckAuth, getBazaarPackageREAME)
+	ginServer.Handle("POST", "/api/bazaar/getUpdatedPackage", model.CheckAuth, getUpdatedPackage)
+	ginServer.Handle("POST", "/api/bazaar/batchUpdatePackage", model.CheckAuth, batchUpdatePackage)
 
 	ginServer.Handle("POST", "/api/repo/initRepoKey", model.CheckAuth, model.CheckReadonly, initRepoKey)
 	ginServer.Handle("POST", "/api/repo/initRepoKeyFromPassphrase", model.CheckAuth, model.CheckReadonly, initRepoKeyFromPassphrase)

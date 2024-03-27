@@ -476,7 +476,7 @@ export const exportMd = (id: string) => {
                 });
                 btnsElement[1].addEventListener("click", () => {
                     if (inputElement.value.trim() === "") {
-                        inputElement.value = "Untitled";
+                        inputElement.value = window.siyuan.languages.untitled;
                     } else {
                         inputElement.value = replaceFileName(inputElement.value);
                     }
@@ -718,8 +718,40 @@ export const openMenu = (app: App, src: string, onlyMenu: boolean, showAccelerat
                     openAssetNewWindow(src.trim());
                 }
             });
+            submenu.push({
+                icon: "iconFolder",
+                label: window.siyuan.languages.showInFolder,
+                accelerator: showAccelerator ? "⌘Click" : "",
+                click: () => {
+                    openBy(src, "folder");
+                }
+            });
+            submenu.push({
+                label: window.siyuan.languages.useDefault,
+                accelerator: showAccelerator ? "⇧Click" : "",
+                click() {
+                    openBy(src, "app");
+                }
+            });
             /// #endif
         } else {
+            /// #if !BROWSER
+            submenu.push({
+                label: window.siyuan.languages.useDefault,
+                accelerator: showAccelerator ? "Click" : "",
+                click() {
+                    openBy(src, "app");
+                }
+            });
+            submenu.push({
+                icon: "iconFolder",
+                label: window.siyuan.languages.showInFolder,
+                accelerator: showAccelerator ? "⌘Click" : "",
+                click: () => {
+                    openBy(src, "folder");
+                }
+            });
+            /// #else
             submenu.push({
                 label: window.siyuan.languages.useBrowserView,
                 accelerator: showAccelerator ? "Click" : "",
@@ -727,24 +759,8 @@ export const openMenu = (app: App, src: string, onlyMenu: boolean, showAccelerat
                     openByMobile(src);
                 }
             });
+            /// #endif
         }
-        /// #if !BROWSER
-        submenu.push({
-            icon: "iconFolder",
-            label: window.siyuan.languages.showInFolder,
-            accelerator: showAccelerator ? "⌘Click" : "",
-            click: () => {
-                openBy(src, "folder");
-            }
-        });
-        submenu.push({
-            label: window.siyuan.languages.useDefault,
-            accelerator: showAccelerator ? "⇧Click" : "",
-            click() {
-                openBy(src, "app");
-            }
-        });
-        /// #endif
     } else if (src) {
         if (0 > src.indexOf(":")) {
             // 使用 : 判断，不使用 :// 判断 Open external application protocol invalid https://github.com/siyuan-note/siyuan/issues/10075

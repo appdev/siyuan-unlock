@@ -82,6 +82,7 @@ import {openViewMenu} from "../render/av/view";
 import {avRender} from "../render/av/render";
 import {checkFold} from "../../util/noRelyPCFunction";
 import {
+    addDragFill,
     dragFillCellsValue,
     genCellValueByElement,
     getCellText,
@@ -307,7 +308,13 @@ export class WYSIWYG {
                     html = "[";
                     cellElements.forEach((item: HTMLElement, index) => {
                         const cellText = getCellText(item);
+                        if (index === 0 || !cellElements[index - 1].isSameNode(item.previousElementSibling)) {
+                            html += "[";
+                        }
                         html += JSON.stringify(genCellValueByElement(getTypeByCellElement(item), item)) + ",";
+                        if (index === cellElements.length - 1 || !cellElements[index + 1].isSameNode(item.nextElementSibling)) {
+                            html = html.substring(0, html.length - 1) + "],";
+                        }
                         textPlain += cellText + ((cellElements[index + 1] && item.nextElementSibling && item.nextElementSibling.isSameNode(cellElements[index + 1])) ? "\t" : "\n\n");
                     });
                     textPlain = textPlain.substring(0, textPlain.length - 2);
@@ -517,7 +524,7 @@ export class WYSIWYG {
                     documentSelf.onselect = null;
                     if (lastCellElement) {
                         dragFillCellsValue(protyle, nodeElement, originData, originCellIds);
-                        lastCellElement.insertAdjacentHTML("beforeend", `<div aria-label="${window.siyuan.languages.dragFill}" class="av__drag-fill ariaLabel"></div>`);
+                        addDragFill(lastCellElement);
                     }
                     return false;
                 };
@@ -589,7 +596,7 @@ export class WYSIWYG {
                     if (lastCellElement) {
                         selectRow(nodeElement.querySelector(".av__firstcol"), "unselectAll");
                         focusBlock(nodeElement);
-                        lastCellElement.insertAdjacentHTML("beforeend", `<div aria-label="${window.siyuan.languages.dragFill}" class="av__drag-fill ariaLabel"></div>`);
+                        addDragFill(lastCellElement);
                         this.preventClick = true;
                     }
                     return false;
@@ -875,11 +882,17 @@ export class WYSIWYG {
                     return;
                 }
                 let firstBlockElement = hasClosestBlock(firstElement);
+                if (!firstBlockElement && firstElement.classList.contains("protyle-breadcrumb__bar")) {
+                    firstBlockElement = firstElement.nextElementSibling as HTMLElement;
+                }
                 if (moveEvent.clientY > y) {
                     if (!startFirstElement) {
                         // 向上选择导致滚动条滚动到顶部再向下选择至 > y 时，firstBlockElement 为 undefined https://ld246.com/article/1705233964097
                         if (!firstBlockElement) {
                             firstBlockElement = protyle.wysiwyg.element.firstElementChild as HTMLElement;
+                            if (firstBlockElement.classList.contains("protyle-breadcrumb__bar")) {
+                                firstBlockElement = firstBlockElement.nextElementSibling as HTMLElement;
+                            }
                         }
                         startFirstElement = firstBlockElement;
                     }
@@ -887,6 +900,9 @@ export class WYSIWYG {
                     // https://github.com/siyuan-note/siyuan/issues/7580
                     moveEvent.clientY < protyle.wysiwyg.element.lastElementChild.getBoundingClientRect().bottom) {
                     firstBlockElement = protyle.wysiwyg.element.firstElementChild as HTMLElement;
+                    if (firstBlockElement.classList.contains("protyle-breadcrumb__bar")) {
+                        firstBlockElement = firstBlockElement.nextElementSibling as HTMLElement;
+                    }
                 }
                 let selectElements: Element[] = [];
                 let currentElement: Element | boolean = firstBlockElement;
@@ -915,7 +931,9 @@ export class WYSIWYG {
                                     hasJump = true;
                                 }
                             } else {
-                                selectElements.push(currentElement);
+                                if (!currentElement.classList.contains("protyle-breadcrumb__bar")) {
+                                    selectElements.push(currentElement);
+                                }
                                 currentElement = currentElement.nextElementSibling;
                             }
                         } else if (currentElement.parentElement.classList.contains("sb")) {
@@ -1436,6 +1454,11 @@ export class WYSIWYG {
                 }
                 this.emojiToMd(tempElement);
                 html = tempElement.innerHTML;
+                // https://github.com/siyuan-note/siyuan/issues/10722
+                if (hasClosestByAttribute(range.startContainer, "data-type", "NodeCodeBlock") ||
+                    hasClosestByMatchTag(range.startContainer, "CODE")) {
+                    textPlain = tempElement.textContent.replace(Constants.ZWSP, "");
+                }
                 // https://github.com/siyuan-note/siyuan/issues/4321
                 if (!nodeElement.classList.contains("table")) {
                     const editableElement = getContenteditableElement(nodeElement);
@@ -1456,7 +1479,7 @@ export class WYSIWYG {
             }
             protyle.hint.render(protyle);
             if (!selectAVElement) {
-                textPlain = protyle.lute.BlockDOM2StdMd(html).trimEnd(); // 需要 trimEnd，否则 \n 会导致 https://github.com/siyuan-note/siyuan/issues/6218
+                textPlain = textPlain || protyle.lute.BlockDOM2StdMd(html).trimEnd(); // 需要 trimEnd，否则 \n 会导致 https://github.com/siyuan-note/siyuan/issues/6218
             }
             textPlain = textPlain.replace(/\u00A0/g, " "); // Replace non-breaking spaces with normal spaces when copying https://github.com/siyuan-note/siyuan/issues/9382
             event.clipboardData.setData("text/plain", textPlain);
@@ -2092,19 +2115,32 @@ export class WYSIWYG {
                     ) {
                         if (event.altKey) {
                             openAsset(protyle.app, linkAddress, parseInt(getSearch("page", linkAddress)));
-                        } else if (!ctrlIsPressed && !event.shiftKey) {
+                        } else if (ctrlIsPressed) {
+                            /// #if !BROWSER
+                            openBy(linkAddress, "folder");
+                            /// #else
+                            openByMobile(linkAddress);
+                            /// #endif
+                        } else if (event.shiftKey) {
+                            /// #if !BROWSER
+                            openBy(linkAddress, "app");
+                            /// #else
+                            openByMobile(linkAddress);
+                            /// #endif
+                        } else {
                             openAsset(protyle.app, linkPathname, parseInt(getSearch("page", linkAddress)), "right");
                         }
                     } else {
+                        /// #if !BROWSER
+                        if (ctrlIsPressed) {
+                            openBy(linkAddress, "folder");
+                        } else {
+                            openBy(linkAddress, "app");
+                        }
+                        /// #else
                         openByMobile(linkAddress);
+                        /// #endif
                     }
-                    /// #if !BROWSER
-                    if (ctrlIsPressed) {
-                        openBy(linkAddress, "folder");
-                    } else if (event.shiftKey) {
-                        openBy(linkAddress, "app");
-                    }
-                    /// #endif
                 } else if (linkAddress) {
                     if (0 > linkAddress.indexOf(":")) {
                         // 使用 : 判断，不使用 :// 判断 Open external application protocol invalid https://github.com/siyuan-note/siyuan/issues/10075
