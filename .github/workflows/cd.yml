@@ -145,16 +145,16 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install Node npm
-        run: npm install -g npm
+      - name: Install Node pnpm
+        run: npm install -g pnpm
         working-directory: ${{ github.workspace }}/go/src/github.com/appdev/siyuan-unlock/app
 
       - name: Install Node Dependencies
-        run: npm install --no-frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
         working-directory: ${{ github.workspace }}/go/src/github.com/appdev/siyuan-unlock/app
 
       - name: Building UI
-        run: npm run build
+        run: pnpm run build
         working-directory: ${{ github.workspace }}/go/src/github.com/appdev/siyuan-unlock/app
 
       - name: Remove Build Directory
@@ -198,7 +198,7 @@ jobs:
           GOARCH: ${{ matrix.config.goarch }}
 
       - name: Building Electron
-        run: npm run ${{ matrix.config.electron_args }}
+        run: pnpm run ${{ matrix.config.electron_args }}
         working-directory: ${{ github.workspace }}/go/src/github.com/appdev/siyuan-unlock/app
 
       - name: Upload Release
