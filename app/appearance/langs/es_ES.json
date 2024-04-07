@@ -1,4 +1,6 @@
 {
+  "updateLayout": "Actualizar diseño",
+  "dndFolderTip": "Tenga en cuenta que ${x} solo inserta el hipervínculo file:// y no copia el archivo",
   "removeCol": "¿Está seguro de que desea eliminar la columna ${x} en la base de datos?",
   "vídeo": "Vídeo",
   "audio": "Audio",
@@ -434,6 +436,14 @@
   "autoDownloadUpdatePkgTip": "Después de abrir, verificará automáticamente la actualización de la versión cada dos horas. Si hay una versión actualizada, descargará automáticamente el paquete de instalación y solicitará la instalación",
   "downloaded": "Descargado",
   "allOp": "Todas las operaciones",
+  "allNotebooks": "Todos los cuadernos",
+  "historyClean": "limpiar (clean)",
+  "historyUpdate": "actualizar (update)",
+  "historyDelete": "eliminar (delete)",
+  "historyFormat": "formatear (format)",
+  "historySync": "sincronizar (sync)",
+  "historyReplace": "reemplazar (replace)",
+  "historyOutline": "esquema (outline)",
   "htmlBlockError": "La ejecución del siguiente script afectará la visualización de la interfaz y el script ha dejado de ejecutarse",
   "fileHistory": "Historial de archivos",
   "htmlBlockTip": "Se forman varios bloques HTML. Para evitar la pérdida de datos, utilice etiquetas <code class='fn__code'>&lt;div&gt;</code> para ajustar y eliminar líneas en blanco",
@@ -1079,7 +1089,7 @@
   "about11": "Red de servicio",
   "about12": "Después de habilitarlo, se permitirá el acceso a otros dispositivos de la misma LAN. La aplicación se cerrará automáticamente después de la modificación, por favor reinicie manualmente",
   "about13": "Token API",
-  "about14": "El token debe ser autentificado al llamar a la API",
+  "about14": "El token debe ser autentificado al llamar a la API<br>Encabezado de solicitud HTTP <code class=\"fn__code\">Authorization: token ${token}</code>",
   "about17": "No habilite el proxy cuando esté configurado como <code class='fn__code'>Conexión directa</code>",
   "about18": "Cuando se utiliza una dirección sin bucle invertido (<code class=\"fn__code\">127.0.0.1</code>/<code class=\"fn__code\">[::1]</code> ) Primero configure el Código de autorización de acceso",
   "checkUpdate": "Comprobar actualización",
@@ -1451,6 +1461,9 @@
     "235": "[%d/%d] está actualizando el paquete del mercado...",
     "236": "[%d/%d] está actualizando el paquete del mercado [%s]...",
     "237": "[%d] todos los paquetes del mercado se han actualizado correctamente",
-    "238": "Error en la actualización del paquete Marketplace [%s], inténtalo de nuevo más tarde"
+    "238": "Error en la actualización del paquete Marketplace [%s], inténtalo de nuevo más tarde",
+    "239": "Las operaciones relacionadas se están procesando, inténtalo de nuevo más tarde",
+    "240": "No se admite arrastrar encabezado debajo de los bloques contenedores en el documento",
+    "241": "No se admite arrastrar a su subtítulo"
   }
 }

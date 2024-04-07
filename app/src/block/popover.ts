@@ -1,9 +1,5 @@
 import {BlockPanel} from "./Panel";
-import {
-    hasClosestBlock,
-    hasClosestByAttribute,
-    hasClosestByClassName,
-} from "../protyle/util/hasClosest";
+import {hasClosestBlock, hasClosestByAttribute, hasClosestByClassName,} from "../protyle/util/hasClosest";
 import {fetchPost, fetchSyncPost} from "../util/fetch";
 import {hideTooltip, showTooltip} from "../dialog/tooltip";
 import {getIdFromSYProtocol, isLocalPath} from "../util/pathName";
@@ -33,12 +29,19 @@ export const initBlockPopover = (app: App) => {
                     if (textElement.scrollWidth > textElement.clientWidth + 2) {
                         tip = getCellText(aElement);
                     }
-                } else if (aElement.dataset.wrap !== "true" && event.target.dataset.type !== "block-more" && !hasClosestByClassName(event.target, "block__icon")) {
-                    aElement.style.overflow = "auto";
-                    if (aElement.scrollWidth > aElement.clientWidth + 2) {
-                        tip = getCellText(aElement);
+                } else {
+                    if (aElement.firstElementChild?.getAttribute("data-type") === "url") {
+                        if (aElement.firstElementChild.textContent.indexOf("...") > -1) {
+                            tip = aElement.firstElementChild.getAttribute("data-href");
+                        }
                     }
-                    aElement.style.overflow = "";
+                    if (!tip && aElement.dataset.wrap !== "true" && event.target.dataset.type !== "block-more" && !hasClosestByClassName(event.target, "block__icon")) {
+                        aElement.style.overflow = "auto";
+                        if (aElement.scrollWidth > aElement.clientWidth + 2) {
+                            tip = getCellText(aElement);
+                        }
+                        aElement.style.overflow = "";
+                    }
                 }
             }
             if (!tip) {
@@ -170,7 +173,7 @@ const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
     if (!popoverTargetElement && linkElement && linkElement.getAttribute("data-href")?.startsWith("siyuan://blocks")) {
         popoverTargetElement = linkElement;
     }
-    if (!popoverTargetElement) {
+    if (!popoverTargetElement || (popoverTargetElement && window.siyuan.menus.menu.data?.isSameNode(popoverTargetElement))) {
         // 移动到弹窗的 loading 元素上，但经过 settimeout 后 loading 已经被移除了
         // https://ld246.com/article/1673596577519/comment/1673767749885#comments
         let targetElement = target;
@@ -262,7 +265,7 @@ const getTarget = (event: MouseEvent & { target: HTMLElement }, aElement: false 
 };
 
 export const showPopover = async (app: App, showRef = false) => {
-    if (!popoverTargetElement) {
+    if (!popoverTargetElement || window.siyuan.menus.menu.data?.isSameNode(popoverTargetElement)) {
         return;
     }
     let ids: string[];

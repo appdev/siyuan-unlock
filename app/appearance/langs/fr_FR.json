@@ -1,4 +1,6 @@
 {
+  "updateLayout": "Mettre à jour la mise en page",
+  "dndFolderTip": "Veuillez noter que ${x} insère uniquement le lien hypertexte file:// et ne copie pas le fichier",
   "removeCol": "Êtes-vous sûr de vouloir supprimer la colonne ${x} de la base de données ?",
   "video": "Vidéo",
   "audio": "Audio",
@@ -434,6 +436,14 @@
   "autoDownloadUpdatePkgTip": "Après l'ouverture, il vérifiera automatiquement la mise à jour de la version toutes les deux heures. S'il existe une version mise à jour, il téléchargera automatiquement le package d'installation et demandera l'installation",
   "downloaded": "Téléchargé",
   "allOp": "Toutes les opérations",
+  "allNotebooks": "Tous les cahiers",
+  "historyClean": "nettoyer (clean)",
+  "historyUpdate": "mettre à jour (update)",
+  "historyDelete": "supprimer (delete)",
+  "historyFormat": "formater (format)",
+  "historySync": "synchroniser (sync)",
+  "historyReplace": "remplacer (replace)",
+  "historyOutline": "contour (outline)",
   "htmlBlockError": "L'exécution du script suivant affectera l'affichage de l'interface et le script a cessé de s'exécuter",
   "fileHistory": "Historique des fichiers",
   "htmlBlockTip": "Plusieurs blocs HTML sont formés. Pour éviter la perte de données, veuillez utiliser les balises <code class='fn__code'>&lt;div&gt;</code> pour envelopper et supprimer les lignes vides",
@@ -1079,7 +1089,7 @@
   "about11": "Service de réseau",
   "about12": "Après l'activation, les autres appareils du même réseau local seront autorisés à accéder. L'application sera fermée automatiquement après modification, veuillez la redémarrer manuellement.",
   "about13": "API token",
-  "about14": "Le token doit être authentifié lors de l'appel de l'API.",
+  "about14": "Le token doit être authentifié lors de l'appel de l'API<br>En-tête de requête HTTP <code class=\"fn__code\">Authorization: token ${token}</code>",
   "about17": "N'activez pas le proxy lorsqu'il est défini sur <code class='fn__code'>Connexion directe</code>.",
   "about18": "Lors de l'utilisation d'une adresse sans bouclage (<code class=\"fn__code\">127.0.0.1</code>/<code class=\"fn__code\">[::1]</code> ) Veuillez d'abord définir le Accès code d'autorisation",
   "checkUpdate": "Vérifier la mise à jour",
@@ -1451,6 +1461,9 @@
     "235": "[%d/%d] met à jour le package Marketplace...",
     "236": "[%d/%d] met à jour le package Marketplace [%s]...",
     "237": "[%d] packages Marketplace ont tous été mis à jour avec succès",
-    "238": "La mise à jour du package Marketplace [%s] a échoué, veuillez réessayer plus tard"
+    "238": "La mise à jour du package Marketplace [%s] a échoué, veuillez réessayer plus tard",
+    "239": "Les opérations associées sont en cours de traitement, veuillez réessayer plus tard",
+    "240": "Le déplacement du titre sous les blocs conteneurs dans la doc n'est pas pris en charge",
+    "241": "Le glisser vers son sous-titre n'est pas pris en charge"
   }
 }

@@ -263,7 +263,6 @@ func RollbackDocHistory(boxID, historyPath string) (err error) {
 		}
 	}
 
-	util.ReloadUI()
 	FullReindex()
 	IncSync()
 	return nil
@@ -333,9 +332,10 @@ type History struct {
 }
 
 type HistoryItem struct {
-	Title string `json:"title"`
-	Path  string `json:"path"`
-	Op    string `json:"op"`
+	Title    string `json:"title"`
+	Path     string `json:"path"`
+	Op       string `json:"op"`
+	Notebook string `json:"notebook"` // 仅用于文档历史
 }
 
 const fileHistoryPageSize = 32
@@ -600,7 +600,35 @@ const (
 	HistoryOpFormat  = "format"
 	HistoryOpSync    = "sync"
 	HistoryOpReplace = "replace"
+	HistoryOpOutline = "outline"
 )
+
+func generateOpTypeHistory(tree *parse.Tree, opType string) {
+	historyDir, err := GetHistoryDir(opType)
+	if nil != err {
+		logging.LogErrorf("get history dir failed: %s", err)
+		return
+	}
+
+	historyPath := filepath.Join(historyDir, tree.Box, tree.Path)
+	if err = os.MkdirAll(filepath.Dir(historyPath), 0755); nil != err {
+		logging.LogErrorf("generate history failed: %s", err)
+		return
+	}
+
+	var data []byte
+	if data, err = filelock.ReadFile(filepath.Join(util.DataDir, tree.Box, tree.Path)); err != nil {
+		logging.LogErrorf("generate history failed: %s", err)
+		return
+	}
+
+	if err = gulu.File.WriteFileSafer(historyPath, data, 0644); err != nil {
+		logging.LogErrorf("generate history failed: %s", err)
+		return
+	}
+
+	indexHistoryDir(filepath.Base(historyDir), util.NewLute())
+}
 
 func GetHistoryDir(suffix string) (ret string, err error) {
 	return getHistoryDir(suffix, time.Now())
@@ -641,7 +669,7 @@ func fullReindexHistory() {
 	return
 }
 
-var validOps = []string{HistoryOpClean, HistoryOpUpdate, HistoryOpDelete, HistoryOpFormat, HistoryOpSync, HistoryOpReplace}
+var validOps = []string{HistoryOpClean, HistoryOpUpdate, HistoryOpDelete, HistoryOpFormat, HistoryOpSync, HistoryOpReplace, HistoryOpOutline}
 
 const (
 	HistoryTypeDocName = 0 // Search docs by doc name
@@ -738,6 +766,13 @@ func fromSQLHistories(sqlHistories []*sql.History) (ret []*HistoryItem) {
 		}
 		if HistoryTypeAsset == sqlHistory.Type {
 			item.Path = filepath.ToSlash(strings.TrimPrefix(item.Path, util.WorkspaceDir))
+		} else {
+			parts := strings.Split(sqlHistory.Path, "/")
+			if 2 <= len(parts) {
+				item.Notebook = parts[1]
+			} else {
+				logging.LogWarnf("invalid doc history path [%s]", item.Path)
+			}
 		}
 		ret = append(ret, item)
 	}

@@ -55,6 +55,7 @@ import {renderAssetsPreview} from "../asset/renderAssets";
 import {upDownHint} from "../util/upDownHint";
 import {hintRenderAssets} from "../protyle/hint/extend";
 import {Menu} from "../plugin/Menu";
+import {getFirstBlock} from "../protyle/wysiwyg/getBlock";
 
 const renderAssetList = (element: Element, k: string, position: IPosition, exts: string[] = []) => {
     fetchPost("/api/search/searchAsset", {
@@ -603,6 +604,7 @@ export const refMenu = (protyle: IProtyle, element: HTMLElement) => {
         h: 26
     });
     const popoverElement = hasTopClosestByClassName(protyle.element, "block__popover", true);
+    window.siyuan.menus.menu.data = element;
     window.siyuan.menus.menu.element.setAttribute("data-from", popoverElement ? popoverElement.dataset.level + "popover" : "app");
     if (!protyle.disabled) {
         window.siyuan.menus.menu.element.querySelector("input").select();
@@ -834,8 +836,19 @@ export const zoomOut = (options: {
         if (options.focusId) {
             const focusElement = options.protyle.wysiwyg.element.querySelector(`[data-node-id="${options.focusId}"]`);
             if (focusElement) {
-                focusBlock(focusElement);
-                focusElement.scrollIntoView();
+                // 退出聚焦后块在折叠中 https://github.com/siyuan-note/siyuan/issues/10746
+                let showElement = focusElement;
+                while (showElement.getBoundingClientRect().height === 0) {
+                    showElement = showElement.parentElement;
+                }
+                if (showElement.classList.contains("protyle-wysiwyg")) {
+                    // 闪卡退出聚焦元素被隐藏 https://github.com/siyuan-note/siyuan/issues/10058#issuecomment-2029524211
+                    showElement = focusElement.previousElementSibling || focusElement.nextElementSibling;
+                } else {
+                    showElement = getFirstBlock(showElement);
+                }
+                focusBlock(showElement);
+                showElement.scrollIntoView();
             } else if (options.id === options.protyle.block.rootID) { // 聚焦返回后，该块是动态加载的，但是没加载出来
                 fetchPost("/api/filetree/getDoc", {
                     id: options.focusId,

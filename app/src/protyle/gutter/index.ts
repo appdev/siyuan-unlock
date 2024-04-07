@@ -9,7 +9,14 @@ import {getIconByType} from "../../editor/getIcon";
 import {enterBack, iframeMenu, setFold, tableMenu, videoMenu, zoomOut} from "../../menus/protyle";
 import {MenuItem} from "../../menus/Menu";
 import {copySubMenu, openAttr, openWechatNotify} from "../../menus/commonMenuItem";
-import {copyPlainText, isMac, isOnlyMeta, openByMobile, updateHotkeyTip, writeText} from "../util/compatibility";
+import {
+    copyPlainText,
+    isMac,
+    isOnlyMeta,
+    openByMobile,
+    updateHotkeyTip,
+    writeText
+} from "../util/compatibility";
 import {
     transaction,
     turnsIntoOneTransaction,
@@ -47,6 +54,7 @@ import {emitOpenMenu} from "../../plugin/EventBus";
 import {insertAttrViewBlockAnimation} from "../render/av/row";
 import {avContextmenu} from "../render/av/action";
 import {openSearchAV} from "../render/av/relation";
+import {getPlainText} from "../util/paste";
 
 export class Gutter {
     public element: HTMLElement;
@@ -749,10 +757,8 @@ export class Gutter {
             accelerator: window.siyuan.config.keymap.editor.general.copyPlainText.custom,
             click() {
                 let html = "";
-                selectsElement.forEach(item => {
-                    item.querySelectorAll("[spellcheck]").forEach(editItem => {
-                        html += editItem.textContent + "\n";
-                    });
+                selectsElement.forEach((item: HTMLElement) => {
+                    html += getPlainText(item) + "\n";
                 });
                 copyPlainText(html.trimEnd());
                 focusBlock(selectsElement[0]);
@@ -1223,11 +1229,7 @@ export class Gutter {
             label: window.siyuan.languages.copyPlainText,
             accelerator: window.siyuan.config.keymap.editor.general.copyPlainText.custom,
             click() {
-                let text = "";
-                nodeElement.querySelectorAll("[spellcheck]").forEach(item => {
-                    text += item.textContent + "\n";
-                });
-                copyPlainText(text.trimEnd());
+                copyPlainText(getPlainText(nodeElement as HTMLElement).trimEnd());
                 focusBlock(nodeElement);
             }
         }, {
@@ -2139,10 +2141,12 @@ data-type="fold"><svg style="width:10px${fold && fold === "1" ? "" : ";transform
         }
         this.element.style.top = `${Math.max(rect.top, contentTop) + marginHeight}px`;
         let left = rect.left - this.element.clientWidth - space;
-        if ((nodeElement.getAttribute("data-type") === "NodeBlockQueryEmbed" && this.element.childElementCount === 1) ||    // 嵌入块为列表时
-            // 为数据库行
-            element.classList.contains("av__row")) {
+        if ((nodeElement.getAttribute("data-type") === "NodeBlockQueryEmbed" && this.element.childElementCount === 1)) {
+            // 嵌入块为列表时
             left = nodeElement.getBoundingClientRect().left - this.element.clientWidth - space;
+        } else if (element.classList.contains("av__row")) {
+            // 为数据库行
+            left = nodeElement.getBoundingClientRect().left - this.element.clientWidth - space + parseInt(getComputedStyle(nodeElement).paddingLeft);
         }
         this.element.style.left = `${left}px`;
         if (left < this.element.parentElement.getBoundingClientRect().left) {

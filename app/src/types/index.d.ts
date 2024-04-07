@@ -46,6 +46,7 @@ type TOperation =
     | "sortAttrViewView"
     | "setAttrViewPageSize"
     | "updateAttrViewColRelation"
+    | "moveOutlineHeading"
     | "updateAttrViewColRollup"
     | "hideAttrViewName"
 type TBazaarType = "templates" | "icons" | "widgets" | "themes" | "plugins"
@@ -273,7 +274,7 @@ interface ISearchOption {
 interface ISearchType {
     audioBlock: boolean
     videoBlock: boolean
-    iFrameBlock: boolean
+    iframeBlock: boolean
     widgetBlock: boolean
     mathBlock: boolean
     table: boolean
@@ -707,6 +708,7 @@ interface IModels {
 }
 
 interface IMenu {
+    checked?: boolean,
     iconClass?: string,
     label?: string,
     click?: (element: HTMLElement, event: MouseEvent) => boolean | void | Promise<boolean | void>

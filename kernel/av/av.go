@@ -420,7 +420,7 @@ func SaveAttributeView(av *AttributeView) (err error) {
 			}
 
 			if 0 == v.UpdatedAt {
-				v.UpdatedAt = v.CreatedAt
+				v.UpdatedAt = v.CreatedAt + 1000
 			}
 		}
 	}
@@ -521,6 +521,22 @@ func (av *AttributeView) GetCurrentView(viewID string) (ret *View, err error) {
 	}
 	ret = av.Views[0]
 	return
+}
+
+func (av *AttributeView) ExistBlock(blockID string) bool {
+	for _, kv := range av.KeyValues {
+		if KeyTypeBlock != kv.Key.Type {
+			continue
+		}
+
+		for _, v := range kv.Values {
+			if v.BlockID == blockID {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 func (av *AttributeView) GetValue(keyID, blockID string) (ret *Value) {
