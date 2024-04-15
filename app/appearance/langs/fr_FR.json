@@ -1,4 +1,8 @@
 {
+  "unbindBlock": "Dissocier le bloc",
+  "showTitle": "Afficher le titre de la base de données",
+  "fillCreated": "Heure de création de remplissage par défaut",
+  "removeCard": "Supprimer la flashcard",
   "updateLayout": "Mettre à jour la mise en page",
   "dndFolderTip": "Veuillez noter que ${x} insère uniquement le lien hypertexte file:// et ne copie pas le fichier",
   "removeCol": "Êtes-vous sûr de vouloir supprimer la colonne ${x} de la base de données ?",
@@ -98,7 +102,7 @@
   "imported": "Importation terminée",
   "mirrorTip": "Base de données miroir, toutes les mises à jour des données seront synchronisées avec tous les autres miroirs",
   "includeTime": "Inclure l'heure",
-  "accountSupport1": "Depuis sa première version publique le 31 août 2020, SiYuan a été publié 481 fois au total, a répondu aux exigences et aux commentaires des utilisateurs 9 257 fois et a soumis du code 10 189 fois. Nous ne pouvons pas nous passer de votre soutien et de vos commentaires.",
+  "accountSupport1": "Depuis sa première version publique le 31 août 2020, SiYuan a été publié 580 fois au total, a répondu aux exigences et aux commentaires des utilisateurs 10 591 fois et a soumis du code 12 822 fois. Nous ne pouvons pas nous passer de votre soutien et de vos commentaires.",
   "accountSupport2": "Votre soutien et vos retours permettront à SiYuan de se développer et de mieux se développer. Nous serons toujours amis avec les utilisateurs, travaillerons dur pour améliorer les produits et vous offrirons une meilleure expérience de gestion des connaissances. Merci beaucoup pour votre soutient!",
   "goToTab1": "Aller à l'onglet #1",
   "goToTab2": "Aller à l'onglet #2",
@@ -686,6 +690,7 @@
   "syncMode3": "Manuelle Complète (pas de synchronisation au démarrage et à l'arrêt, contrôle manuel complet de la synchronisation et du sens de synchronisation)",
   "cloudSync": "Cloud Sync",
   "cloudSyncDir": "Répertoire de sync cloud",
+  "cloudSyncDirTip": "Les répertoires de synchronisation cloud correspondent un à un aux espaces de travail, ils ne doivent pas être mélangés. Après avoir modifié la clé de référentiel de données, il est nécessaire de remplacer le nouveau répertoire de synchronisation cloud",
   "emptyCloudSyncList": "La liste de sync du cloud est videy",
   "retry": "Réessayer",
   "insertVideoURL": "Insérer lien vidéo",
@@ -741,7 +746,7 @@
   "moveToLeft": "vers la Gauche",
   "moveToRight": "vers la Droite",
   "copyProtocol": "Copier bloc d'hyperliens",
-  "copyProtocolInMd": "Copier bloc d'hyperliens (Markdown)",
+  "copyProtocolInMd": "Copier le lien Markdown du bloc",
   "uploadAssets2CDN": "Transférer les fichiers asset vers le Cloud",
   "uploadAssets2CDNConfirmTip": "Êtes-vous sûr de télécharger les ressources de ce document dans le cloud ?",
   "notSupport1": "Le glisser-déposer entre carnets n'est pas pris en charge",
@@ -989,6 +994,7 @@
   "fileTree19": "Certains systèmes d'exploitation ont des limitations techniques qui peuvent empêcher la copie manuelle des données de l'espace de travail après la création de sous-documents supérieurs à 7 niveaux",
   "fileTree20": "Enregistrer avec une seule ligne",
   "fileTree21": "Après activation, le format JSON sur une seule ligne sera utilisé lors de l'enregistrement des documents .sy et des fichiers .json de base de données, ce qui peut réduire la taille du fichier d'environ 30 % et améliorer l'efficacité de lecture et d'écriture de 50 %",
+  "export10": "Par exemple <code class='fn__code'>&lt;span style=\"color: #fff;background-color: black;padding: 4px;border-radius: 5px;float:right;\"&gt;SiYuan&lt;/span&gt;</code>, s'il est vide, utilisez le texte du filigrane ou le chemin du fichier du filigrane.",
   "export11": "Traitement du contenu des blocs de référence lors de l'exportation",
   "export12": "Gestion du contenu des blocs intégrés lors de l'exportation",
   "export13": "Symbole d'enveloppement du texte d'ancrage",
@@ -1052,6 +1058,7 @@
   "parentRelation": "Parent - Enfant",
   "openInNewTab": "Ouvrir dans un nouvel onglet",
   "help": "Aide",
+  "userGuide": "User Guide",
   "paragraphBeginningSpace": "Deux espaces vides au début du paragraphe",
   "outline": "Outline",
   "newFile": "Nouveau Doc",
@@ -1464,6 +1471,7 @@
     "238": "La mise à jour du package Marketplace [%s] a échoué, veuillez réessayer plus tard",
     "239": "Les opérations associées sont en cours de traitement, veuillez réessayer plus tard",
     "240": "Le déplacement du titre sous les blocs conteneurs dans la doc n'est pas pris en charge",
-    "241": "Le glisser vers son sous-titre n'est pas pris en charge"
+    "241": "Le glisser vers son sous-titre n'est pas pris en charge",
+    "242": "Le bloc de liaison existe déjà dans la base de données actuelle"
   }
 }

@@ -3,20 +3,14 @@ import {
     hasClosestByAttribute,
     hasClosestByClassName,
     hasClosestByMatchTag,
-    hasClosestByTag, hasTopClosestByClassName
+    hasClosestByTag,
+    hasTopClosestByClassName
 } from "../util/hasClosest";
 import {getIconByType} from "../../editor/getIcon";
 import {enterBack, iframeMenu, setFold, tableMenu, videoMenu, zoomOut} from "../../menus/protyle";
 import {MenuItem} from "../../menus/Menu";
 import {copySubMenu, openAttr, openWechatNotify} from "../../menus/commonMenuItem";
-import {
-    copyPlainText,
-    isMac,
-    isOnlyMeta,
-    openByMobile,
-    updateHotkeyTip,
-    writeText
-} from "../util/compatibility";
+import {copyPlainText, isMac, isOnlyMeta, openByMobile, updateHotkeyTip, writeText} from "../util/compatibility";
 import {
     transaction,
     turnsIntoOneTransaction,
@@ -101,10 +95,12 @@ export class Gutter {
             const ghostElement = document.createElement("div");
             ghostElement.className = protyle.wysiwyg.element.className;
             selectElements.forEach(item => {
-                if (item.getAttribute("data-type") === "NodeIFrame") {
+                const type = item.getAttribute("data-type");
+                if (["NodeIFrame", "NodeWidget"].includes(type)) {
                     const embedElement = genEmptyElement();
                     embedElement.classList.add("protyle-wysiwyg--select");
-                    getContenteditableElement(embedElement).innerHTML = "<svg class=\"svg\"><use xlink:href=\"#iconLanguage\"></use></svg> IFrame";
+                    const isIFrame = type === "NodeIFrame";
+                    getContenteditableElement(embedElement).innerHTML = `<svg class="svg"><use xlink:href="#icon${isIFrame ? "Language" : "Both"}"></use></svg> ${isIFrame ? "IFrame" : window.siyuan.languages.widget}`;
                     ghostElement.append(embedElement);
                 } else {
                     ghostElement.append(item.cloneNode(true));
@@ -840,6 +836,7 @@ export class Gutter {
                         srcIDs: sourceIds,
                         avID,
                     }]);
+                    focusBlock(selectsElement[0]);
                 });
             }
         }).element);
@@ -1300,6 +1297,7 @@ export class Gutter {
                             srcIDs: sourceIds,
                             avID,
                         }]);
+                        focusBlock(nodeElement);
                     });
                 }
             }).element);

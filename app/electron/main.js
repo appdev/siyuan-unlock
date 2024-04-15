@@ -785,7 +785,9 @@ app.whenReady().then(() => {
                 event.sender.openDevTools({mode: "bottom"});
                 break;
             case "unregisterGlobalShortcut":
-                globalShortcut.unregister(hotKey2Electron(data.accelerator));
+                if (data.accelerator) {
+                    globalShortcut.unregister(hotKey2Electron(data.accelerator));
+                }
                 break;
             case "show":
                 if (!currentWindow) {
@@ -1190,8 +1192,23 @@ app.whenReady().then(() => {
     });
 });
 
-app.on("open-url", (event, url) => { // for macOS
+app.on("open-url", async (event, url) => { // for macOS
     if (url.startsWith("siyuan://")) {
+        let isBackground = true;
+        if (workspaces.length === 0) {
+            isBackground = false;
+            let index = 0;
+            while (index < 10) {
+                index++;
+                await sleep(500);
+                if (workspaces.length > 0) {
+                    break;
+                }
+            }
+        }
+        if (!isBackground) {
+            await sleep(1500);
+        }
         workspaces.forEach(item => {
             if (item.browserWindow && !item.browserWindow.isDestroyed()) {
                 item.browserWindow.webContents.send("siyuan-open-url", url);

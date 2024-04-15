@@ -144,7 +144,7 @@ func AddVirtualBlockRefExclude(keyword []string) {
 }
 
 func processVirtualRef(n *ast.Node, unlinks *[]*ast.Node, virtualBlockRefKeywords []string, refCount map[string]int, luteEngine *lute.Lute) bool {
-	if !Conf.Editor.VirtualBlockRef {
+	if !Conf.Editor.VirtualBlockRef || 1 > len(virtualBlockRefKeywords) {
 		return false
 	}
 
@@ -153,12 +153,15 @@ func processVirtualRef(n *ast.Node, unlinks *[]*ast.Node, virtualBlockRefKeyword
 	}
 
 	parentBlock := treenode.ParentBlock(n)
-	if nil == parentBlock || 0 < refCount[parentBlock.ID] {
+	if nil == parentBlock {
 		return false
 	}
 
-	if 1 > len(virtualBlockRefKeywords) {
-		return false
+	if 0 < refCount[parentBlock.ID] {
+		// 如果块被引用过，则将其自身的文本排除在虚拟引用关键字之外
+		// Referenced blocks support rendering virtual references https://github.com/siyuan-note/siyuan/issues/10960
+		parentText := getNodeRefText(parentBlock)
+		virtualBlockRefKeywords = gulu.Str.RemoveElem(virtualBlockRefKeywords, parentText)
 	}
 
 	content := string(n.Tokens)
@@ -275,7 +278,7 @@ func prepareMarkKeywords(keywords []string) (ret []string) {
 	ret = gulu.Str.RemoveDuplicatedElem(keywords)
 	var tmp []string
 	for _, k := range ret {
-		if "" != k {
+		if "" != k && "*" != k { // 提及和虚引排除 * Ignore `*` back mentions and virtual references https://github.com/siyuan-note/siyuan/issues/10873
 			tmp = append(tmp, k)
 		}
 	}

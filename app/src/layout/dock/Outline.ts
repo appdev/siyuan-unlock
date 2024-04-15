@@ -48,7 +48,7 @@ export class Outline extends Model {
             msgCallback(data) {
                 if (data) {
                     switch (data.cmd) {
-                        case "transactions":
+                        case "savedoc":
                             this.onTransaction(data);
                             break;
                         case "rename":
@@ -229,15 +229,22 @@ export class Outline extends Model {
     private bindSort() {
         this.element.addEventListener("mousedown", (event: MouseEvent) => {
             const item = hasClosestByClassName(event.target as HTMLElement, "b3-list-item");
-            if (!item || item.tagName !== "LI") {
+            if (!item || item.tagName !== "LI" || this.element.getAttribute("data-loading") === "true") {
                 return;
             }
             const documentSelf = document;
             documentSelf.ondragstart = () => false;
             let ghostElement: HTMLElement;
             let selectItem: HTMLElement;
+            let editor: IProtyle;
+            getAllModels().editor.find(editItem => {
+                if (editItem.editor.protyle.block.rootID === this.blockId) {
+                    editor = editItem.editor.protyle;
+                    return true;
+                }
+            });
             documentSelf.onmousemove = (moveEvent: MouseEvent) => {
-                if (moveEvent.clientY === event.clientY && moveEvent.clientX === event.clientX) {
+                if (!editor || editor.disabled || moveEvent.clientY === event.clientY && moveEvent.clientX === event.clientX) {
                     return;
                 }
                 moveEvent.preventDefault();
@@ -275,55 +282,56 @@ export class Outline extends Model {
                 documentSelf.ondragstart = null;
                 documentSelf.onselectstart = null;
                 documentSelf.onselect = null;
-                ghostElement.remove();
+                ghostElement?.remove();
                 item.style.opacity = "";
                 if (!selectItem) {
                     selectItem = this.element.querySelector(".dragover__top, .dragover__bottom, .dragover");
                 }
-                if (selectItem && selectItem.className.indexOf("dragover") > -1) {
-                    getAllModels().editor.find(editItem => {
-                        if (editItem.editor.protyle.block.rootID === this.blockId) {
-                            let previousID;
-                            let parentID;
-                            const undoPreviousID = (item.previousElementSibling && item.previousElementSibling.tagName === "UL") ? item.previousElementSibling.previousElementSibling.getAttribute("data-node-id") : item.previousElementSibling?.getAttribute("data-node-id");
-                            const undoParentID = item.parentElement.previousElementSibling?.getAttribute("data-node-id");
-                            if (selectItem.classList.contains("dragover")) {
-                                parentID = selectItem.getAttribute("data-node-id");
-                                if (selectItem.nextElementSibling && selectItem.nextElementSibling.tagName === "UL") {
-                                    selectItem.nextElementSibling.insertAdjacentElement("afterbegin", item);
-                                } else {
-                                    selectItem.insertAdjacentHTML("afterend", `<ul>${item.outerHTML}</ul>`);
-                                    item.remove();
-                                }
-                            } else if (selectItem.classList.contains("dragover__top")) {
-                                parentID = selectItem.parentElement.previousElementSibling?.getAttribute("data-node-id");
-                                if (selectItem.previousElementSibling && selectItem.previousElementSibling.tagName === "UL") {
-                                    previousID = selectItem.previousElementSibling.previousElementSibling.getAttribute("data-node-id");
-                                } else {
-                                    previousID = selectItem.previousElementSibling?.getAttribute("data-node-id");
-                                }
-                                if (previousID === item.dataset.nodeId || parentID === item.dataset.nodeId) {
-                                    return true;
-                                }
-                                selectItem.before(item);
-                            } else if (selectItem.classList.contains("dragover__bottom")) {
-                                previousID = selectItem.getAttribute("data-node-id");
-                                selectItem.after(item);
-                            }
-                            transaction(editItem.editor.protyle, [{
-                                action: "moveOutlineHeading",
-                                id: item.dataset.nodeId,
-                                previousID,
-                                parentID,
-                            }], [{
-                                action: "moveOutlineHeading",
-                                id: item.dataset.nodeId,
-                                previousID: undoPreviousID,
-                                parentID: undoParentID,
-                            }]);
+                if (selectItem && selectItem.className.indexOf("dragover") > -1 && editor) {
+                    let previousID;
+                    let parentID;
+                    const undoPreviousID = (item.previousElementSibling && item.previousElementSibling.tagName === "UL") ? item.previousElementSibling.previousElementSibling.getAttribute("data-node-id") : item.previousElementSibling?.getAttribute("data-node-id");
+                    const undoParentID = item.parentElement.previousElementSibling?.getAttribute("data-node-id");
+                    if (selectItem.classList.contains("dragover")) {
+                        parentID = selectItem.getAttribute("data-node-id");
+                        if (selectItem.nextElementSibling && selectItem.nextElementSibling.tagName === "UL") {
+                            selectItem.nextElementSibling.insertAdjacentElement("afterbegin", item);
+                        } else {
+                            selectItem.insertAdjacentHTML("afterend", `<ul>${item.outerHTML}</ul>`);
+                            item.remove();
+                        }
+                    } else if (selectItem.classList.contains("dragover__top")) {
+                        parentID = selectItem.parentElement.previousElementSibling?.getAttribute("data-node-id");
+                        if (selectItem.previousElementSibling && selectItem.previousElementSibling.tagName === "UL") {
+                            previousID = selectItem.previousElementSibling.previousElementSibling.getAttribute("data-node-id");
+                        } else {
+                            previousID = selectItem.previousElementSibling?.getAttribute("data-node-id");
+                        }
+                        if (previousID === item.dataset.nodeId || parentID === item.dataset.nodeId) {
                             return true;
                         }
+                        selectItem.before(item);
+                    } else if (selectItem.classList.contains("dragover__bottom")) {
+                        previousID = selectItem.getAttribute("data-node-id");
+                        selectItem.after(item);
+                    }
+                    this.element.setAttribute("data-loading", "true");
+                    transaction(editor, [{
+                        action: "moveOutlineHeading",
+                        id: item.dataset.nodeId,
+                        previousID,
+                        parentID,
+                    }], [{
+                        action: "moveOutlineHeading",
+                        id: item.dataset.nodeId,
+                        previousID: undoPreviousID,
+                        parentID: undoParentID,
+                    }]);
+                    // https://github.com/siyuan-note/siyuan/issues/10828#issuecomment-2044099675
+                    editor.wysiwyg.element.querySelectorAll('[data-type="NodeHeading"] [contenteditable="true"][spellcheck]').forEach(item => {
+                        item.setAttribute("contenteditable", "false");
                     });
+                    return true;
                 }
                 this.element.querySelectorAll(".dragover__top, .dragover__bottom, .dragover").forEach(item => {
                     item.classList.remove("dragover__top", "dragover__bottom", "dragover");
@@ -353,11 +361,12 @@ export class Outline extends Model {
     }
 
     private onTransaction(data: IWebSocketData) {
-        if (this.isPreview) {
+        if (this.isPreview || data.data.rootID !== this.blockId) {
             return;
         }
         let needReload = false;
-        data.data[0].doOperations.forEach((item: IOperation) => {
+        const ops = data.data.sources[0];
+        ops.doOperations.forEach((item: IOperation) => {
             if ((item.action === "update" || item.action === "insert") &&
                 (item.data.indexOf('data-type="NodeHeading"') > -1 || item.data.indexOf(`<div contenteditable="true" spellcheck="${window.siyuan.config.editor.spellcheck}"><wbr></div>`) > -1)) {
                 needReload = true;
@@ -365,8 +374,8 @@ export class Outline extends Model {
                 needReload = true;
             }
         });
-        if (data.data[0].undoOperations) {
-            data.data[0].undoOperations.forEach((item: IOperation) => {
+        if (ops.undoOperations) {
+            ops.undoOperations.forEach((item: IOperation) => {
                 if (item.action === "update" && item.data.indexOf('data-type="NodeHeading"') > -1) {
                     needReload = true;
                 }
@@ -469,5 +478,6 @@ export class Outline extends Model {
                 currentElement.classList.add("b3-list-item--focus");
             }
         }
+        this.element.removeAttribute("data-loading");
     }
 }

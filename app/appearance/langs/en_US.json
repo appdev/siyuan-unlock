@@ -1,4 +1,8 @@
 {
+  "unbindBlock": "Unbind block",
+  "showTitle": "Show database title",
+  "fillCreated": "Default fill created time",
+  "removeCard": "Remove flashcard",
   "updateLayout": "Update layout",
   "dndFolderTip": "Please note that ${x} only inserts the file:// hyperlink and does not copy the file",
   "removeCol": "Are you sure you want to delete the ${x} column in the database?",
@@ -98,7 +102,7 @@
   "imported": "Import completed",
   "mirrorTip": "Mirror database, all data updates will be synchronized to all other mirrors",
   "includeTime": "Include time",
-  "accountSupport1": "Since its first public release on August 31, 2020, SiYuan has been released a total of 481 times, solved user requirements and feedback 9257 times, and submitted code 10189 times. We cannot do without your support and feedback.",
+  "accountSupport1": "Since its first public release on August 31, 2020, SiYuan has been released a total of 580 times, solved user requirements and feedback 10591 times, and commited code 12822 times. We cannot do without your support and feedback.",
   "accountSupport2": "Your support and feedback will allow SiYuan to develop and develop better. We will always be friends with users, work hard to make products better, and provide you with a better knowledge management experience. Thank you very much for your support!",
   "goToTab1": "Go to tab #1",
   "goToTab2": "Go to tab #2",
@@ -685,7 +689,8 @@
   "syncMode2": "Manual (automatic auto only once when the software is started and closed, other times need to manually trigger)",
   "syncMode3": "Full manual sync (no sync on startup and shutdown, full manual control of sync timing and sync direction)",
   "cloudSync": "Cloud sync",
-  "cloudSyncDir": "Cloud sync dir",
+  "cloudSyncDir": "Cloud sync directory",
+  "cloudSyncDirTip": "The cloud sync directory corresponds one-to-one with the workspace and cannot be mixed. After changing the data repo key, a new cloud sync directory needs to be replaced",
   "emptyCloudSyncList": "The cloud sync list is empty",
   "retry": "Retry",
   "insertVideoURL": "Insert video link",
@@ -741,7 +746,7 @@
   "moveToLeft": "Move Left",
   "moveToRight": "Move Right",
   "copyProtocol": "Copy block hyperlink",
-  "copyProtocolInMd": "Copy block hyperlink (Markdown)",
+  "copyProtocolInMd": "Copy block Markdown link",
   "uploadAssets2CDN": "Upload asset files to cloud",
   "uploadAssets2CDNConfirmTip": "Are you sure to upload the assets in this document to the cloud?",
   "notSupport1": "Does not support drag and drop across notebooks",
@@ -989,6 +994,7 @@
   "fileTree19": "Some operating systems have technical limitations that may prevent manual copying of workspace data after creating sub-documents greater than 7 levels",
   "fileTree20": "Save with a single line",
   "fileTree21": "After enabling, the single-line JSON format will be used when saving .sy docs and database .json files, which can reduce the file size by about 30% and improve read and write efficiency by 50%",
+  "export10": "For example <code class='fn__code'>&lt;span style=\"color: #fff;background-color: black;padding: 4px;border-radius: 5px;float:right;\"&gt;SiYuan&lt;/span&gt;</code>, if empty, use watermark text or watermark file path.",
   "export11": "Content handling method of content ref block when exporting",
   "export12": "Content handling method of content embed block when exporting",
   "export13": "Anchor text wrapping symbol",
@@ -1052,6 +1058,7 @@
   "parentRelation": "Parent - Child",
   "openInNewTab": "Open in New Tab",
   "help": "Help",
+  "userGuide": "User Guide",
   "paragraphBeginningSpace": "Two empty spaces at the beginning of the paragraph",
   "outline": "Outline",
   "newFile": "New Doc",
@@ -1464,6 +1471,7 @@
     "238": "Marketplace package [%s] update failed, please try again later",
     "239": "Related operations are being processed, please try again later",
     "240": "Drag heading under container blocks in the doc is not supported",
-    "241": "Drag to its subheading is not supported"
+    "241": "Drag to its subheading is not supported",
+    "242": "The binding block already exists in the current database"
   }
 }

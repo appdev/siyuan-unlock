@@ -17,13 +17,12 @@ const filterSelectHTML = (key: string, options: { name: string, color: string }[
             selected.push(item.dataset.content);
         });
     }
-    const checkedName = document.querySelector('.av__panel .b3-menu__item--current[data-type="addColOptionOrCell"]')?.getAttribute("data-name") || "";
     if (options) {
         options.forEach(item => {
             if (!key ||
                 (key.toLowerCase().indexOf(item.name.toLowerCase()) > -1 ||
                     item.name.toLowerCase().indexOf(key.toLowerCase()) > -1)) {
-                html += `<button data-type="addColOptionOrCell" class="b3-menu__item${checkedName === item.name ? " b3-menu__item--current" : ""}" data-name="${item.name}" draggable="true" data-color="${item.color}">
+                html += `<button data-type="addColOptionOrCell" class="b3-menu__item" data-name="${item.name}" draggable="true" data-color="${item.color}">
     <svg class="b3-menu__icon fn__grab"><use xlink:href="#iconDrag"></use></svg>
     <div class="fn__flex-1">
         <span class="b3-chip" style="background-color:var(--b3-font-background${item.color});color:var(--b3-font-color${item.color})">
@@ -40,7 +39,6 @@ const filterSelectHTML = (key: string, options: { name: string, color: string }[
         });
     }
     if (!hasMatch && key) {
-        html = html.replace('class="b3-menu__item b3-menu__item--current"', 'class="b3-menu__item"');
         const colorIndex = (options?.length || 0) % 13 + 1;
         html = `<button data-type="addColOptionOrCell" class="b3-menu__item b3-menu__item--current" data-name="${key}" data-color="${colorIndex}">
 <svg class="b3-menu__icon"><use xlink:href="#iconAdd"></use></svg>
@@ -51,12 +49,6 @@ const filterSelectHTML = (key: string, options: { name: string, color: string }[
 </div>
 <span class="b3-menu__accelerator">Enter</span>
 </button>${html}`;
-    } else if (html.indexOf("b3-menu__item--current") === -1) {
-        if (key) {
-            html = html.replace(`class="b3-menu__item" data-name="${key}"`, `class="b3-menu__item b3-menu__item--current" data-name="${key}"`);
-        } else {
-            html = html.replace('class="b3-menu__item"', 'class="b3-menu__item b3-menu__item--current"');
-        }
     }
     return html;
 };
@@ -135,6 +127,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
     if (!menuElement) {
         return;
     }
+    const blockID = blockElement.getAttribute("data-node-id");
     const colId = cellElements ? cellElements[0].dataset.colId : menuElement.querySelector(".b3-menu__item").getAttribute("data-col-id");
     let name = target.parentElement.dataset.name;
     let color = target.parentElement.dataset.color;
@@ -189,7 +182,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
         });
         if (!cellElements) {
             menuElement.innerHTML = getEditHTML({protyle, data, colId, isCustomAttr});
-            bindEditEvent({protyle, data, menuElement, isCustomAttr});
+            bindEditEvent({protyle, data, menuElement, isCustomAttr, blockID});
         } else {
             cellElements.forEach((cellElement: HTMLMediaElement) => {
                 data.view.rows.find(row => {
@@ -267,7 +260,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
                 });
                 if (!cellElements) {
                     menuElement.innerHTML = getEditHTML({protyle, data, colId, isCustomAttr});
-                    bindEditEvent({protyle, data, menuElement, isCustomAttr});
+                    bindEditEvent({protyle, data, menuElement, isCustomAttr, blockID});
                 } else {
                     cellElements.forEach((cellElement: HTMLElement) => {
                         data.view.rows.find(row => {
@@ -346,7 +339,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
                 });
                 if (!cellElements) {
                     menuElement.innerHTML = getEditHTML({protyle, data, colId, isCustomAttr});
-                    bindEditEvent({protyle, data, menuElement, isCustomAttr});
+                    bindEditEvent({protyle, data, menuElement, isCustomAttr, blockID});
                 } else {
                     cellElements.forEach((cellElement: HTMLElement) => {
                         data.view.rows.find(row => {
@@ -422,7 +415,7 @@ export const bindSelectEvent = (protyle: IProtyle, data: IAV, menuElement: HTMLE
         if (event.isComposing) {
             return;
         }
-        let currentElement = upDownHint(listElement, event, "b3-menu__item--current");
+        let currentElement = upDownHint(listElement, event, "b3-menu__item--current", listElement.firstElementChild);
         if (event.key === "Enter") {
             if (!currentElement) {
                 currentElement = menuElement.querySelector(".b3-menu__item--current");

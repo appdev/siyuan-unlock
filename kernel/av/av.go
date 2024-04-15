@@ -91,20 +91,23 @@ type Key struct {
 
 	// 以下是某些列类型的特有属性
 
-	// 单选/多选列
+	// 单选/多选
 	Options []*SelectOption `json:"options,omitempty"` // 选项列表
 
-	// 数字列
+	// 数字
 	NumberFormat NumberFormat `json:"numberFormat"` // 列数字格式化
 
-	// 模板列
+	// 模板
 	Template string `json:"template"` // 模板内容
 
-	// 关联列
+	// 关联
 	Relation *Relation `json:"relation,omitempty"` // 关联信息
 
-	// 汇总列
+	// 汇总
 	Rollup *Rollup `json:"rollup,omitempty"` // 汇总信息
+
+	// 日期
+	Date *Date `json:"date,omitempty"` // 日期设置
 }
 
 func NewKey(id, name, icon string, keyType KeyType) *Key {
@@ -114,6 +117,10 @@ func NewKey(id, name, icon string, keyType KeyType) *Key {
 		Type: keyType,
 		Icon: icon,
 	}
+}
+
+type Date struct {
+	AutoFillNow bool `json:"autoFillNow"` // 是否自动填充当前时间 The database date field supports filling the current time by default https://github.com/siyuan-note/siyuan/issues/10823
 }
 
 type Rollup struct {
@@ -222,9 +229,13 @@ func GetAttributeViewName(avID string) (ret string, err error) {
 		return
 	}
 
+	return GetAttributeViewNameByPath(avJSONPath)
+}
+
+func GetAttributeViewNameByPath(avJSONPath string) (ret string, err error) {
 	data, err := filelock.ReadFile(avJSONPath)
 	if nil != err {
-		logging.LogErrorf("read attribute view [%s] failed: %s", avID, err)
+		logging.LogErrorf("read attribute view [%s] failed: %s", avJSONPath, err)
 		return
 	}
 
@@ -420,7 +431,7 @@ func SaveAttributeView(av *AttributeView) (err error) {
 			}
 
 			if 0 == v.UpdatedAt {
-				v.UpdatedAt = v.CreatedAt + 1000
+				v.UpdatedAt = v.CreatedAt
 			}
 		}
 	}
