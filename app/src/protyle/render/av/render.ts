@@ -4,7 +4,7 @@ import {Constants} from "../../../constants";
 import {addDragFill, renderCell} from "./cell";
 import {unicode2Emoji} from "../../../emoji";
 import {focusBlock} from "../../util/selection";
-import {hasClosestBlock, hasClosestByClassName} from "../../util/hasClosest";
+import {hasClosestBlock, hasClosestByAttribute, hasClosestByClassName} from "../../util/hasClosest";
 import {stickyRow} from "./row";
 import {getCalcValue} from "./calc";
 import {renderAVAttribute} from "./blockAttr";
@@ -129,8 +129,15 @@ style="width: ${column.width || "200px"};">
                     if (pinIndex === index) {
                         tableHTML += "</div>";
                     }
-                    calcHTML += `<div class="av__calc${column.calc && column.calc.operator !== "" ? " av__calc--ashow" : ""}" data-col-id="${column.id}" data-dtype="${column.type}" data-operator="${column.calc?.operator || ""}"  
-style="width: ${index === 0 ? ((parseInt(column.width || "200") + 24) + "px") : (column.width || "200px")}">${getCalcValue(column) || '<svg><use xlink:href="#iconDown"></use></svg>' + window.siyuan.languages.calc}</div>`;
+
+                    // lineNumber type 不参与计算操作
+                    if (column.type === "lineNumber") {
+                        calcHTML += `<div data-col-id="${column.id}" data-dtype="${column.type}" style="display: flex; width: ${column.width || "200px"}">&nbsp;</div>`;
+                    } else {
+                        calcHTML += `<div class="av__calc${column.calc && column.calc.operator !== "" ? " av__calc--ashow" : ""}" data-col-id="${column.id}" data-dtype="${column.type}" data-operator="${column.calc?.operator || ""}" 
+style="width: ${column.width || "200px"}">${getCalcValue(column) || '<svg><use xlink:href="#iconDown"></use></svg>' + window.siyuan.languages.calc}</div>`;
+                    }
+
                     if (pinIndex === index) {
                         calcHTML += "</div>";
                     }
@@ -142,7 +149,7 @@ style="width: ${index === 0 ? ((parseInt(column.width || "200") + 24) + "px") : 
 </div>
 </div>`;
                 // body
-                data.rows.forEach((row: IAVRow) => {
+                data.rows.forEach((row: IAVRow, rowIndex: number) => {
                     tableHTML += `<div class="av__row" data-id="${row.id}">`;
                     if (pinIndex > -1) {
                         tableHTML += '<div class="av__colsticky"><div class="av__firstcol"><svg><use xlink:href="#iconUncheck"></use></svg></div>';
@@ -165,7 +172,7 @@ ${cell.value?.isDetached ? ' data-detached="true"' : ""}
 style="width: ${data.columns[index].width || "200px"};
 ${cell.valueType === "number" ? "text-align: right;" : ""}
 ${cell.bgColor ? `background-color:${cell.bgColor};` : ""}
-${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
+${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex)}</div>`;
 
                         if (pinIndex === index) {
                             tableHTML += "</div>";
@@ -184,8 +191,13 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
                         viewData = item;
                     }
                 });
-
-                e.firstElementChild.outerHTML = `<div class="av__container" style="--av-background:${e.style.backgroundColor || "var(--b3-theme-background)"}">
+                let avBackground = "--av-background:var(--b3-theme-background)";
+                if (e.style.backgroundColor) {
+                    avBackground = "--av-background:" + e.style.backgroundColor;
+                } else if (hasClosestByAttribute(e, "data-type", "NodeBlockQueryEmbed")) {
+                    avBackground = "--av-background:var(--b3-theme-surface)";
+                }
+                e.firstElementChild.outerHTML = `<div class="av__container" style="${avBackground}">
     <div class="av__header">
         <div class="fn__flex av__views${isSearching || query ? " av__views--show" : ""}">
             <div class="layout-tab-bar fn__flex">
@@ -214,7 +226,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
             <span data-type="av-search-icon" class="block__icon">
                 <svg><use xlink:href="#iconSearch"></use></svg>
             </span>
-            <div style="position: relative">
+            <div style="position: relative" class="fn__flex">
                 <input style="${isSearching || query ? "width:128px" : "width:0;padding-left: 0;padding-right: 0;"}" data-type="av-search" class="b3-text-field b3-text-field--text" placeholder="${window.siyuan.languages.search}">
             </div>
             <div class="fn__space"></div>
@@ -229,7 +241,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
             ${response.data.isMirror ? ` <span data-av-id="${response.data.id}" data-popover-url="/api/av/getMirrorDatabaseBlocks" class="popover__block block__icon block__icon--show ariaLabel" aria-label="${window.siyuan.languages.mirrorTip}">
     <svg><use xlink:href="#iconSplitLR"></use></svg></span><div class="fn__space"></div>` : ""}
         </div>
-        <div contenteditable="${protyle.disabled ? "false" : "true"}" spellcheck="${window.siyuan.config.editor.spellcheck.toString()}" class="av__title${viewData.hideAttrViewName ? " av__title--hide" : ""}" data-title="${response.data.name || ""}" data-tip="${window.siyuan.languages.title}">${response.data.name || ""}</div>
+        <div contenteditable="${protyle.disabled ? "false" : "true"}" spellcheck="${window.siyuan.config.editor.spellcheck.toString()}" class="av__title${viewData.hideAttrViewName ? " fn__none" : ""}" data-title="${response.data.name || ""}" data-tip="${window.siyuan.languages.title}">${response.data.name || ""}</div>
         <div class="av__counter fn__none"></div>
     </div>
     <div class="av__scroll">
@@ -254,6 +266,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
             <div class="av__row--footer">${calcHTML}</div>
         </div>
     </div>
+    <div class="av__cursor" contenteditable="true">${Constants.ZWSP}</div>
 </div>`;
                 e.setAttribute("data-render", "true");
                 // 历史兼容
@@ -341,6 +354,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value)}</div>`;
                 addClearButton({
                     inputElement: searchInputElement,
                     right: 0,
+                    width: "1em",
                     height: searchInputElement.clientHeight,
                     clearCB() {
                         viewsElement.classList.remove("av__views--show");
@@ -386,7 +400,7 @@ export const refreshAV = (protyle: IProtyle, operation: IOperation) => {
         if (operation.action === "setAttrViewColWidth") {
             Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-av-id="${operation.avID}"]`)).forEach((item: HTMLElement) => {
                 const cellElement = item.querySelector(`.av__cell[data-col-id="${operation.id}"]`) as HTMLElement;
-                if (!cellElement || cellElement.style.width === operation.data) {
+                if (!cellElement || cellElement.style.width === operation.data || item.getAttribute("custom-sy-av-view") !== operation.keyID) {
                     return;
                 }
                 item.querySelectorAll(".av__row").forEach(rowItem => {

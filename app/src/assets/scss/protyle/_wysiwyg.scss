@@ -459,7 +459,7 @@
 
   &--hl,
   &--hl .hljs {
-    transition: var(--b3-transition);
+    transition: var(--b3-background-transition);
     background-color: var(--b3-theme-primary-lightest) !important;
   }
 
@@ -635,7 +635,8 @@
 }
 
 .protyle-wysiwyg:not([contenteditable]),
-.protyle-wysiwyg[data-readonly="true"] {
+.protyle-wysiwyg[data-readonly="true"],
+.protyle-wysiwyg__embed {
   .img:hover .protyle-icons {
     display: none;
   }

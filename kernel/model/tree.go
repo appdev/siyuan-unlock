@@ -162,7 +162,7 @@ func LoadTreeByBlockIDWithReindex(id string) (ret *parse.Tree, err error) {
 
 	bt := treenode.GetBlockTree(id)
 	if nil == bt {
-		if task.Contain(task.DatabaseIndex, task.DatabaseIndexFull) {
+		if task.ContainIndexTask() {
 			err = ErrIndexing
 			return
 		}
@@ -187,7 +187,7 @@ func LoadTreeByBlockID(id string) (ret *parse.Tree, err error) {
 
 	bt := treenode.GetBlockTree(id)
 	if nil == bt {
-		if task.Contain(task.DatabaseIndex, task.DatabaseIndexFull) {
+		if task.ContainIndexTask() {
 			err = ErrIndexing
 			return
 		}
@@ -244,6 +244,11 @@ func searchTreeInFilesystem(rootID string) {
 	treePath = strings.TrimPrefix(treePath, string(os.PathSeparator))
 	treePath = strings.TrimPrefix(treePath, boxID)
 	treePath = filepath.ToSlash(treePath)
+	if nil == Conf.Box(boxID) {
+		logging.LogInfof("box [%s] not found", boxID)
+		// 如果笔记本不存在或者已经关闭，则不处理 https://github.com/siyuan-note/siyuan/issues/11149
+		return
+	}
 
 	tree, err := filesys.LoadTree(boxID, treePath, util.NewLute())
 	if nil != err {

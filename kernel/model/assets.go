@@ -32,12 +32,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/88250/go-humanize"
 	"github.com/88250/gulu"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/editor"
 	"github.com/88250/lute/html"
 	"github.com/88250/lute/parse"
-	"github.com/dustin/go-humanize"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/imroc/req/v3"
 	"github.com/siyuan-note/filelock"
@@ -235,7 +235,7 @@ func NetImg2LocalAssets(rootID, originalURL string) (err error) {
 	})
 	if 0 < files {
 		util.PushUpdateMsg(msgId, Conf.Language(113), 7000)
-		if err = writeJSONQueue(tree); nil != err {
+		if err = writeTreeUpsertQueue(tree); nil != err {
 			return
 		}
 		util.PushUpdateMsg(msgId, fmt.Sprintf(Conf.Language(120), files), 5000)
@@ -422,7 +422,7 @@ func NetAssets2LocalAssets(rootID string) (err error) {
 
 	if 0 < files {
 		util.PushUpdateMsg(msgId, Conf.Language(113), 7000)
-		if err = writeJSONQueue(tree); nil != err {
+		if err = writeTreeUpsertQueue(tree); nil != err {
 			return
 		}
 		util.PushUpdateMsg(msgId, fmt.Sprintf(Conf.Language(120), files), 5000)

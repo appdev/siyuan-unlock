@@ -15,7 +15,19 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const {
-    net, app, BrowserWindow, shell, Menu, screen, ipcMain, globalShortcut, Tray, dialog, systemPreferences, powerMonitor
+    net,
+    app,
+    BrowserWindow,
+    shell,
+    Menu,
+    MenuItem,
+    screen,
+    ipcMain,
+    globalShortcut,
+    Tray,
+    dialog,
+    systemPreferences,
+    powerMonitor
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -51,6 +63,17 @@ try {
     require("electron").dialog.showErrorBox("创建配置目录失败 Failed to create config directory", "思源需要在用户家目录下创建配置文件夹（~/.config/siyuan），请确保该路径具有写入权限。\n\nSiYuan needs to create a configuration folder (~/.config/siyuan) in the user's home directory. Please make sure that the path has write permissions.");
     app.exit();
 }
+
+const windowNavigate = (currentWindow) => {
+    currentWindow.webContents.on("will-navigate", (event) => {
+        const url = event.url;
+        if (url.startsWith(localServer)) {
+            return;
+        }
+        event.preventDefault();
+        shell.openExternal(url);
+    });
+};
 
 const setProxy = (proxyURL, webContents) => {
     if (proxyURL.startsWith("://")) {
@@ -207,7 +230,12 @@ const writeLog = (out) => {
     }
 };
 
-const boot = () => {
+let openAsHidden = false;
+const isOpenAsHidden = function () {
+    return 1 === workspaces.length && openAsHidden;
+};
+
+const initMainWindow = () => {
     let windowStateInitialized = true;
     // 恢复主窗体状态
     let oldWindowState = {};
@@ -359,11 +387,15 @@ const boot = () => {
 
     // 主界面事件监听
     currentWindow.once("ready-to-show", () => {
-        currentWindow.show();
-        if (windowState.isMaximized) {
-            currentWindow.maximize();
+        if (isOpenAsHidden()) {
+            currentWindow.minimize();
         } else {
-            currentWindow.unmaximize();
+            currentWindow.show();
+            if (windowState.isMaximized) {
+                currentWindow.maximize();
+            } else {
+                currentWindow.unmaximize();
+            }
         }
         if (bootWindow && !bootWindow.isDestroyed()) {
             bootWindow.destroy();
@@ -381,10 +413,8 @@ const boot = () => {
             label: `Quit ${productName}`, role: "quit",
         },],
     }, {
-        role: "editMenu",
-        submenu: [{role: "cut"}, {role: "copy"}, {role: "paste"}, {
-            role: "pasteAndMatchStyle",
-            accelerator: "CmdOrCtrl+Shift+C"
+        role: "editMenu", submenu: [{role: "cut"}, {role: "copy"}, {role: "paste"}, {
+            role: "pasteAndMatchStyle", accelerator: "CmdOrCtrl+Shift+C"
         }, {role: "selectAll"},],
     }, {
         role: "windowMenu",
@@ -393,15 +423,7 @@ const boot = () => {
     const menu = Menu.buildFromTemplate(template);
     Menu.setApplicationMenu(menu);
     // 当前页面链接使用浏览器打开
-    currentWindow.webContents.on("will-navigate", (event) => {
-        const url = event.url;
-        if (url.startsWith(localServer)) {
-            return;
-        }
-        event.preventDefault();
-        shell.openExternal(url);
-    });
-
+    windowNavigate(currentWindow);
     currentWindow.on("close", (event) => {
         if (currentWindow && !currentWindow.isDestroyed()) {
             currentWindow.webContents.send("siyuan-save-close", false);
@@ -427,10 +449,12 @@ const showWindow = (wnd) => {
 const initKernel = (workspace, port, lang) => {
     return new Promise(async (resolve) => {
         bootWindow = new BrowserWindow({
+            show: false,
             width: Math.floor(screen.getPrimaryDisplay().size.width / 2),
             height: Math.floor(screen.getPrimaryDisplay().workAreaSize.height / 2),
             frame: false,
             backgroundColor: "#1e1e1e",
+            resizable: false,
             icon: path.join(appDir, "stage", "icon-large.png"),
         });
         let bootIndex = path.join(appDir, "app", "electron", "boot.html");
@@ -438,7 +462,11 @@ const initKernel = (workspace, port, lang) => {
             bootIndex = path.join(appDir, "electron", "boot.html");
         }
         bootWindow.loadFile(bootIndex, {query: {v: appVer}});
-        bootWindow.show();
+        if (openAsHidden) {
+            bootWindow.minimize();
+        } else {
+            bootWindow.show();
+        }
 
         const kernelName = "win32" === process.platform ? "SiYuan-Kernel.exe" : "SiYuan-Kernel";
         const kernelPath = path.join(appDir, "kernel", kernelName);
@@ -546,9 +574,7 @@ const initKernel = (workspace, port, lang) => {
             try {
                 const apiResult = await net.fetch(getServer() + "/api/system/version");
                 apiData = await apiResult.json();
-                bootWindow.setResizable(false);
                 bootWindow.loadURL(getServer() + "/appearance/boot/index.html");
-                bootWindow.show();
                 break;
             } catch (e) {
                 writeLog("get kernel version failed: " + e.message);
@@ -612,10 +638,15 @@ let argStart = 1;
 if (!app.isPackaged) {
     argStart = 2;
 }
+
 for (let i = argStart; i < process.argv.length; i++) {
     let arg = process.argv[i];
-    if (arg.startsWith("--workspace=") || arg.startsWith("--port=") || arg.startsWith("siyuan://")) {
+    if (arg.startsWith("--workspace=") || arg.startsWith("--openAsHidden") || arg.startsWith("--port=") || arg.startsWith("siyuan://")) {
         // 跳过内置参数
+        if (arg.startsWith("--openAsHidden")) {
+            openAsHidden = true;
+            writeLog("open as hidden");
+        }
         continue;
     }
 
@@ -677,7 +708,27 @@ app.whenReady().then(() => {
     const getWindowByContentId = (id) => {
         return BrowserWindow.getAllWindows().find((win) => win.webContents.id === id);
     };
-
+    ipcMain.on("siyuan-context-menu", (event, langs) => {
+        const template = [new MenuItem({
+            role: "undo", label: langs.undo
+        }), new MenuItem({
+            role: "redo", label: langs.redo
+        }), {type: "separator"}, new MenuItem({
+            role: "copy", label: langs.copy
+        }), new MenuItem({
+            role: "cut", label: langs.cut
+        }), new MenuItem({
+            role: "delete", label: langs.delete
+        }), new MenuItem({
+            role: "paste", label: langs.paste
+        }), new MenuItem({
+            role: "pasteAndMatchStyle", label: langs.pasteAsPlainText
+        }), new MenuItem({
+            role: "selectAll", label: langs.selectAll
+        })];
+        const menu = Menu.buildFromTemplate(template);
+        menu.popup({window: BrowserWindow.fromWebContents(event.sender)});
+    });
     ipcMain.on("siyuan-open-folder", (event, filePath) => {
         shell.showItemInFolder(filePath);
     });
@@ -856,6 +907,9 @@ app.whenReady().then(() => {
                 }
                 currentWindow.destroy();
                 break;
+            case "writeLog":
+                writeLog(data.msg);
+                break;
             case "closeButtonBehavior":
                 if (!currentWindow) {
                     return;
@@ -884,8 +938,7 @@ app.whenReady().then(() => {
     });
     ipcMain.on("siyuan-export-pdf", (event, data) => {
         dialog.showOpenDialog({
-            title: data.title,
-            properties: ["createDirectory", "openDirectory"],
+            title: data.title, properties: ["createDirectory", "openDirectory"],
         }).then((result) => {
             if (result.canceled) {
                 event.sender.destroy();
@@ -919,13 +972,7 @@ app.whenReady().then(() => {
         printWin.center();
         printWin.webContents.userAgent = "SiYuan/" + appVer + " https://b3log.org/siyuan Electron " + printWin.webContents.userAgent;
         printWin.loadURL(data);
-        printWin.webContents.on("will-navigate", (nEvent) => {
-            nEvent.preventDefault();
-            if (nEvent.url.startsWith(localServer)) {
-                return;
-            }
-            shell.openExternal(nEvent.url);
-        });
+        windowNavigate(printWin);
     });
     ipcMain.on("siyuan-quit", (event, port) => {
         exitApp(port);
@@ -963,6 +1010,7 @@ app.whenReady().then(() => {
         win.webContents.userAgent = "SiYuan/" + appVer + " https://b3log.org/siyuan Electron " + win.webContents.userAgent;
         win.webContents.session.setSpellCheckerLanguages(["en-US"]);
         win.loadURL(data.url);
+        windowNavigate(win);
         win.on("close", (event) => {
             if (win && !win.isDestroyed()) {
                 win.webContents.send("siyuan-save-close");
@@ -984,7 +1032,7 @@ app.whenReady().then(() => {
         if (!foundWorkspace) {
             initKernel(data.workspace, "", "").then((isSucc) => {
                 if (isSucc) {
-                    boot();
+                    initMainWindow();
                 }
             });
         }
@@ -1080,7 +1128,10 @@ app.whenReady().then(() => {
         });
     });
     ipcMain.on("siyuan-auto-launch", (event, data) => {
-        app.setLoginItemSettings({openAtLogin: data.openAtLogin});
+        app.setLoginItemSettings({
+            openAtLogin: data.openAtLogin,
+            args: data.openAsHidden ? ["--openAsHidden"] : ""
+        });
     });
 
     if (firstOpen) {
@@ -1114,7 +1165,7 @@ app.whenReady().then(() => {
         ipcMain.on("siyuan-first-init", (event, data) => {
             initKernel(data.workspace, "", data.lang).then((isSucc) => {
                 if (isSucc) {
-                    boot();
+                    initMainWindow();
                 }
             });
             firstOpenWindow.destroy();
@@ -1138,7 +1189,7 @@ app.whenReady().then(() => {
         }
         initKernel(workspace, port, "").then((isSucc) => {
             if (isSucc) {
-                boot();
+                initMainWindow();
             }
         });
     }
@@ -1245,7 +1296,7 @@ app.on("second-instance", (event, argv) => {
     if (workspace) {
         initKernel(workspace, port, "").then((isSucc) => {
             if (isSucc) {
-                boot();
+                initMainWindow();
             }
         });
         return;
@@ -1271,7 +1322,7 @@ app.on("activate", () => {
         }
     }
     if (BrowserWindow.getAllWindows().length === 0) {
-        boot();
+        initMainWindow();
     }
 });
 

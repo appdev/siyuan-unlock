@@ -36,10 +36,10 @@ const updateTitle = (rootID: string, tab: Tab, protyle?: IProtyle) => {
 };
 
 export const reloadSync = (app: App, data: { upsertRootIDs: string[], removeRootIDs: string[] }, hideMsg = true) => {
-   if (hideMsg) {
-       hideMessage();
-   }
-   /// #if MOBILE
+    if (hideMsg) {
+        hideMessage();
+    }
+    /// #if MOBILE
     if (window.siyuan.mobile.popEditor) {
         if (data.removeRootIDs.includes(window.siyuan.mobile.popEditor.protyle.block.rootID)) {
             hideElements(["dialog"]);
@@ -278,23 +278,32 @@ export const transactionError = () => {
     });
 };
 
+let statusTimeout: number;
 export const progressStatus = (data: IWebSocketData) => {
     const statusElement = document.querySelector("#status") as HTMLElement;
     if (!statusElement) {
         return;
     }
+
     if (isMobile()) {
         if (!document.querySelector("#keyboardToolbar").classList.contains("fn__none")) {
             return;
         }
+        clearTimeout(statusTimeout);
         statusElement.innerHTML = data.msg;
-        statusElement.classList.remove("status--hide");
         statusElement.style.bottom = "0";
-        return;
-    }
-    const msgElement = statusElement.querySelector(".status__msg");
-    if (msgElement) {
-        msgElement.innerHTML = data.msg;
+        statusTimeout = window.setTimeout(() => {
+            statusElement.style.bottom = "";
+        }, 7000);
+    } else {
+        const msgElement = statusElement.querySelector(".status__msg");
+        if (msgElement) {
+            clearTimeout(statusTimeout);
+            msgElement.innerHTML = data.msg;
+            statusTimeout = window.setTimeout(() => {
+                msgElement.innerHTML = "";
+            }, 7000);
+        }
     }
 };
 

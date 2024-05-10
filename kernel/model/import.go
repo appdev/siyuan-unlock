@@ -33,6 +33,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -549,7 +550,7 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 		}
 
 		treenode.IndexBlockTree(tree)
-		sql.UpsertTreeQueue(tree)
+		sql.IndexTreeQueue(tree)
 	}
 
 	IncSync()
@@ -894,7 +895,7 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 		buildBlockRefInText()
 
 		for i, tree := range importTrees {
-			indexWriteJSONQueue(tree)
+			indexWriteTreeIndexQueue(tree)
 			if 0 == i%4 {
 				util.PushEndlessProgress(fmt.Sprintf(Conf.Language(66), fmt.Sprintf("%d/%d ", i, len(importTrees))+tree.HPath))
 			}
@@ -927,8 +928,11 @@ func processBase64Img(n *ast.Node, dest string, assetDirPath string, err error) 
 	os.MkdirAll(base64TmpDir, 0755)
 
 	sep := strings.Index(dest, ";base64,")
+	str := strings.TrimSpace(dest[sep+8:])
+	re := regexp.MustCompile(`(?i)%0A`)
+	str = re.ReplaceAllString(str, "\n")
 	var decodeErr error
-	unbased, decodeErr := base64.StdEncoding.DecodeString(dest[sep+8:])
+	unbased, decodeErr := base64.StdEncoding.DecodeString(str)
 	if nil != decodeErr {
 		logging.LogErrorf("decode base64 image failed: %s", decodeErr)
 		return
@@ -1193,6 +1197,10 @@ func convertWikiLinksAndTags0(tree *parse.Tree) {
 }
 
 func convertTags(text string) (ret string) {
+	if !util.MarkdownSettings.InlineTag {
+		return text
+	}
+
 	pos, i := -1, 0
 	tokens := []byte(text)
 	for ; i < len(tokens); i++ {

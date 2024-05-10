@@ -26,12 +26,17 @@ export const reloadProtyle = (protyle: IProtyle, focus: boolean) => {
     }
     protyle.lute.SetProtyleMarkNetImg(window.siyuan.config.editor.displayNetImgMark);
     protyle.lute.SetSpellcheck(window.siyuan.config.editor.spellcheck);
+    protyle.lute.SetSup(window.siyuan.config.editor.markdown.inlineSup);
+    protyle.lute.SetSub(window.siyuan.config.editor.markdown.inlineSub);
+    protyle.lute.SetTag(window.siyuan.config.editor.markdown.inlineTag);
+    protyle.lute.SetInlineMath(window.siyuan.config.editor.markdown.inlineMath);
+    protyle.lute.SetGFMStrikethrough1(false);
     addLoading(protyle);
     if (protyle.options.backlinkData) {
         const isMention = protyle.element.getAttribute("data-ismention") === "true";
         const tabElement = hasClosestByClassName(protyle.element, "sy__backlink");
         if (tabElement) {
-            const inputsElement = tabElement.querySelectorAll(".b3-form__icon-input") as NodeListOf<HTMLInputElement>;
+            const inputsElement = tabElement.querySelectorAll(".b3-text-field") as NodeListOf<HTMLInputElement>;
             fetchPost(isMention ? "/api/ref/getBackmentionDoc" : "/api/ref/getBacklinkDoc", {
                 defID: protyle.element.getAttribute("data-defid"),
                 refTreeID: protyle.block.rootID,

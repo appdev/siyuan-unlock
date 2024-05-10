@@ -17,7 +17,6 @@
 package bazaar
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -25,9 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dustin/go-humanize"
+	"github.com/88250/go-humanize"
 	"github.com/panjf2000/ants/v2"
-	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/httpclient"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/util"
@@ -52,6 +50,13 @@ func Templates() (templates []*Template) {
 
 		repo := arg.(*StageRepo)
 		repoURL := repo.URL
+
+		if pkg, found := packageCache.Get(repoURL); found {
+			lock.Lock()
+			templates = append(templates, pkg.(*Template))
+			lock.Unlock()
+			return
+		}
 
 		template := &Template{}
 		innerU := util.BazaarOSSServer + "/package/" + repoURL + "/template.json"
@@ -84,7 +89,10 @@ func Templates() (templates []*Template) {
 		template.Stars = repo.Stars
 		template.OpenIssues = repo.OpenIssues
 		template.Size = repo.Size
-		template.HSize = humanize.Bytes(uint64(template.Size))
+		template.HSize = humanize.BytesCustomCeil(uint64(template.Size), 2)
+		template.InstallSize = repo.InstallSize
+		template.HInstallSize = humanize.BytesCustomCeil(uint64(template.InstallSize), 2)
+		packageInstallSizeCache.SetDefault(template.RepoURL, template.InstallSize)
 		template.HUpdated = formatUpdated(template.Updated)
 		pkg := bazaarIndex[strings.Split(repoURL, "@")[0]]
 		if nil != pkg {
@@ -93,6 +101,8 @@ func Templates() (templates []*Template) {
 		lock.Lock()
 		templates = append(templates, template)
 		lock.Unlock()
+
+		packageCache.SetDefault(repoURL, template)
 	})
 	for _, repo := range stageIndex.Repos {
 		waitGroup.Add(1)
@@ -150,9 +160,14 @@ func InstalledTemplates() (ret []*Template) {
 			continue
 		}
 		template.HInstallDate = info.ModTime().Format("2006-01-02")
-		installSize, _ := util.SizeOfDirectory(installPath)
-		template.InstallSize = installSize
-		template.HInstallSize = humanize.Bytes(uint64(installSize))
+		if installSize, ok := packageInstallSizeCache.Get(template.RepoURL); ok {
+			template.InstallSize = installSize.(int64)
+		} else {
+			is, _ := util.SizeOfDirectory(installPath)
+			template.InstallSize = is
+			packageInstallSizeCache.SetDefault(template.RepoURL, is)
+		}
+		template.HInstallSize = humanize.BytesCustomCeil(uint64(template.InstallSize), 2)
 		readmeFilename := getPreferredReadme(template.Readme)
 		readme, readErr := os.ReadFile(filepath.Join(installPath, readmeFilename))
 		if nil != readErr {
@@ -173,15 +188,11 @@ func InstallTemplate(repoURL, repoHash, installPath string, systemID string) err
 	if nil != err {
 		return err
 	}
-	return installPackage(data, installPath)
+	return installPackage(data, installPath, repoURLHash)
 }
 
 func UninstallTemplate(installPath string) error {
-	if err := filelock.Remove(installPath); nil != err {
-		logging.LogErrorf("remove template [%s] failed: %s", installPath, err)
-		return errors.New("remove community template failed")
-	}
-	return nil
+	return uninstallPackage(installPath)
 }
 
 func filterLegacyTemplates(templates []*Template) (ret []*Template) {

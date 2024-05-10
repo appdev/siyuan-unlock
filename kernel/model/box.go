@@ -28,11 +28,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/88250/go-humanize"
 	"github.com/88250/gulu"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/html"
 	"github.com/88250/lute/parse"
-	"github.com/dustin/go-humanize"
 	"github.com/facette/natsort"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
@@ -73,7 +73,7 @@ func StatJob() {
 	Conf.m.Unlock()
 	Conf.Save()
 
-	logging.LogInfof("auto stat [trees=%d, blocks=%d, dataSize=%s, assetsSize=%s]", Conf.Stat.TreeCount, Conf.Stat.BlockCount, humanize.Bytes(uint64(Conf.Stat.DataSize)), humanize.Bytes(uint64(Conf.Stat.AssetsSize)))
+	logging.LogInfof("auto stat [trees=%d, blocks=%d, dataSize=%s, assetsSize=%s]", Conf.Stat.TreeCount, Conf.Stat.BlockCount, humanize.BytesCustomCeil(uint64(Conf.Stat.DataSize), 2), humanize.BytesCustomCeil(uint64(Conf.Stat.AssetsSize), 2))
 
 	// 桌面端检查磁盘可用空间 https://github.com/siyuan-note/siyuan/issues/6873
 	if util.ContainerStd != util.Container {
@@ -458,7 +458,7 @@ func genTreeID(tree *parse.Tree) {
 
 		if "" == n.IALAttr("id") && (ast.NodeParagraph == n.Type || ast.NodeList == n.Type || ast.NodeListItem == n.Type || ast.NodeBlockquote == n.Type ||
 			ast.NodeMathBlock == n.Type || ast.NodeCodeBlock == n.Type || ast.NodeHeading == n.Type || ast.NodeTable == n.Type || ast.NodeThematicBreak == n.Type ||
-			ast.NodeYamlFrontMatter == n.Type || ast.NodeBlockQueryEmbed == n.Type || ast.NodeSuperBlock == n.Type ||
+			ast.NodeYamlFrontMatter == n.Type || ast.NodeBlockQueryEmbed == n.Type || ast.NodeSuperBlock == n.Type || ast.NodeAttributeView == n.Type ||
 			ast.NodeHTMLBlock == n.Type || ast.NodeIFrame == n.Type || ast.NodeWidget == n.Type || ast.NodeAudio == n.Type || ast.NodeVideo == n.Type) {
 			n.ID = ast.NewNodeID()
 			n.KramdownIAL = [][]string{{"id", n.ID}}
@@ -506,14 +506,15 @@ func FullReindex() {
 }
 
 func fullReindex() {
-	util.PushMsg(Conf.Language(35), 7*1000)
+	util.PushEndlessProgress(Conf.language(35))
+	defer util.PushClearProgress()
+
 	WaitForWritingFiles()
 
 	if err := sql.InitDatabase(true); nil != err {
 		os.Exit(logging.ExitCodeReadOnlyDatabase)
 		return
 	}
-	treenode.InitBlockTree(true)
 
 	sql.IndexIgnoreCached = false
 	openedBoxes := Conf.GetOpenedBoxes()

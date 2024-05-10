@@ -157,7 +157,7 @@ export class BlockPanel {
                 action.push(Constants.CB_GET_ALL);
             } else {
                 action.push(Constants.CB_GET_CONTEXT);
-                action.push(Constants.CB_GET_HL);
+                // 不需要高亮 https://github.com/siyuan-note/siyuan/issues/11160#issuecomment-2084652764
             }
 
             if (this.isBacklink) {
@@ -265,6 +265,9 @@ export class BlockPanel {
         this.element.querySelectorAll(".block__edit").forEach((item: HTMLElement, index) => {
             if (index < 5) {
                 this.initProtyle(item, index === 0 ? () => {
+                    if (!document.contains(this.element)) {
+                        return;
+                    }
                     let targetRect;
                     if (this.targetElement && this.targetElement.classList.contains("protyle-wysiwyg__embed")) {
                         targetRect = this.targetElement.getBoundingClientRect();

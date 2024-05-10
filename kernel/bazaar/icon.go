@@ -17,14 +17,13 @@
 package bazaar
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 
-	"github.com/dustin/go-humanize"
+	"github.com/88250/go-humanize"
 	ants "github.com/panjf2000/ants/v2"
 	"github.com/siyuan-note/httpclient"
 	"github.com/siyuan-note/logging"
@@ -50,6 +49,13 @@ func Icons() (icons []*Icon) {
 
 		repo := arg.(*StageRepo)
 		repoURL := repo.URL
+
+		if pkg, found := packageCache.Get(repoURL); found {
+			lock.Lock()
+			icons = append(icons, pkg.(*Icon))
+			lock.Unlock()
+			return
+		}
 
 		icon := &Icon{}
 		innerU := util.BazaarOSSServer + "/package/" + repoURL + "/icon.json"
@@ -82,7 +88,10 @@ func Icons() (icons []*Icon) {
 		icon.Stars = repo.Stars
 		icon.OpenIssues = repo.OpenIssues
 		icon.Size = repo.Size
-		icon.HSize = humanize.Bytes(uint64(icon.Size))
+		icon.HSize = humanize.BytesCustomCeil(uint64(icon.Size), 2)
+		icon.InstallSize = repo.InstallSize
+		icon.HInstallSize = humanize.BytesCustomCeil(uint64(icon.InstallSize), 2)
+		packageInstallSizeCache.SetDefault(icon.RepoURL, icon.InstallSize)
 		icon.HUpdated = formatUpdated(icon.Updated)
 		pkg := bazaarIndex[strings.Split(repoURL, "@")[0]]
 		if nil != pkg {
@@ -91,6 +100,8 @@ func Icons() (icons []*Icon) {
 		lock.Lock()
 		icons = append(icons, icon)
 		lock.Unlock()
+
+		packageCache.SetDefault(repoURL, icon)
 	})
 	for _, repo := range stageIndex.Repos {
 		waitGroup.Add(1)
@@ -148,9 +159,14 @@ func InstalledIcons() (ret []*Icon) {
 			continue
 		}
 		icon.HInstallDate = info.ModTime().Format("2006-01-02")
-		installSize, _ := util.SizeOfDirectory(installPath)
-		icon.InstallSize = installSize
-		icon.HInstallSize = humanize.Bytes(uint64(installSize))
+		if installSize, ok := packageInstallSizeCache.Get(icon.RepoURL); ok {
+			icon.InstallSize = installSize.(int64)
+		} else {
+			is, _ := util.SizeOfDirectory(installPath)
+			icon.InstallSize = is
+			packageInstallSizeCache.SetDefault(icon.RepoURL, is)
+		}
+		icon.HInstallSize = humanize.BytesCustomCeil(uint64(icon.InstallSize), 2)
 		readmeFilename := getPreferredReadme(icon.Readme)
 		readme, readErr := os.ReadFile(filepath.Join(installPath, readmeFilename))
 		if nil != readErr {
@@ -175,14 +191,9 @@ func InstallIcon(repoURL, repoHash, installPath string, systemID string) error {
 	if nil != err {
 		return err
 	}
-	return installPackage(data, installPath)
+	return installPackage(data, installPath, repoURLHash)
 }
 
 func UninstallIcon(installPath string) error {
-	if err := os.RemoveAll(installPath); nil != err {
-		logging.LogErrorf("remove icon [%s] failed: %s", installPath, err)
-		return errors.New("remove community icon failed")
-	}
-	//logging.Logger.Infof("uninstalled icon [%s]", installPath)
-	return nil
+	return uninstallPackage(installPath)
 }

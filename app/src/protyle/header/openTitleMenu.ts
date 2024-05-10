@@ -21,8 +21,7 @@ import {openDocHistory} from "../../history/doc";
 import {openNewWindowById} from "../../window/openNewWindow";
 import {genImportMenu} from "../../menus/navigation";
 import {transferBlockRef} from "../../menus/block";
-import {openSearchAV} from "../render/av/relation";
-import {transaction} from "../wysiwyg/transaction";
+import {addEditorToDatabase} from "../render/av/addToDatabase";
 
 export const openTitleMenu = (protyle: IProtyle, position: IPosition) => {
     hideTooltip();
@@ -44,31 +43,13 @@ export const openTitleMenu = (protyle: IProtyle, position: IPosition) => {
         }).element);
         if (!protyle.disabled) {
             window.siyuan.menus.menu.append(movePathToMenu([protyle.path]));
+            const range = getSelection().rangeCount > 0 ? getSelection().getRangeAt(0) : undefined;
             window.siyuan.menus.menu.append(new MenuItem({
                 label: window.siyuan.languages.addToDatabase,
                 accelerator: window.siyuan.config.keymap.general.addToDatabase.custom,
                 icon: "iconDatabase",
                 click: () => {
-                    openSearchAV("", protyle.breadcrumb.element, (listItemElement) => {
-                        const sourceIds: string[] = [response.data.rootID];
-                        const avID = listItemElement.dataset.avId;
-                        transaction(protyle, [{
-                            action: "insertAttrViewBlock",
-                            avID,
-                            ignoreFillFilter: true,
-                            srcIDs: sourceIds,
-                            isDetached: false,
-                            blockID: listItemElement.dataset.nodeId
-                        }, {
-                            action: "doUpdateUpdated",
-                            id: listItemElement.dataset.nodeId,
-                            data: dayjs().format("YYYYMMDDHHmmss"),
-                        }], [{
-                            action: "removeAttrViewBlock",
-                            srcIDs: sourceIds,
-                            avID,
-                        }]);
-                    });
+                    addEditorToDatabase(protyle, range, "title");
                 }
             }).element);
             window.siyuan.menus.menu.append(new MenuItem({

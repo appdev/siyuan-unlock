@@ -50,6 +50,7 @@ type TOperation =
     | "updateAttrViewColRollup"
     | "hideAttrViewName"
     | "setAttrViewColDate"
+    | "unbindAttrViewBlock"
 type TBazaarType = "templates" | "icons" | "widgets" | "themes" | "plugins"
 type TCardType = "doc" | "notebook" | "all"
 type TEventBus = "ws-main" | "sync-start" | "sync-end" | "sync-fail" |
@@ -82,6 +83,7 @@ type TAVCol =
     | "created"
     | "updated"
     | "checkbox"
+    | "lineNumber"
 type THintSource = "search" | "av" | "hint";
 type TAVFilterOperator =
     "="
@@ -197,6 +199,7 @@ interface IPosition {
 interface ISaveLayout {
     name: string,
     layout: IObject
+    time: number
 }
 
 interface IWorkspace {
@@ -233,6 +236,7 @@ interface IPluginSettingOption {
     title: string
     description?: string
     actionElement?: HTMLElement
+    direction?: "column" | "row"
 
     createActionElement?(): HTMLElement
 }
@@ -476,12 +480,20 @@ interface IOperation {
     nextID?: string // insert 专享
     isDetached?: boolean // insertAttrViewBlock 专享
     ignoreFillFilter?: boolean // insertAttrViewBlock 专享
-    srcIDs?: string[] // insertAttrViewBlock 专享
+    srcIDs?: string[] // removeAttrViewBlock 专享
+    srcs?: IOperationSrcs[] // insertAttrViewBlock 专享
     name?: string // addAttrViewCol 专享
     type?: TAVCol // addAttrViewCol 专享
     deckID?: string // add/removeFlashcards 专享
     blockIDs?: string[] // add/removeFlashcards 专享
 }
+
+interface IOperationSrcs {
+    id: string,
+    content?: string,
+    isDetached: boolean
+}
+
 
 interface IObject {
     [key: string]: string;
@@ -840,6 +852,7 @@ interface IAVCell {
 }
 
 interface IAVCellValue {
+    keyID?: string,
     id?: string,
     type: TAVCol,
     isDetached?: boolean,

@@ -7,6 +7,7 @@ import {hasClosestBlock, hasClosestByClassName} from "../../util/hasClosest";
 import {unicode2Emoji} from "../../../emoji";
 import {transaction} from "../../wysiwyg/transaction";
 import {openMenuPanel} from "./openMenuPanel";
+import {uploadFiles} from "../../upload";
 
 const genAVRollupHTML = (value: IAVCellValue) => {
     let html = "";
@@ -102,7 +103,7 @@ export const genAVValueHTML = (value: IAVCellValue) => {
 <a href="tel:${value.phone.content}" target="_blank" aria-label="${window.siyuan.languages.openBy}" class="block__icon block__icon--show fn__flex-center b3-tooltips__w b3-tooltips"><svg><use xlink:href="#iconPhone"></use></svg></a>`;
             break;
         case "checkbox":
-            html = `<svg class="av__checkbox" style="height: 17px;"><use xlink:href="#icon${value.checkbox.checked ? "Check" : "Uncheck"}"></use></svg>`;
+            html = `<svg class="av__checkbox"><use xlink:href="#icon${value.checkbox.checked ? "Check" : "Uncheck"}"></use></svg>`;
             break;
         case "template":
             html = `<div class="fn__flex-1">${value.template.content}</div>`;
@@ -215,23 +216,27 @@ class="fn__flex-1 fn__flex${["url", "text", "number", "email", "phone", "block"]
                 const targetElement = element.querySelector(".dragover__bottom, .dragover__top") as HTMLElement;
                 if (targetElement && dragBlockElement) {
                     const isBottom = targetElement.classList.contains("dragover__bottom");
-                    transaction(protyle, [{
-                        action: "sortAttrViewCol",
-                        avID: dragBlockElement.dataset.avId,
-                        previousID: isBottom ? targetElement.dataset.colId : targetElement.previousElementSibling?.getAttribute("data-col-id"),
-                        id: window.siyuan.dragElement.dataset.colId,
-                        blockID: id
-                    }, {
-                        action: "sortAttrViewCol",
-                        avID: dragBlockElement.dataset.avId,
-                        previousID: window.siyuan.dragElement.previousElementSibling?.getAttribute("data-col-id"),
-                        id,
-                        blockID: id
-                    }]);
-                    if (isBottom) {
-                        targetElement.after(window.siyuan.dragElement);
-                    } else {
-                        targetElement.before(window.siyuan.dragElement);
+                    const previousID = isBottom ? targetElement.dataset.colId : targetElement.previousElementSibling?.getAttribute("data-col-id");
+                    const undoPreviousID = window.siyuan.dragElement.previousElementSibling?.getAttribute("data-col-id");
+                    if (previousID !== undoPreviousID && previousID !== window.siyuan.dragElement.dataset.colId) {
+                        transaction(protyle, [{
+                            action: "sortAttrViewCol",
+                            avID: dragBlockElement.dataset.avId,
+                            previousID,
+                            id: window.siyuan.dragElement.dataset.colId,
+                            blockID: id
+                        }, {
+                            action: "sortAttrViewCol",
+                            avID: dragBlockElement.dataset.avId,
+                            previousID: undoPreviousID,
+                            id,
+                            blockID: id
+                        }]);
+                        if (isBottom) {
+                            targetElement.after(window.siyuan.dragElement);
+                        } else {
+                            targetElement.before(window.siyuan.dragElement);
+                        }
                     }
                     targetElement.classList.remove("dragover__bottom", "dragover__top");
                 }
@@ -270,6 +275,12 @@ class="fn__flex-1 fn__flex${["url", "text", "number", "email", "phone", "block"]
                     window.siyuan.dragElement = undefined;
                 }
             });
+            element.addEventListener("paste", (event) => {
+                const files = event.clipboardData.files;
+                if (document.querySelector(".av__panel .b3-form__upload") && files && files.length > 0) {
+                    uploadFiles(protyle, files);
+                }
+            });
             element.addEventListener("click", (event) => {
                 let target = event.target as HTMLElement;
                 const blockElement = hasClosestBlock(target);
@@ -289,6 +300,11 @@ class="fn__flex-1 fn__flex${["url", "text", "number", "email", "phone", "block"]
                         event.preventDefault();
                         break;
                     } else if (type === "mAsset") {
+                        element.querySelectorAll('.custom-attr__avvalue[data-type="mAsset"]').forEach(item => {
+                            item.removeAttribute("data-active");
+                        });
+                        target.setAttribute("data-active", "true");
+                        target.focus();
                         popTextCell(protyle, [target], "mAsset");
                         event.stopPropagation();
                         event.preventDefault();

@@ -5,22 +5,27 @@ import * as dayjs from "dayjs";
 import {transaction, updateTransaction} from "./transaction";
 import {mathRender} from "../render/mathRender";
 import {highlightRender} from "../render/highlightRender";
-import {getContenteditableElement, getNextBlock, isNotEditBlock} from "./getBlock";
+import {getContenteditableElement, getNextBlock, hasNextSibling, isNotEditBlock} from "./getBlock";
 import {genEmptyBlock} from "../../block/util";
 import {blockRender} from "../render/blockRender";
 import {hideElements} from "../ui/hideElements";
-import {hasClosestByAttribute} from "../util/hasClosest";
+import {hasClosestByAttribute, hasClosestByClassName} from "../util/hasClosest";
 import {fetchPost, fetchSyncPost} from "../../util/fetch";
 import {headingTurnIntoList, turnIntoTaskList} from "./turnIntoList";
 import {updateAVName} from "../render/av/action";
 
-export const input = async (protyle: IProtyle, blockElement: HTMLElement, range: Range, needRender = true) => {
+export const input = async (protyle: IProtyle, blockElement: HTMLElement, range: Range, needRender = true, event?: InputEvent) => {
     if (!blockElement.parentElement) {
         // 不同 windows 版本下输入法会多次触发 input，导致 outerhtml 赋值的块丢失
         return;
     }
     if (blockElement.classList.contains("av")) {
-        updateAVName(protyle, blockElement);
+        const avCursorElement = hasClosestByClassName(range.startContainer, "av__cursor");
+        if (avCursorElement) {
+            range.startContainer.textContent = Constants.ZWSP;
+        } else {
+            updateAVName(protyle, blockElement);
+        }
         return;
     }
     const editElement = getContenteditableElement(blockElement) as HTMLElement;
@@ -46,8 +51,17 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
         return;
     }
     blockElement.setAttribute("updated", dayjs().format("YYYYMMDDHHmmss"));
-    const wbrElement = document.createElement("wbr");
+    const wbrElement: HTMLElement = document.createElement("wbr");
     range.insertNode(wbrElement);
+    if (event && event.inputType === "deleteContentForward") {
+        const wbrNextElement = hasNextSibling(wbrElement) as HTMLElement;
+        if (wbrNextElement && wbrNextElement.nodeType === 1 && !wbrNextElement.textContent.startsWith(Constants.ZWSP)) {
+            const nextType = (wbrNextElement.getAttribute("data-type") || "").split(" ");
+            if (nextType.includes("code") || nextType.includes("kbd") || nextType.includes("tag")) {
+                wbrNextElement.insertAdjacentElement("afterbegin", wbrElement);
+            }
+        }
+    }
     const id = blockElement.getAttribute("data-node-id");
     if (type !== "NodeCodeBlock" && (editElement.innerHTML.endsWith("\n<wbr>") || editElement.innerHTML.endsWith("\n<wbr>\n"))) {
         // 软换行
@@ -143,7 +157,7 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
         log("SpinBlockDOM", html, "result", protyle.options.debugger);
         let scrollLeft: number;
         if (blockElement.classList.contains("table")) {
-            scrollLeft = getContenteditableElement(blockElement).scrollLeft;
+            scrollLeft = blockElement.firstElementChild.scrollLeft;
         }
         if (/<span data-type="backslash">.+<\/span><wbr>/.test(html)) {
             // 转义不需要添加 zwsp
@@ -209,11 +223,19 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
                 });
                 mathRender(realElement);
                 if (index === tempElement.content.childElementCount - 1) {
+                    // https://github.com/siyuan-note/siyuan/issues/11156
+                    const currentWbrElement = blockElement.querySelector("wbr");
+                    if (currentWbrElement && currentWbrElement.parentElement.tagName === "SPAN" && currentWbrElement.parentElement.innerHTML === "<wbr>") {
+                        const types = currentWbrElement.parentElement.getAttribute("data-type") || "";
+                        if (types.includes("sup") || types.includes("u") || types.includes("sub")) {
+                            currentWbrElement.insertAdjacentText("beforebegin", Constants.ZWSP);
+                        }
+                    }
                     focusByWbr(protyle.wysiwyg.element, range);
                     protyle.hint.render(protyle);
                     // 表格出现滚动条，输入数字会向前滚 https://github.com/siyuan-note/siyuan/issues/3650
                     if (scrollLeft > 0) {
-                        getContenteditableElement(realElement).scrollLeft = scrollLeft;
+                        blockElement.firstElementChild.scrollLeft = scrollLeft;
                     }
                 }
             }

@@ -119,6 +119,7 @@ func ExportAv2CSV(avID, blockID string) (zipPath string, err error) {
 		return
 	}
 
+	rowNum := 1
 	for _, row := range table.Rows {
 		var rowVal []string
 		for _, cell := range row.Cells {
@@ -140,15 +141,32 @@ func ExportAv2CSV(avID, blockID string) (zipPath string, err error) {
 					if nil != cell.Value.MAsset {
 						buf := &bytes.Buffer{}
 						for _, a := range cell.Value.MAsset {
-							buf.WriteString("![](")
-							buf.WriteString(a.Content)
-							buf.WriteString(") ")
+							if av.AssetTypeImage == a.Type {
+								buf.WriteString("![")
+								buf.WriteString(a.Name)
+								buf.WriteString("](")
+								buf.WriteString(a.Content)
+								buf.WriteString(") ")
+							} else if av.AssetTypeFile == a.Type {
+								buf.WriteString("[")
+								buf.WriteString(a.Name)
+								buf.WriteString("](")
+								buf.WriteString(a.Content)
+								buf.WriteString(") ")
+							} else {
+								buf.WriteString(a.Content)
+								buf.WriteString(" ")
+							}
 						}
 						val = strings.TrimSpace(buf.String())
 					}
+				} else if av.KeyTypeLineNumber == cell.Value.Type {
+					val = strconv.Itoa(rowNum)
 				}
 
-				val = cell.Value.String()
+				if "" == val {
+					val = cell.Value.String(true)
+				}
 			}
 
 			rowVal = append(rowVal, val)
@@ -158,6 +176,7 @@ func ExportAv2CSV(avID, blockID string) (zipPath string, err error) {
 			f.Close()
 			return
 		}
+		rowNum++
 	}
 	writer.Flush()
 
@@ -295,7 +314,7 @@ func Export2Liandi(id string) (err error) {
 		articleId = result.Data.(string)
 		tree, _ = LoadTreeByBlockID(id) // 这里必须重新加载，因为前面导出时已经修改了树结构
 		tree.Root.SetIALAttr(liandiArticleIdAttrName, articleId)
-		if err = writeJSONQueue(tree); nil != err {
+		if err = writeTreeUpsertQueue(tree); nil != err {
 			return
 		}
 	}
@@ -2301,6 +2320,8 @@ func exportTree(tree *parse.Tree, wysiwyg, expandKaTexMacros, keepFold bool,
 			cell.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(col.Name)})
 			mdTableHeadRow.AppendChild(cell)
 		}
+
+		rowNum := 1
 		for _, row := range table.Rows {
 			mdTableRow := &ast.Node{Type: ast.NodeTableRow, TableAligns: aligns}
 			mdTable.AppendChild(mdTableRow)
@@ -2325,17 +2346,33 @@ func exportTree(tree *parse.Tree, wysiwyg, expandKaTexMacros, keepFold bool,
 						if nil != cell.Value.MAsset {
 							buf := &bytes.Buffer{}
 							for _, a := range cell.Value.MAsset {
-								buf.WriteString("![](")
-								buf.WriteString(a.Content)
-								buf.WriteString(") ")
+								if av.AssetTypeImage == a.Type {
+									buf.WriteString("![")
+									buf.WriteString(a.Name)
+									buf.WriteString("](")
+									buf.WriteString(a.Content)
+									buf.WriteString(") ")
+								} else if av.AssetTypeFile == a.Type {
+									buf.WriteString("[")
+									buf.WriteString(a.Name)
+									buf.WriteString("](")
+									buf.WriteString(a.Content)
+									buf.WriteString(") ")
+								} else {
+									buf.WriteString(a.Content)
+									buf.WriteString(" ")
+								}
 							}
 							val = strings.TrimSpace(buf.String())
-							mdTableCell.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(val)})
-							continue
 						}
+					} else if av.KeyTypeLineNumber == cell.Value.Type {
+						val = strconv.Itoa(rowNum)
+						rowNum++
 					}
 
-					val = cell.Value.String()
+					if "" == val {
+						val = cell.Value.String(true)
+					}
 				}
 				mdTableCell.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(val)})
 			}
