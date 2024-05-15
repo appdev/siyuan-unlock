@@ -1,4 +1,7 @@
 {
+  "enterKey": "Enter",
+  "doubleClick": "Double Click",
+  "click": "Click",
   "allowHTMLBLockScript": "Allow execution of scripts within HTML blocks",
   "allowHTMLBLockScriptTip": "After enabling, the script in the HTML block will not be sanitized, Please be aware of the potential risk of XSS attacks",
   "autoLaunchMode0": "Do not launch automatically",
@@ -115,7 +118,7 @@
   "freezeCol": "Freeze column",
   "unfreezeCol": "Unfreeze column",
   "snippetsTip": "The code snippet has been updated, do you want to save it?",
-  "addBelowAbove": "Click to add below<br>⌥Click to add above",
+  "addBelowAbove": "Click <span class='ft__on-surface'>Add below</span><br>⌥Click <span class='ft__on-surface'>Add above</span>",
   "imported": "Import completed",
   "mirrorTip": "Mirror database, all data updates will be synchronized to all other mirrors",
   "includeTime": "Include time",
@@ -422,9 +425,9 @@
   "dynamicLoadBlocks": "Number of dynamically loaded blocks",
   "dynamicLoadBlocksTip": "This value contains the number of subblocks. If there are many code blocks, formula blocks or chart blocks that need to be rendered, it is recommended not to set too large",
   "backlinkExpand": "Backlink default expand",
-  "backlinkExpandTip": "If configured as <code class='fn__code'>0</code>, it will not be expanded",
+  "backlinkExpandTip": "If configured as <code class='fn__code'>0</code>",
   "backmentionExpand": "Backmention default expand",
-  "backmentionExpandTip": "If configured as <code class='fn__code'>0</code>, it will not be expanded",
+  "backmentionExpandTip": "If configured as <code class='fn__code'>0</code>, it will not be expanded, if configured as <code class='fn__code'>-1</code>, the panel will be closed",
   "googleAnalytics": "Google Analytics",
   "googleAnalyticsTip": "After enabling, it will use <a href=\"https://analytics.google.com/\" target=\"_blank\">Google Analytics</a> to count the opening status of the application and will not collect users data and operations",
   "floatWindowMode": "Floating window trigger method",
@@ -781,9 +784,9 @@
   "customSort": "Custom Sorting",
   "collapse": "Collapse",
   "blockEmbed": "Embed Block",
-  "rowTip": "Click to open menu<br>Drag to sort",
-  "gutterTip": "Click/⌘/ to open menu<br>⌘Click to focus<br>⌥Click/⌥→ to fold/expand<br>⇧Click/⌥⌘A to update attr<br>Drag to move<br>⌃Drag to duplicate<br>⌥Drag to ref<br> ⇧Drag to embed<br>",
-  "gutterTip2": "Click to open the menu<br>⇧Click Update attribute",
+  "rowTip": "Click <span class='ft__on-surface'>Open Menu</span><br>Drag <span class='ft__on-surface'>Sort</span>",
+  "gutterTip": "Click/⌘/ <span class='ft__on-surface'>Open Menu</span><br>⌘Click/⌥→ <span class='ft__on-surface'>Focus</span><br>⌥Click/⌘↑ <span class='ft__on-surface'>Collapse/Expand</span><br>⇧Click/⌥⌘A <span class='ft__on-surface'>Update attribute</span><br>Drag <span class='ft__on-surface'>Move position</span><br>⌃Drag <span class='ft__on-surface'>Repeat</span><br>⌥Drag <span class='ft__on-surface'>Generate block reference</span><br>⇧Drag <span class='ft__on-surface'>Generate embedded block</span>",
+  "gutterTip2": "Click <span class='ft__on-surface'>Open Menu</span><br>⇧Click <span class='ft__on-surface'>Update attribute</span>",
   "linkDistance": "Link distance",
   "collideStrength": "Collide strength",
   "collideRadius": "Collide radius",
@@ -1099,7 +1102,8 @@
   "config": "Settings",
   "userName": "Username",
   "password": "Password",
-  "passphrase": "Passphrase",
+  "passphrase": "Password",
+  "reEnterPassphrase": "Enter the Password again",
   "theme": "Theme",
   "language": "Language",
   "about": "About",
@@ -1232,7 +1236,8 @@
     "task.database.index.embedBlock": "Execute database index embed block",
     "task.reload.ui": "Execute reload UI",
     "task.asset.database.index.full": "Execute asset database rebuild index",
-    "task.asset.database.index.commit": "Execute asset database index commit"
+    "task.asset.database.index.commit": "Execute asset database index commit",
+    "task.cache.virtualBlockRef": "Execute cache virtual reference"
   },
   "_trayMenu": {
     "showWindow": "Show Window",
@@ -1496,6 +1501,7 @@
     "243": "Only list the first [%d] tags (including subtags), if you need to adjust, please modify [Settings - Doc Tree - Maximum number to list]",
     "244": "It did not exit normally after the last use. It is recommended to execute [Doc Tree - Rebuild Index]. In the future, please exit the program completely before shutting down the computer",
     "245": "It did not exit normally after the last use. It is recommended to execute [Doc Tree - Rebuild Index]. In the future, please use [Exit Application] in the right panel to exit normally",
-    "246": "The document title cannot contain / and has been replaced with _"
+    "246": "The document title cannot contain / and has been replaced with _",
+    "247": "File [%s] is larger than the maximum limit [%s], and has been ignored for uploading to the cloud"
   }
 }

@@ -37,7 +37,7 @@ if errorlevel 1 (
 
 cd ..
 
-echo 'Building Electron'
+echo 'Building Electron App'
 cd app
 call npm run dist
 cd ..

@@ -357,9 +357,9 @@ export const genSearch = (app: App, config: Config.IUILayoutTabSearchConfig, ele
     <div class="search__tip${closeCB ? "" : " fn__none"}">
         <kbd>↑/↓/PageUp/PageDown</kbd> ${window.siyuan.languages.searchTip1}
         <kbd>${updateHotkeyTip(window.siyuan.config.keymap.general.newFile.custom)}</kbd> ${window.siyuan.languages.new}
-        <kbd>Enter/Double Click</kbd> ${window.siyuan.languages.searchTip2}
-        <kbd>Click</kbd> ${window.siyuan.languages.searchTip3}
-        <kbd>${updateHotkeyTip(window.siyuan.config.keymap.editor.general.insertRight.custom)}/${updateHotkeyTip("⌥Click")}</kbd> ${window.siyuan.languages.searchTip4}
+        <kbd>${window.siyuan.languages.enterKey}/${window.siyuan.languages.doubleClick}</kbd> ${window.siyuan.languages.searchTip2}
+        <kbd>${window.siyuan.languages.click}</kbd> ${window.siyuan.languages.searchTip3}
+        <kbd>${updateHotkeyTip(window.siyuan.config.keymap.editor.general.insertRight.custom)}/${updateHotkeyTip("⌥")}${window.siyuan.languages.click}</kbd> ${window.siyuan.languages.searchTip4}
         <kbd>Esc</kbd> ${window.siyuan.languages.searchTip5}
     </div>
 </div>
@@ -388,8 +388,8 @@ export const genSearch = (app: App, config: Config.IUILayoutTabSearchConfig, ele
     </div>
     <div class="search__tip${closeCB ? "" : " fn__none"}">
         <kbd>↑/↓/PageUp/PageDown</kbd> ${window.siyuan.languages.searchTip1}
-        <kbd>Enter/Double Click</kbd> ${window.siyuan.languages.searchTip2}
-        <kbd>${updateHotkeyTip(window.siyuan.config.keymap.editor.general.insertRight.custom)}/${updateHotkeyTip("⌥Click")}</kbd> ${window.siyuan.languages.searchTip4}
+        <kbd>${window.siyuan.languages.enterKey}/${window.siyuan.languages.doubleClick}</kbd> ${window.siyuan.languages.searchTip2}
+        <kbd>${updateHotkeyTip(window.siyuan.config.keymap.editor.general.insertRight.custom)}/${updateHotkeyTip("⌥" + window.siyuan.languages.click)}</kbd> ${window.siyuan.languages.searchTip4}
         <kbd>Esc</kbd> ${window.siyuan.languages.searchTip5}
     </div>
 </div>
@@ -1179,6 +1179,11 @@ export const getArticle = (options: {
                 size: zoomIn ? Constants.SIZE_GET_MAX : window.siyuan.config.editor.dynamicLoadBlocks,
                 zoom: zoomIn,
             }, getResponse => {
+                options.edit.protyle.query = {
+                    key: options.value || null,
+                    method: options.config?.method || null,
+                    types: options.config?.types || null,
+                };
                 onGet({
                     updateReadonly: true,
                     data: getResponse,

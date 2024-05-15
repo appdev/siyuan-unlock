@@ -6,13 +6,10 @@ import {reloadProtyle} from "../protyle/util/reload";
 import {updateHotkeyTip} from "../protyle/util/compatibility";
 import {Constants} from "../constants";
 import {resize} from "../protyle/util/resize";
+import {setReadOnly} from "./util/setReadOnly";
 
 export const editor = {
     element: undefined as Element,
-    setReadonly: (readOnly: boolean) => {
-        window.siyuan.config.editor.readOnly = readOnly;
-        fetchPost("/api/setting/setEditor", window.siyuan.config.editor);
-    },
     genHTML: () => {
         let fontFamilyHTML = "";
         fontFamilyHTML = '<select id="fontFamily" class="b3-select fn__flex-center fn__size200"></select>';
@@ -192,7 +189,7 @@ export const editor = {
         <div class="b3-label__text">${window.siyuan.languages.backmentionExpandTip}</div>
     </div>
     <span class="fn__space"></span>
-    <input class="b3-text-field fn__flex-center fn__size200" id="backmentionExpandCount" type="number" min="0" max="512" value="${window.siyuan.config.editor.backmentionExpandCount}"/>
+    <input class="b3-text-field fn__flex-center fn__size200" id="backmentionExpandCount" type="number" min="-1" max="512" value="${window.siyuan.config.editor.backmentionExpandCount}"/>
 </div>
 <div class="fn__flex b3-label config__item">
     <div class="fn__flex-1">
@@ -401,7 +398,7 @@ export const editor = {
     _onSetEditor: (editorData: Config.IEditor) => {
         const changeReadonly = editorData.readOnly !== window.siyuan.config.editor.readOnly;
         if (changeReadonly) {
-            editor.setReadonly(editorData.readOnly);
+            setReadOnly(editorData.readOnly);
         }
         window.siyuan.config.editor = editorData;
         getAllModels().editor.forEach((item) => {

@@ -167,6 +167,8 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
             protyle.toolbar.range = document.createRange();
             protyle.toolbar.range.selectNodeContents(target);
             focusByRange(protyle.toolbar.range);
+            target.parentElement.classList.add("av__cell--select");
+            addDragFill(target.parentElement);
             hintRef(target.previousElementSibling.textContent.trim(), protyle, "av");
             event.preventDefault();
             event.stopPropagation();
@@ -275,43 +277,43 @@ export const avContextmenu = (protyle: IProtyle, rowElement: HTMLElement, positi
             }
         });
     }
-    menu.addItem({
-        label: window.siyuan.languages.addToDatabase,
-        icon: "iconDatabase",
-        click() {
-            openSearchAV(blockElement.getAttribute("data-av-id"), rowElements[0] as HTMLElement, (listItemElement) => {
-                const srcs: IOperationSrcs[] = [];
-                const sourceIds: string[] = [];
-                rowElements.forEach(item => {
-                    const rowId = item.getAttribute("data-id");
-                    const blockValue = genCellValueByElement("block", item.querySelector(".av__cell[data-block-id]"));
-                    srcs.push({
-                        content: blockValue.block.content,
-                        id: rowId,
-                        isDetached: blockValue.isDetached,
-                    });
-                    sourceIds.push(rowId);
-                });
-                const avID = listItemElement.dataset.avId;
-                transaction(protyle, [{
-                    action: "insertAttrViewBlock",
-                    avID,
-                    ignoreFillFilter: true,
-                    srcs,
-                    blockID: listItemElement.dataset.blockId
-                }, {
-                    action: "doUpdateUpdated",
-                    id: listItemElement.dataset.blockId,
-                    data: dayjs().format("YYYYMMDDHHmmss"),
-                }], [{
-                    action: "removeAttrViewBlock",
-                    srcIDs: sourceIds,
-                    avID,
-                }]);
-            });
-        }
-    });
     if (!protyle.disabled) {
+        menu.addItem({
+            label: window.siyuan.languages.addToDatabase,
+            icon: "iconDatabase",
+            click() {
+                openSearchAV(blockElement.getAttribute("data-av-id"), rowElements[0] as HTMLElement, (listItemElement) => {
+                    const srcs: IOperationSrcs[] = [];
+                    const sourceIds: string[] = [];
+                    rowElements.forEach(item => {
+                        const rowId = item.getAttribute("data-id");
+                        const blockValue = genCellValueByElement("block", item.querySelector(".av__cell[data-block-id]"));
+                        srcs.push({
+                            content: blockValue.block.content,
+                            id: rowId,
+                            isDetached: blockValue.isDetached,
+                        });
+                        sourceIds.push(rowId);
+                    });
+                    const avID = listItemElement.dataset.avId;
+                    transaction(protyle, [{
+                        action: "insertAttrViewBlock",
+                        avID,
+                        ignoreFillFilter: true,
+                        srcs,
+                        blockID: listItemElement.dataset.blockId
+                    }, {
+                        action: "doUpdateUpdated",
+                        id: listItemElement.dataset.blockId,
+                        data: dayjs().format("YYYYMMDDHHmmss"),
+                    }], [{
+                        action: "removeAttrViewBlock",
+                        srcIDs: sourceIds,
+                        avID,
+                    }]);
+                });
+            }
+        });
         if (rowElements.length === 1) {
             if (keyCellElement.getAttribute("data-detached") !== "true") {
                 menu.addSeparator();
@@ -319,7 +321,7 @@ export const avContextmenu = (protyle: IProtyle, rowElement: HTMLElement, positi
             menu.addItem({
                 icon: "iconBefore",
                 label: `<div class="fn__flex" style="align-items: center;">
-${window.siyuan.languages.insertRowBefore.replace("${x}", '<span class="fn__space"></span><input style="width:64px" type="number" step="1" min="1" value="1" placeholder="Enter" class="b3-text-field"><span class="fn__space"></span>')}
+${window.siyuan.languages.insertRowBefore.replace("${x}", '<span class="fn__space"></span><input style="width:64px" type="number" step="1" min="1" value="1" placeholder="${window.siyuan.languages.enterKey}" class="b3-text-field"><span class="fn__space"></span>')}
 </div>`,
                 bind(element) {
                     const inputElement = element.querySelector("input");
@@ -341,7 +343,7 @@ ${window.siyuan.languages.insertRowBefore.replace("${x}", '<span class="fn__spac
             menu.addItem({
                 icon: "iconAfter",
                 label: `<div class="fn__flex" style="align-items: center;">
-${window.siyuan.languages.insertRowAfter.replace("${x}", '<span class="fn__space"></span><input style="width:64px" type="number" step="1" min="1" placeholder="Enter" class="b3-text-field" value="1"><span class="fn__space"></span>')}
+${window.siyuan.languages.insertRowAfter.replace("${x}", '<span class="fn__space"></span><input style="width:64px" type="number" step="1" min="1" placeholder="${window.siyuan.languages.enterKey}" class="b3-text-field" value="1"><span class="fn__space"></span>')}
 </div>`,
                 bind(element) {
                     const inputElement = element.querySelector("input");

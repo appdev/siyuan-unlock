@@ -18,6 +18,8 @@ import {processRender} from "../util/processCode";
 import {highlightRender} from "../render/highlightRender";
 import {speechRender} from "../render/speechRender";
 import {avRender} from "../render/av/render";
+import {getPadding} from "../ui/initUI";
+import {hasClosestByAttribute} from "../util/hasClosest";
 
 export class Preview {
     public element: HTMLElement;
@@ -33,10 +35,6 @@ export class Preview {
         if (protyle.options.classes.preview) {
             previewElement.classList.add(protyle.options.classes.preview);
         }
-        if (protyle.wysiwyg.element.style.padding) {
-            previewElement.style.padding = protyle.wysiwyg.element.style.padding;
-        }
-
         const actions = protyle.options.preview.actions;
         const actionElement = document.createElement("div");
         actionElement.className = "protyle-preview__action";
@@ -49,7 +47,7 @@ export class Preview {
             }
             switch (action) {
                 case "desktop":
-                    actionHtml.push(`<button type="button"${protyle.wysiwyg.element.style.padding ? ' class="protyle-preview__action--current"' : ""} data-type="desktop">Desktop</button>`);
+                    actionHtml.push('<button type="button" class="protyle-preview__action--current" data-type="desktop">Desktop</button>');
                     break;
                 case "tablet":
                     actionHtml.push('<button type="button" data-type="tablet">Tablet</button>');
@@ -144,6 +142,23 @@ export class Preview {
                 }
                 target = target.parentElement;
             }
+            const nodeElement = hasClosestByAttribute(event.target as HTMLElement, "id", undefined);
+            if (nodeElement) {
+                // 用于点击后大纲定位
+                this.element.querySelectorAll(".protyle-wysiwyg--select").forEach(item => {
+                    item.classList.remove("selected");
+                });
+                nodeElement.classList.add("selected");
+                /// #if !MOBILE
+                if (protyle.model) {
+                    getAllModels().outline.forEach(item => {
+                        if (item.blockId === protyle.block.rootID) {
+                            item.setCurrentByPreview(nodeElement);
+                        }
+                    });
+                }
+                /// #endif
+            }
         });
 
         this.previewElement = previewElement;
@@ -153,6 +168,11 @@ export class Preview {
         if (this.element.style.display === "none") {
             return;
         }
+        if (this.element.querySelector('.protyle-preview__action [data-type="desktop"]')?.classList.contains("protyle-preview__action--current")) {
+            const padding = getPadding(protyle);
+            this.previewElement.style.padding = `${padding.top}px ${padding.left}px ${padding.bottom}px ${padding.right}px`;
+        }
+
         let loadingElement = this.element.querySelector(".fn__loading");
         if (!loadingElement) {
             this.element.insertAdjacentHTML("beforeend", `<div style="flex-direction: column;" class="fn__loading">

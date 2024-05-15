@@ -106,6 +106,10 @@ func listSyFiles(dir string) (ret []string) {
 
 func (box *Box) Unindex() {
 	task.AppendTask(task.DatabaseIndex, unindex, box.ID)
+	go func() {
+		sql.WaitForWritingDatabase()
+		ResetVirtualBlockRefCache()
+	}()
 }
 
 func unindex(boxID string) {
@@ -115,8 +119,17 @@ func unindex(boxID string) {
 }
 
 func (box *Box) Index() {
+	task.AppendTask(task.DatabaseIndexRef, removeBoxRefs, box.ID)
 	task.AppendTask(task.DatabaseIndex, index, box.ID)
 	task.AppendTask(task.DatabaseIndexRef, IndexRefs)
+	go func() {
+		sql.WaitForWritingDatabase()
+		ResetVirtualBlockRefCache()
+	}()
+}
+
+func removeBoxRefs(boxID string) {
+	sql.DeleteBoxRefsQueue(boxID)
 }
 
 func index(boxID string) {
@@ -219,8 +232,6 @@ func IndexRefs() {
 	luteEngine := util.NewLute()
 	boxes := Conf.GetOpenedBoxes()
 	for _, box := range boxes {
-		sql.DeleteBoxRefsQueue(box.ID)
-
 		pages := pagedPaths(filepath.Join(util.DataDir, box.ID), 32)
 		for _, paths := range pages {
 			for _, treeAbsPath := range paths {
@@ -269,7 +280,7 @@ func IndexRefs() {
 			}
 
 			util.IncBootProgress(bootProgressPart, "Indexing ref "+defTree.ID)
-			sql.InsertRefsTreeQueue(defTree)
+			sql.UpdateRefsTreeQueue(defTree)
 			if 1 < i && 0 == i%64 {
 				util.PushStatusBar(fmt.Sprintf(Conf.Language(55), i))
 			}
@@ -278,17 +289,20 @@ func IndexRefs() {
 	}
 	logging.LogInfof("resolved refs [%d] in [%dms]", size, time.Now().Sub(start).Milliseconds())
 	util.PushStatusBar(fmt.Sprintf(Conf.Language(55), i))
-
-	ResetVirtualBlockRefCache()
 }
+
+var indexEmbedBlockLock = sync.Mutex{}
 
 // IndexEmbedBlockJob 嵌入块支持搜索 https://github.com/siyuan-note/siyuan/issues/7112
 func IndexEmbedBlockJob() {
-	embedBlocks := sql.QueryEmptyContentEmbedBlocks()
-	task.AppendTaskWithTimeout(task.DatabaseIndexEmbedBlock, 30*time.Second, autoIndexEmbedBlock, embedBlocks)
+	task.AppendTaskWithTimeout(task.DatabaseIndexEmbedBlock, 30*time.Second, autoIndexEmbedBlock)
 }
 
-func autoIndexEmbedBlock(embedBlocks []*sql.Block) {
+func autoIndexEmbedBlock() {
+	indexEmbedBlockLock.Lock()
+	defer indexEmbedBlockLock.Unlock()
+
+	embedBlocks := sql.QueryEmptyContentEmbedBlocks()
 	for i, embedBlock := range embedBlocks {
 		markdown := strings.TrimSpace(embedBlock.Markdown)
 		markdown = strings.TrimPrefix(markdown, "{{")

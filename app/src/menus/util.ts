@@ -31,13 +31,12 @@ export const exportAsset = (src: string) => {
     /// #endif
 };
 
-
 export const openEditorTab = (app: App, ids: string[], notebookId?: string, pathString?: string) => {
     /// #if !MOBILE
     const openSubmenus: IMenu[] = [{
         icon: "iconLayoutRight",
         label: window.siyuan.languages.insertRight,
-        accelerator: ids.length === 1 ? `${updateHotkeyTip(window.siyuan.config.keymap.editor.general.insertRight.custom)}/${updateHotkeyTip("⌥Click")}` : undefined,
+        accelerator: ids.length === 1 ? `${updateHotkeyTip(window.siyuan.config.keymap.editor.general.insertRight.custom)}/${updateHotkeyTip("⌥" + window.siyuan.languages.click)}` : undefined,
         click: () => {
             if (notebookId) {
                 openFileById({
@@ -63,7 +62,7 @@ export const openEditorTab = (app: App, ids: string[], notebookId?: string, path
     }, {
         icon: "iconLayoutBottom",
         label: window.siyuan.languages.insertBottom,
-        accelerator: ids.length === 1 ? "⇧Click" : "",
+        accelerator: ids.length === 1 ? "⇧" + window.siyuan.languages.click : "",
         click: () => {
             if (notebookId) {
                 openFileById({
@@ -90,7 +89,7 @@ export const openEditorTab = (app: App, ids: string[], notebookId?: string, path
     if (window.siyuan.config.fileTree.openFilesUseCurrentTab) {
         openSubmenus.push({
             label: window.siyuan.languages.openInNewTab,
-            accelerator: ids.length === 1 ? "⌥⌘Click" : undefined,
+            accelerator: ids.length === 1 ? "⌥⌘" + window.siyuan.languages.click : undefined,
             click: () => {
                 if (notebookId) {
                     openFileById({

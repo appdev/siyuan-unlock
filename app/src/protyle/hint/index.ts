@@ -9,7 +9,7 @@ import {
     getSelectionPosition
 } from "../util/selection";
 import {genHintItemHTML, hintEmbed, hintRef, hintSlash} from "./extend";
-import {getSavePath} from "../../util/newFile";
+import {getSavePath, newFile} from "../../util/newFile";
 import {upDownHint} from "../../util/upDownHint";
 import {setPosition} from "../../util/setPosition";
 import {getContenteditableElement, hasNextSibling, hasPreviousSibling} from "../wysiwyg/getBlock";
@@ -615,6 +615,19 @@ ${genHintItemHTML(item)}
                 range.deleteContents();
                 return;
             } else if (value === Constants.ZWSP + 4) {
+                // 新建文档
+                newFile({
+                    app: protyle.app,
+                    notebookId: protyle.notebookId,
+                    useSavePath: true,
+                    currentPath: protyle.path,
+                    afterCB: (createDocId, createDocTitle) => {
+                        insertHTML(`<span data-type="block-ref" data-id="${createDocId}" data-subtype="d">${createDocTitle}</span>`, protyle);
+                    }
+                });
+                return;
+            } else if (value === Constants.ZWSP + 6) {
+                // 新建子文档
                 const newSubDocId = Lute.NewNodeID();
                 fetchPost("/api/filetree/createDoc", {
                     notebook: protyle.notebookId,
@@ -622,14 +635,14 @@ ${genHintItemHTML(item)}
                     title: window.siyuan.languages.untitled,
                     md: ""
                 }, () => {
-                    insertHTML(`<span data-type="block-ref" data-id="${newSubDocId}" data-subtype="d">Untitled</span>`, protyle);
+                    insertHTML(`<span data-type="block-ref" data-id="${newSubDocId}" data-subtype="d">${window.siyuan.languages.untitled}</span>`, protyle);
                     /// #if MOBILE
-                    openMobileFileById(protyle.app, newSubDocId, [Constants.CB_GET_HL, Constants.CB_GET_CONTEXT]);
+                    openMobileFileById(protyle.app, newSubDocId, [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]);
                     /// #else
                     openFileById({
                         app: protyle.app,
                         id: newSubDocId,
-                        action: [Constants.CB_GET_HL, Constants.CB_GET_CONTEXT]
+                        action: [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]
                     });
                     /// #endif
                 });

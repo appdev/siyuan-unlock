@@ -6,7 +6,7 @@
 		"id": "20211226120147-ib6yy3i",
 		"title": "內容塊類型",
 		"type": "doc",
-		"updated": "20240427230732"
+		"updated": "20240513102142"
 	},
 	"Children": [
 		{
@@ -1077,6 +1077,70 @@
 			]
 		},
 		{
+			"ID": "20240513102059-nfnc22t",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20240513102059-nfnc22t",
+				"updated": "20240513102059"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "​"
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "tag",
+					"TextMarkTextContent": "注意"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​："
+				}
+			]
+		},
+		{
+			"ID": "20240513102059-ttfrx4f",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20240513102059-ttfrx4f",
+				"updated": "20240513102142"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "不建議在正文中使用一級標題，建議使用二級標題作為頂層標題，這樣在開啟了 "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "kbd",
+					"TextMarkTextContent": "設定"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​ - "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "kbd",
+					"TextMarkTextContent": "匯出"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​ - "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "kbd",
+					"TextMarkTextContent": "新增文檔標題"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​ 後，整體的標題層級在匯出時才符合正常邏輯。"
+				}
+			]
+		},
+		{
 			"ID": "20211226120227-qntcfuy",
 			"Type": "NodeHeading",
 			"HeadingLevel": 3,
@@ -1764,6 +1828,20 @@
 			]
 		},
 		{
+			"ID": "20240510235226-7fqokpj",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20240510235226-7fqokpj",
+				"updated": "20240510235233"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "無序列表塊只能包含列表項塊，相鄰的無序列表塊間距較大。"
+				}
+			]
+		},
+		{
 			"ID": "20211226120227-wx6gvu6",
 			"Type": "NodeParagraph",
 			"Properties": {
@@ -1935,6 +2013,20 @@
 			]
 		},
 		{
+			"ID": "20240510235224-yj7efu2",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20240510235224-yj7efu2",
+				"updated": "20240510235237"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "有序列表塊只能包含列表項塊，相鄰的有序列表塊間距較大。"
+				}
+			]
+		},
+		{
 			"ID": "20211226120227-16ew3ez",
 			"Type": "NodeHeading",
 			"HeadingLevel": 3,
@@ -2090,6 +2182,20 @@
 			]
 		},
 		{
+			"ID": "20240510235222-wwcw8cn",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20240510235222-wwcw8cn",
+				"updated": "20240510235243"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "任務列表塊只能包含列表項塊，相鄰的任務列表塊間距較大。"
+				}
+			]
+		},
+		{
 			"ID": "20211226120227-ot6klof",
 			"Type": "NodeHeading",
 			"HeadingLevel": 3,
@@ -2165,6 +2271,20 @@
 				{
 					"Type": "NodeText",
 					"Data": "。"
+				}
+			]
+		},
+		{
+			"ID": "20240510235159-gjhzzj5",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20240510235159-gjhzzj5",
+				"updated": "20240510235159"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "列表項塊被包含在列表塊內，相鄰的列表項塊間距較小。"
 				}
 			]
 		},

@@ -80,7 +80,8 @@ export const newFile = (optios: {
     currentPath?: string,
     paths?: string[],
     useSavePath: boolean,
-    name?: string
+    name?: string,
+    afterCB?: (id: string, title: string) => void
 }) => {
     if (getOpenNotebookCount() === 0) {
         showMessage(window.siyuan.languages.newFileTip);
@@ -97,20 +98,24 @@ export const newFile = (optios: {
         }
         if ((data.data.path.indexOf("/") > -1 && optios.useSavePath) || optios.name) {
             if (data.data.path.startsWith("/") || optios.currentPath === "/") {
+                const createPath = pathPosix().join(data.data.path, optios.name || (data.data.path.endsWith("/") ? window.siyuan.languages.untitled : ""));
                 fetchPost("/api/filetree/createDocWithMd", {
                     notebook: data.data.box,
-                    path: pathPosix().join(data.data.path, optios.name || (data.data.path.endsWith("/") ? window.siyuan.languages.untitled : "")),
+                    path: createPath,
                     // 根目录时无法确定 parentID
                     markdown: ""
                 }, response => {
+                    if (optios.afterCB) {
+                        optios.afterCB(response.data, pathPosix().basename(createPath));
+                    }
                     /// #if !MOBILE
                     openFileById({
                         app: optios.app,
                         id: response.data,
-                        action: [Constants.CB_GET_CONTEXT]
+                        action: [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]
                     });
                     /// #else
-                    openMobileFileById(optios.app, response.data, [Constants.CB_GET_CONTEXT]);
+                    openMobileFileById(optios.app, response.data, [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]);
                     /// #endif
                 });
             } else {
@@ -118,20 +123,24 @@ export const newFile = (optios: {
                     notebook: data.data.box,
                     path: optios.notebookId === data.data.box ? (optios.currentPath.endsWith(".sy") ? optios.currentPath : optios.currentPath + ".sy") : (data.data.path || "/")
                 }, (responseHPath) => {
+                    const createPath = pathPosix().join(responseHPath.data, data.data.path, optios.name || (data.data.path.endsWith("/") ? window.siyuan.languages.untitled : ""));
                     fetchPost("/api/filetree/createDocWithMd", {
                         notebook: data.data.box,
-                        path: pathPosix().join(responseHPath.data, data.data.path, optios.name || (data.data.path.endsWith("/") ? window.siyuan.languages.untitled : "")),
+                        path: createPath,
                         parentID: getDisplayName(optios.currentPath, true, true),
                         markdown: ""
                     }, response => {
+                        if (optios.afterCB) {
+                            optios.afterCB(response.data, pathPosix().basename(createPath));
+                        }
                         /// #if !MOBILE
                         openFileById({
                             app: optios.app,
                             id: response.data,
-                            action: [Constants.CB_GET_CONTEXT]
+                            action: [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]
                         });
                         /// #else
-                        openMobileFileById(optios.app, response.data, [Constants.CB_GET_CONTEXT]);
+                        openMobileFileById(optios.app, response.data, [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]);
                         /// #endif
                     });
                 });
@@ -142,19 +151,23 @@ export const newFile = (optios: {
                 return;
             }
             if (optios.notebookId !== data.data.box) {
+                const createPath = pathPosix().join(data.data.path || "/", optios.name || (data.data.path.endsWith("/") ? window.siyuan.languages.untitled : ""));
                 fetchPost("/api/filetree/createDocWithMd", {
                     notebook: data.data.box,
-                    path: pathPosix().join(data.data.path || "/", optios.name || (data.data.path.endsWith("/") ? window.siyuan.languages.untitled : "")),
+                    path: createPath,
                     markdown: ""
                 }, response => {
+                    if (optios.afterCB) {
+                        optios.afterCB(response.data, pathPosix().basename(createPath));
+                    }
                     /// #if !MOBILE
                     openFileById({
                         app: optios.app,
                         id: response.data,
-                        action: [Constants.CB_GET_CONTEXT]
+                        action: [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]
                     });
                     /// #else
-                    openMobileFileById(optios.app, response.data, [Constants.CB_GET_CONTEXT]);
+                    openMobileFileById(optios.app, response.data, [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]);
                     /// #endif
                 });
                 return;
@@ -172,10 +185,13 @@ export const newFile = (optios: {
                 md: "",
                 sorts: optios.paths
             }, () => {
+                if (optios.afterCB) {
+                    optios.afterCB(id, title);
+                }
                 /// #if !MOBILE
-                openFileById({app: optios.app, id, action: [Constants.CB_GET_CONTEXT]});
+                openFileById({app: optios.app, id, action: [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]});
                 /// #else
-                openMobileFileById(optios.app, id, [Constants.CB_GET_CONTEXT]);
+                openMobileFileById(optios.app, id, [Constants.CB_GET_CONTEXT, Constants.CB_GET_OPENNEW]);
                 /// #endif
             });
         }

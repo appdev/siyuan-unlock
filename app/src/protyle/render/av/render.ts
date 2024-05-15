@@ -5,7 +5,7 @@ import {addDragFill, renderCell} from "./cell";
 import {unicode2Emoji} from "../../../emoji";
 import {focusBlock} from "../../util/selection";
 import {hasClosestBlock, hasClosestByAttribute, hasClosestByClassName} from "../../util/hasClosest";
-import {stickyRow} from "./row";
+import {stickyRow, updateHeader} from "./row";
 import {getCalcValue} from "./calc";
 import {renderAVAttribute} from "./blockAttr";
 import {showMessage} from "../../../dialog/message";
@@ -45,6 +45,13 @@ export const avRender = (element: Element, protyle: IProtyle, cb?: () => void, v
             const left = e.querySelector(".av__scroll")?.scrollLeft || 0;
             const headerTransform = (e.querySelector(".av__row--header") as HTMLElement)?.style.transform;
             const footerTransform = (e.querySelector(".av__row--footer") as HTMLElement)?.style.transform;
+            const selectRowIds: string[] = [];
+            e.querySelectorAll(".av__row--select").forEach(rowItem => {
+                const rowId = rowItem.getAttribute("data-id");
+                if (rowId) {
+                    selectRowIds.push(rowId);
+                }
+            });
             let selectCellId = "";
             const selectCellElement = e.querySelector(".av__cell--select") as HTMLElement;
             if (selectCellElement) {
@@ -114,6 +121,7 @@ export const avRender = (element: Element, protyle: IProtyle, cb?: () => void, v
                     tableHTML = '<div class="av__row av__row--header"><div class="av__colsticky"><div class="av__firstcol"><svg><use xlink:href="#iconUncheck"></use></svg></div>';
                     calcHTML = '<div class="av__colsticky">';
                 }
+                let hasCalc = false;
                 data.columns.forEach((column: IAVColumn, index: number) => {
                     if (column.hidden) {
                         return;
@@ -130,12 +138,15 @@ style="width: ${column.width || "200px"};">
                         tableHTML += "</div>";
                     }
 
-                    // lineNumber type 不参与计算操作
                     if (column.type === "lineNumber") {
-                        calcHTML += `<div data-col-id="${column.id}" data-dtype="${column.type}" style="display: flex; width: ${column.width || "200px"}">&nbsp;</div>`;
+                        // lineNumber type 不参与计算操作
+                        calcHTML += `<div data-col-id="${column.id}" data-dtype="${column.type}" style="width: ${column.width || "200px"}">&nbsp;</div>`;
                     } else {
                         calcHTML += `<div class="av__calc${column.calc && column.calc.operator !== "" ? " av__calc--ashow" : ""}" data-col-id="${column.id}" data-dtype="${column.type}" data-operator="${column.calc?.operator || ""}" 
 style="width: ${column.width || "200px"}">${getCalcValue(column) || '<svg><use xlink:href="#iconDown"></use></svg>' + window.siyuan.languages.calc}</div>`;
+                    }
+                    if (column.calc && column.calc.operator !== "") {
+                        hasCalc = true;
                     }
 
                     if (pinIndex === index) {
@@ -247,7 +258,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex)}
     <div class="av__scroll">
         <div class="av__body">
             ${tableHTML}
-            <div class="av__row--util">
+            <div class="av__row--util${data.rowCount > data.rows.length ? " av__readonly--show" : ""}">
                 <div class="av__colsticky">
                     <button class="b3-button" data-type="av-add-bottom">
                         <svg><use xlink:href="#iconAdd"></use></svg>
@@ -263,7 +274,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex)}
                     </button>
                 </div>
             </div>
-            <div class="av__row--footer">${calcHTML}</div>
+            <div class="av__row--footer${hasCalc ? " av__readonly--show" : ""}">${calcHTML}</div>
         </div>
     </div>
     <div class="av__cursor" contenteditable="true">${Constants.ZWSP}</div>
@@ -300,6 +311,19 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex)}
                         focusBlock(e);
                     }
                 }
+                selectRowIds.forEach((selectRowId, index) => {
+                    const rowElement = e.querySelector(`.av__row[data-id="${selectRowId}"]`) as HTMLElement;
+                    if (rowElement) {
+                        rowElement.classList.add("av__row--select");
+                        rowElement.querySelector(".av__firstcol use").setAttribute("xlink:href", "#iconCheck");
+
+                    }
+
+                    if (index === selectRowIds.length - 1 && rowElement) {
+                        updateHeader(rowElement);
+                    }
+                });
+
                 if (dragFillId) {
                     addDragFill(e.querySelector(`.av__row[data-id="${dragFillId.split(Constants.ZWSP)[0]}"] .av__cell[data-col-id="${dragFillId.split(Constants.ZWSP)[1]}"]`));
                 }

@@ -4,7 +4,7 @@ import {upDownHint} from "../../../util/upDownHint";
 import {fetchPost} from "../../../util/fetch";
 import {escapeGreat, escapeHtml} from "../../../util/escape";
 import {transaction} from "../../wysiwyg/transaction";
-import {genCellValueByElement, updateCellsValue} from "./cell";
+import {updateCellsValue} from "./cell";
 import {updateAttrViewCellAnimation} from "./action";
 import {focusBlock} from "../../util/selection";
 import {setPosition} from "../../../util/setPosition";
@@ -174,7 +174,7 @@ export const toggleUpdateRelationBtn = (menuItemsElement: HTMLElement, avId: str
     const switchElement = switchItemElement.querySelector(".b3-switch") as HTMLInputElement;
     const inputItemElement = switchItemElement.nextElementSibling;
     const btnElement = inputItemElement.nextElementSibling;
-    const oldValue = JSON.parse(searchElement.dataset.oldValue) as IAVCellRelationValue;
+    const oldValue = JSON.parse(searchElement.dataset.oldValue) as IAVColumnRelation;
     if (oldValue.avID) {
         const inputElement = inputItemElement.querySelector("input") as HTMLInputElement;
         if (resetData) {
@@ -186,16 +186,10 @@ export const toggleUpdateRelationBtn = (menuItemsElement: HTMLElement, avId: str
                 switchElement.checked = oldValue.isTwoWay;
             }
         }
-        if (searchElement.dataset.avId === avId && oldValue.avID === avId && oldValue.isTwoWay) {
-            switchItemElement.classList.add("fn__none");
-            inputItemElement.classList.add("fn__none");
+        if (switchElement.checked) {
+            inputItemElement.classList.remove("fn__none");
         } else {
-            switchItemElement.classList.remove("fn__none");
-            if (switchElement.checked) {
-                inputItemElement.classList.remove("fn__none");
-            } else {
-                inputItemElement.classList.add("fn__none");
-            }
+            inputItemElement.classList.add("fn__none");
         }
         if ((searchElement.dataset.avId && oldValue.avID !== searchElement.dataset.avId) || oldValue.isTwoWay !== switchElement.checked || inputElement.dataset.oldValue !== inputElement.value) {
             btnElement.classList.remove("fn__none");
@@ -203,7 +197,6 @@ export const toggleUpdateRelationBtn = (menuItemsElement: HTMLElement, avId: str
             btnElement.classList.add("fn__none");
         }
     } else if (searchElement.dataset.avId) {
-        switchItemElement.classList.remove("fn__none");
         if (switchElement.checked) {
             inputItemElement.classList.remove("fn__none");
         } else {
@@ -323,7 +316,7 @@ ${html || genSelectItemHTML("empty")}`;
 };
 
 export const getRelationHTML = (data: IAV, cellElements?: HTMLElement[]) => {
-    let colRelationData: IAVCellRelationValue;
+    let colRelationData: IAVColumnRelation;
     data.view.columns.find(item => {
         if (item.id === cellElements[0].dataset.colId) {
             colRelationData = item.relation;
@@ -351,6 +344,9 @@ export const setRelationCell = (protyle: IProtyle, nodeElement: HTMLElement, tar
     if (!menuElement) {
         return;
     }
+    if (menuElement.querySelector(".dragover__bottom, .dragover__top")) {
+        return;
+    }
     const rowElement = hasClosestByClassName(cellElements[0], "av__row");
     if (!rowElement) {
         return;
@@ -358,7 +354,19 @@ export const setRelationCell = (protyle: IProtyle, nodeElement: HTMLElement, tar
     if (!nodeElement.contains(cellElements[0])) {
         cellElements[0] = nodeElement.querySelector(`.av__row[data-id="${rowElement.dataset.id}"] .av__cell[data-col-id="${cellElements[0].dataset.colId}"]`) as HTMLElement;
     }
-    const newValue = genCellValueByElement("relation", cellElements[0]).relation;
+    const newValue: IAVCellRelationValue = {blockIDs: [], contents: []};
+    menuElement.querySelectorAll('[draggable="true"]').forEach(item => {
+        const id = item.getAttribute("data-id");
+        newValue.blockIDs.push(id);
+        newValue.contents.push({
+            type: "block",
+            block: {
+                id,
+                content: item.querySelector(".b3-menu__label").textContent
+            },
+            isDetached: !item.querySelector(".popover__block")
+        });
+    });
     if (target.classList.contains("b3-menu__item")) {
         const targetId = target.getAttribute("data-id");
         const separatorElement = menuElement.querySelector(".b3-menu__separator");

@@ -18,8 +18,6 @@ package treenode
 
 import (
 	"bytes"
-	"github.com/siyuan-note/siyuan/kernel/av"
-	"github.com/siyuan-note/siyuan/kernel/cache"
 	"strings"
 	"sync"
 	"text/template"
@@ -34,7 +32,10 @@ import (
 	"github.com/88250/lute/parse"
 	"github.com/88250/lute/render"
 	"github.com/88250/vitess-sqlparser/sqlparser"
+	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/siyuan-note/logging"
+	"github.com/siyuan-note/siyuan/kernel/av"
+	"github.com/siyuan-note/siyuan/kernel/cache"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
@@ -357,17 +358,36 @@ func CountBlockNodes(node *ast.Node) (ret int) {
 	return
 }
 
-func ParentNodes(node *ast.Node) (parents []*ast.Node) {
-	const maxDepth = 256
+// ParentNodesWithHeadings 返回所有父级节点。
+// 注意:返回的父级节点包括了标题节点，并且不保证父级层次顺序。
+func ParentNodesWithHeadings(node *ast.Node) (parents []*ast.Node) {
+	const maxDepth = 255
 	i := 0
-	for n := node.Parent; nil != n; n = n.Parent {
-		i++
-		parents = append(parents, n)
-		if ast.NodeDocument == n.Type {
-			return
-		}
+	headingIDs := hashset.New()
+	for n := node; nil != n; n = n.Parent {
+		parent := n.Parent
 		if maxDepth < i {
 			logging.LogWarnf("parent nodes of node [%s] is too deep", node.ID)
+			return
+		}
+		i++
+
+		if nil == parent {
+			return
+		}
+
+		// 标题下方块编辑后刷新标题块更新时间
+		// The heading block update time is refreshed after editing the blocks under the heading https://github.com/siyuan-note/siyuan/issues/11374
+		parentHeadingLevel := 7
+		for prev := n.Previous; nil != prev; prev = prev.Previous {
+			if ast.NodeHeading == prev.Type && prev.HeadingLevel < parentHeadingLevel && !headingIDs.Contains(prev.ID) {
+				parents = append(parents, prev)
+				headingIDs.Add(prev.ID)
+			}
+		}
+
+		parents = append(parents, parent)
+		if ast.NodeDocument == parent.Type {
 			return
 		}
 	}
@@ -399,6 +419,39 @@ func ParentBlock(node *ast.Node) *ast.Node {
 		}
 	}
 	return nil
+}
+
+func PreviousBlock(node *ast.Node) *ast.Node {
+	for n := node.Previous; nil != n; n = n.Previous {
+		if "" != n.ID && n.IsBlock() {
+			return n
+		}
+	}
+	return nil
+}
+
+func NextBlock(node *ast.Node) *ast.Node {
+	for n := node.Next; nil != n; n = n.Next {
+		if "" != n.ID && n.IsBlock() {
+			return n
+		}
+	}
+	return nil
+}
+
+func FirstChildBlock(node *ast.Node) (ret *ast.Node) {
+	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering {
+			return ast.WalkContinue
+		}
+
+		if n.IsBlock() {
+			ret = n
+			return ast.WalkStop
+		}
+		return ast.WalkContinue
+	})
+	return
 }
 
 func GetNodeInTree(tree *parse.Tree, id string) (ret *ast.Node) {
@@ -721,6 +774,22 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 			case av.KeyTypeRelation: // 清空关联列值，后面再渲染 https://ld246.com/article/1703831044435
 				if nil != tableCell.Value && nil != tableCell.Value.Relation {
 					tableCell.Value.Relation.Contents = nil
+				}
+			case av.KeyTypeText:
+				if nil != tableCell.Value && nil != tableCell.Value.Text {
+					tableCell.Value.Text.Content = util.EscapeHTML(tableCell.Value.Text.Content)
+				}
+			case av.KeyTypeEmail:
+				if nil != tableCell.Value && nil != tableCell.Value.Email {
+					tableCell.Value.Email.Content = util.EscapeHTML(tableCell.Value.Email.Content)
+				}
+			case av.KeyTypeURL:
+				if nil != tableCell.Value && nil != tableCell.Value.URL {
+					tableCell.Value.URL.Content = util.EscapeHTML(tableCell.Value.URL.Content)
+				}
+			case av.KeyTypePhone:
+				if nil != tableCell.Value && nil != tableCell.Value.Phone {
+					tableCell.Value.Phone.Content = util.EscapeHTML(tableCell.Value.Phone.Content)
 				}
 			}
 

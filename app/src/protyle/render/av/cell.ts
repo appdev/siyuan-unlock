@@ -147,7 +147,7 @@ export const genCellValue = (colType: TAVCol, value: string | any) => {
             cellValue = {
                 type: colType,
                 [colType]: {
-                    content: value
+                    content: ["block", "text", "url", "phone", "email"].includes(colType) ? Lute.EscapeHTMLStr(value) : value
                 }
             };
         } else if (colType === "mSelect" || colType === "select") {
