@@ -29,7 +29,7 @@ cd ..
 
 echo 'Building Electron App amd64'
 cd app
-pnpm run dist-darwin
+npm run dist-darwin
 echo 'Building Electron App arm64'
-pnpm run dist-darwin-arm64
+npm run dist-darwin-arm64
 cd ..
