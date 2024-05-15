@@ -3,7 +3,7 @@ name: CD For SiYuan Unlock
 on:
   push:
     tags:
-      - 'v'
+      - 'v*'
   workflow_dispatch:
 
 # ref https://docs.github.com/zh/actions/learn-github-actions/variables
