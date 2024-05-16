@@ -36,7 +36,7 @@ import java.util.Random;
 /**
  * 保活服务.
  *
- * @author <a href="http://88250.b3log.org">Liang Ding</a>
+ * @author <a href="https://88250.b3log.org">Liang Ding</a>
  * @version 1.0.1.2, Feb 7, 2024
  * @since 1.0.0
  */
@@ -91,7 +91,7 @@ public class KeepLiveService extends Service {
             resultPendingIntent = PendingIntent.getActivity(this, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT);
         }
 
-        final String NOTIFICATION_CHANNEL_ID = "org.b3log.siyuan";
+        final String NOTIFICATION_CHANNEL_ID = BuildConfig.APPLICATION_ID;
         final String channelName = "SiYuan Kernel Service";
         final NotificationChannel chan = new NotificationChannel(NOTIFICATION_CHANNEL_ID, channelName, NotificationManager.IMPORTANCE_NONE);
         chan.setLightColor(Color.BLUE);

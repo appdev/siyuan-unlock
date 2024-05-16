@@ -9,7 +9,7 @@ rm -rf android/app/libs
 rm -rf android/app/src/main/assets
 echo 'Building UI'
 cd app
-npm install && npm run build:mobile
+npm install && npm run build
 cd ..
 
 echo 'Building Kernel'
@@ -18,6 +18,7 @@ mkdir -p android/app/libs
 mkdir -p android/app/src/main/assets
 
 cd kernel
+export GOPROXY=https://goproxy.io
 gomobile bind --tags fts5 -ldflags '-s -w' -v -o ../android/app/libs/kernel.aar -target='android/arm64' -androidapi 24 ./mobile/
 cd ..
 rm android/app/libs/kernel-sources.jar

@@ -1,36 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 拥有完全的网络访问权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 运行前台服务 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <!--
-    Fix the problem that notifications cannot be allowed on Android 13 https://github.com/siyuan-note/siyuan/issues/7960
-    https://developer.android.google.cn/guide/topics/ui/notifiers/notification-permission?hl=zh-cn
+        Fix the problem that notifications cannot be allowed on Android 13
+        https://github.com/siyuan-note/siyuan/issues/7960
+        https://developer.android.google.cn/guide/topics/ui/notifiers/notification-permission?hl=zh-cn
     -->
     <uses-permission
         android:name="android.permission.POST_NOTIFICATIONS"
         android:minSdkVersion="33" />
+
     <!-- Foreground KeepLiveService Crash on Android 14 https://github.com/siyuan-note/siyuan/issues/9212 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!-- 支持拍照 Support taking photos for inserting on Android https://github.com/siyuan-note/siyuan/issues/10479 -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <!-- 拍摄照片和视频 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <application
         android:name=".App"
+        android:theme="@style/Theme.SiYuan"
         android:icon="@drawable/icon"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:roundIcon="@drawable/icon"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SiYuan"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        tools:targetApi="tiramisu">
 
         <activity
             android:name=".BootActivity"
+            android:theme="@style/Theme.SiYuan.Boot"
             android:autoRemoveFromRecents="true"
             android:configChanges="orientation|screenSize"
             android:exported="true"
             android:hardwareAccelerated="true"
-            android:noHistory="true"
-            android:theme="@style/Theme.SiYuan.Boot">
+            android:noHistory="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -48,17 +65,18 @@
 
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.SiYuan"
             android:autoRemoveFromRecents="true"
             android:configChanges="keyboard|keyboardHidden|screenLayout|uiMode|orientation|screenSize|smallestScreenSize"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.SiYuan">
+            android:windowSoftInputMode="adjustResize">
             <!--
-            android:windowSoftInputMode="adjustResize"
-            是为了解决软键盘遮挡 https://github.com/siyuan-note/siyuan-android/pull/7
+                android:windowSoftInputMode="adjustResize"
+                是为了解决软键盘遮挡 https://github.com/siyuan-note/siyuan-android/pull/7
 
-            不要添加 android:launchMode="singleInstance" 否则无法从相册中选择上传
-            Supports inserting pictures from photo gallery on the Android https://github.com/siyuan-note/siyuan/issues/9455
+                不要添加 android:launchMode="singleInstance" 否则无法从相册中选择上传
+                Supports inserting pictures from photo gallery on the Android
+                https://github.com/siyuan-note/siyuan/issues/9455
             -->
         </activity>
 
@@ -69,6 +87,19 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="hosting" />
         </service>
+
+        <!--
+            Support opening assets through other apps on the Android
+            https://github.com/siyuan-note/siyuan/issues/10657
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="@string/app_package_name"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths" />
+        </provider>
     </application>
 
 </manifest>

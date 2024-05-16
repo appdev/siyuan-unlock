@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SiYuan</string>
+    <string name="app_package_name">org.b3log.siyuan</string>
 </resources>

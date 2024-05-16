@@ -1,13 +1,11 @@
-import groovy.json.JsonSlurper
-
 plugins {
     id 'com.android.application'
 }
-
+import groovy.json.JsonSlurper
 def getVersionCode() {
     def versionFile = file('../version.properties')
     if (versionFile.canRead()) {
-        def Properties versionProps = new Properties()
+        def versionProps = new Properties()
         versionProps.load(new FileInputStream(versionFile))
         def versionCode = versionProps['VERSION_CODE'].toInteger()
         def runTasks = gradle.startParameter.taskNames
@@ -25,17 +23,17 @@ def getVersionCode() {
 }
 
 android {
+    namespace 'org.b3log.siyuan'
     compileSdk 34
-    buildToolsVersion "34"
     def jsonFile = file('../../app/package.json')
     def jsonContent = new JsonSlurper().parseText(jsonFile.text)
     def currentVersionCode = getVersionCode()
     defaultConfig {
         applicationId "org.b3log.siyuan"
-        minSdkVersion 24
-        targetSdkVersion 34
-        versionCode currentVersionCode
-        versionName jsonContent.version
+        minSdk 24
+        targetSdk 34
+        versionCode siyuanVersionCode
+        versionName siyuanVersionName
     }
 
     buildTypes {
@@ -84,14 +82,14 @@ android {
     lint {
         abortOnError false
     }
-    namespace 'org.b3log.siyuan'
+
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.0'
-    implementation 'com.google.android.material:material:1.8.0'
-    implementation 'androidx.lifecycle:lifecycle-process:2.5.1'
-    implementation 'androidx.work:work-runtime:2.7.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'androidx.lifecycle:lifecycle-process:2.6.1'
+    implementation 'androidx.work:work-runtime:2.8.1'
 
     implementation(name: 'kernel', ext: 'aar')
     implementation("commons-io:commons-io:2.5") // 不要升级，否则无法兼容 Android 7

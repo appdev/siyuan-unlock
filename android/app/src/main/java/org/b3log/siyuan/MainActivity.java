@@ -20,13 +20,16 @@ package org.b3log.siyuan;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ClipData;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.LocaleList;
 import android.os.Looper;
 import android.os.Message;
 import android.provider.MediaStore;
@@ -48,6 +51,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.blankj.utilcode.util.AppUtils;
@@ -73,7 +77,9 @@ import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.TimeZone;
 
 import mobile.Mobile;
@@ -81,8 +87,8 @@ import mobile.Mobile;
 /**
  * 主程序.
  *
- * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.0.6.1, Jan 28, 2024
+ * @author <a href="https://88250.b3log.org">Liang Ding</a>
+ * @version 1.1.0.3, Apr 24, 2024
  * @since 1.0.0
  */
 public class MainActivity extends AppCompatActivity implements com.blankj.utilcode.util.Utils.OnAppStatusChangedListener {
@@ -97,6 +103,7 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
     private String userAgent;
     private ValueCallback<Uri[]> uploadMessage;
     private static final int REQUEST_SELECT_FILE = 100;
+    private static final int REQUEST_CAMERA = 101;
 
     @Override
     public void onNewIntent(final Intent intent) {
@@ -131,7 +138,9 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
         AppUtils.registerAppStatusChangedListener(this);
 
         // 使用 Chromium 调试 WebView
-        // WebView.setWebContentsDebuggingEnabled(true);
+        if (Utils.isDebugPackageAndMode(this)) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
 
         // 注册工具栏显示/隐藏跟随软键盘状态
         // Fix https://github.com/siyuan-note/siyuan/issues/9765
@@ -158,7 +167,27 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
                 if (uploadMessage != null) {
                     uploadMessage.onReceiveValue(null);
                 }
+
                 uploadMessage = filePathCallback;
+
+                if (fileChooserParams.isCaptureEnabled()) {
+                    if (Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+                        // 不支持 Android 10 以下
+                        Toast.makeText(getApplicationContext(), "Capture is not supported on your device (Android 10+ required)", Toast.LENGTH_LONG).show();
+                        uploadMessage = null;
+                        return false;
+                    }
+
+                    final String[] permissions = {android.Manifest.permission.CAMERA};
+                    if (!hasPermissions(permissions)) {
+                        ActivityCompat.requestPermissions(MainActivity.this, permissions, REQUEST_CAMERA);
+                        return true;
+                    }
+
+                    openCamera();
+                    return true;
+                }
+
                 final Intent intent = fileChooserParams.createIntent();
                 intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                 try {
@@ -312,10 +341,13 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
 
         serverPort = getAvailablePort();
         final AsyncServer s = AsyncServer.getDefault();
-        // 生产环境绑定 ipv6 回环地址 [::1] 以防止被远程访问
-        s.listen(InetAddress.getLoopbackAddress(), serverPort, server.getListenCallback());
-        // 开发环境绑定所有网卡以便调试
-        //s.listen(null, serverPort, server.getListenCallback());
+        if (Utils.isDebugPackageAndMode(this)) {
+            // 开发环境绑定所有网卡以便调试
+            s.listen(null, serverPort, server.getListenCallback());
+        } else {
+            // 生产环境绑定 ipv6 回环地址 [::1] 以防止被远程访问
+            s.listen(InetAddress.getLoopbackAddress(), serverPort, server.getListenCallback());
+        }
         Utils.LogInfo("http", "HTTP server is listening on port [" + serverPort + "]");
     }
 
@@ -348,19 +380,45 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
         }
 
         final String appDir = getFilesDir().getAbsolutePath() + "/app";
-        final Locale locale = getResources().getConfiguration().locale;
+        final Locale locale = LocaleList.getDefault().get(0); // 获取用户的设备首选语言
+        final String language = locale.getLanguage().toLowerCase(); // 获取语言代码
+        final String script = locale.getScript().toLowerCase(); // 获取脚本代码
+        final String country = locale.getCountry().toLowerCase(); // 获取国家代码
         final String workspaceBaseDir = getExternalFilesDir(null).getAbsolutePath();
         final String timezone = TimeZone.getDefault().getID();
         new Thread(() -> {
             final String localIPs = Utils.getIPAddressList();
-            String lang = locale.getLanguage() + "_" + locale.getCountry();
-            if (lang.toLowerCase().contains("cn")) {
-                lang = "zh_CN";
+
+            String langCode;
+            if ("zh".equals(language)) {
+                // 检查是否为简体字脚本
+                if ("hans".equals(script)) {
+                    langCode = "zh_CN"; // 简体中文，使用 zh_CN
+
+                } else if ("hant".equals(script)) {
+                    // 对于繁体字脚本，需要进一步检查国家代码
+                    if ("tw".equals(country)) {
+                        langCode = "zh_CHT"; // 繁体中文对应台湾
+                    } else if ("hk".equals(country)) {
+                        langCode = "zh_CHT"; // 繁体中文对应香港
+                    } else {
+                        langCode = "zh_CHT"; // 其他繁体中文情况也使用 zh_CHT
+                    }
+                } else {
+                    langCode = "zh_CN"; // 如果脚本不是简体或繁体，默认为简体中文
+                }
+
             } else {
-                lang = "en_US";
+                // 对于非中文语言，创建一个映射来定义其他语言代码的对应关系
+                Map<String, String> otherLangMap = new HashMap<>();
+                otherLangMap.put("es", "es_ES"); // 西班牙语使用 es_ES
+                otherLangMap.put("fr", "fr_FR"); // 法语使用 fr_FR
+
+                // 使用 getOrDefault 方法从映射中获取语言代码，如果语言不存在则默认为 en_US
+                langCode = otherLangMap.getOrDefault(language, "en_US");
             }
 
-            Mobile.startKernel("android", appDir, workspaceBaseDir, timezone, localIPs, lang,
+            Mobile.startKernel("android", appDir, workspaceBaseDir, timezone, localIPs, langCode,
                     Build.VERSION.RELEASE +
                             "/SDK " + Build.VERSION.SDK_INT +
                             "/WebView " + webViewVer +
@@ -456,6 +514,45 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
         webView.evaluateJavascript("javascript:window.goBack ? window.goBack() : window.history.back()", null);
     }
 
+    // 用于保存拍照图片的 uri
+    private Uri mCameraUri;
+
+    private boolean hasPermissions(String[] permissions) {
+        for (String permission : permissions) {
+            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == REQUEST_CAMERA) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                openCamera();
+                return;
+            }
+
+            Toast.makeText(this, "Permission denied", Toast.LENGTH_LONG).show();
+        }
+
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
+
+    private void openCamera() {
+        final Intent captureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (captureIntent.resolveActivity(getPackageManager()) != null) {
+            final Uri photoUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, new ContentValues());
+            mCameraUri = photoUri;
+            if (photoUri != null) {
+                captureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
+                captureIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                startActivityForResult(captureIntent, REQUEST_CAMERA);
+            }
+        }
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
         if (null == uploadMessage) {
@@ -463,12 +560,20 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
             return;
         }
 
-        // 以下代码参考自 https://github.com/mgks/os-fileup/blob/master/app/src/main/java/mgks/os/fileup/MainActivity.java MIT license
-        if (requestCode == REQUEST_SELECT_FILE) {
+        if (requestCode == REQUEST_CAMERA) {
+            if (RESULT_OK != resultCode) {
+                uploadMessage.onReceiveValue(null);
+                uploadMessage = null;
+                return;
+            }
+
+            uploadMessage.onReceiveValue(new Uri[]{mCameraUri});
+        } else if (requestCode == REQUEST_SELECT_FILE) {
+            // 以下代码参考自 https://github.com/mgks/os-fileup/blob/master/app/src/main/java/mgks/os/fileup/MainActivity.java MIT license
+
             Uri[] results = null;
             ClipData clipData;
             String stringData;
-
             try {
                 clipData = intent.getClipData();
                 stringData = intent.getDataString();
@@ -498,9 +603,9 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
             }
 
             uploadMessage.onReceiveValue(results);
-            uploadMessage = null;
         }
 
+        uploadMessage = null;
         super.onActivityResult(requestCode, resultCode, intent);
     }
 
@@ -511,6 +616,11 @@ public class MainActivity extends AppCompatActivity implements com.blankj.utilco
         appDirFile.mkdirs();
 
         boolean ret = true;
+        if (Utils.isDebugPackageAndMode(this)) {
+            Log.i("boot", "always unzip assets in debug mode");
+            return ret;
+        }
+
         final File appVerFile = new File(appDir, "VERSION");
         if (appVerFile.exists()) {
             try {
