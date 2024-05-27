@@ -74,12 +74,8 @@ func ExportAv2CSV(avID, blockID string) (zipPath string, err error) {
 		return
 	}
 
-	name := util.FilterFileName(attrView.Name)
-	if "" == name {
-		name = Conf.language(105)
-	}
-
-	table, err := renderAttributeViewTable(attrView, view, "")
+	name := util.FilterFileName(getAttrViewName(attrView))
+	table, err := sql.RenderAttributeViewTable(attrView, view, "", GetBlockAttrsWithoutWaitWriting)
 	if nil != err {
 		logging.LogErrorf("render attribute view [%s] table failed: %s", avID, err)
 		return
@@ -557,12 +553,13 @@ func Preview(id string) (retStdHTML string, retOutline []*Path) {
 	return
 }
 
-func ExportDocx(id, savePath string, removeAssets, merge bool) (err error) {
+func ExportDocx(id, savePath string, removeAssets, merge bool) (fullPath string, err error) {
 	if !util.IsValidPandocBin(Conf.Export.PandocBin) {
 		Conf.Export.PandocBin = util.PandocBinPath
 		Conf.Save()
 		if !util.IsValidPandocBin(Conf.Export.PandocBin) {
-			return errors.New(Conf.Language(115))
+			err = errors.New(Conf.Language(115))
+			return
 		}
 	}
 
@@ -587,7 +584,8 @@ func ExportDocx(id, savePath string, removeAssets, merge bool) (err error) {
 		if !gulu.File.IsExist(docxTemplate) {
 			logging.LogErrorf("docx template [%s] not found", docxTemplate)
 			msg := fmt.Sprintf(Conf.Language(197), docxTemplate)
-			return errors.New(msg)
+			err = errors.New(msg)
+			return
 		}
 
 		args = append(args, "--reference-doc", docxTemplate)
@@ -600,28 +598,23 @@ func ExportDocx(id, savePath string, removeAssets, merge bool) (err error) {
 	if nil != err {
 		logging.LogErrorf("export docx failed: %s", gulu.Str.FromBytes(output))
 		msg := fmt.Sprintf(Conf.Language(14), gulu.Str.FromBytes(output))
-		return errors.New(msg)
+		err = errors.New(msg)
+		return
 	}
 
-	targetPath := filepath.Join(savePath, name+".docx")
-	if gulu.File.IsExist(targetPath) {
-		// 先删除目标文件，以检查是否被占用 https://github.com/siyuan-note/siyuan/issues/8822
-		if err := os.RemoveAll(targetPath); nil != err {
-			logging.LogErrorf("export docx failed: %s", err)
-			msg := fmt.Sprintf(Conf.language(215))
-			return errors.New(msg)
-		}
-	}
-
-	if err = filelock.Copy(tmpDocxPath, targetPath); nil != err {
+	fullPath = filepath.Join(savePath, name+".docx")
+	fullPath = util.GetUniqueFilename(fullPath)
+	if err = filelock.Copy(tmpDocxPath, fullPath); nil != err {
 		logging.LogErrorf("export docx failed: %s", err)
-		return errors.New(fmt.Sprintf(Conf.Language(14), err))
+		err = errors.New(fmt.Sprintf(Conf.Language(14), err))
+		return
 	}
 
 	if tmpAssets := filepath.Join(tmpDir, "assets"); !removeAssets && gulu.File.IsDir(tmpAssets) {
 		if err = filelock.Copy(tmpAssets, filepath.Join(savePath, "assets")); nil != err {
 			logging.LogErrorf("export docx failed: %s", err)
-			return errors.New(fmt.Sprintf(Conf.Language(14), err))
+			err = errors.New(fmt.Sprintf(Conf.Language(14), err))
+			return
 		}
 	}
 	return
@@ -881,9 +874,14 @@ func ExportHTML(id, savePath string, pdf, image, keepFold, merge bool) (name, do
 	luteEngine.SetFootnotes(true)
 	luteEngine.RenderOptions.ProtyleContenteditable = false
 	luteEngine.SetProtyleMarkNetImg(false)
+
 	// 不进行安全过滤，因为导出时需要保留所有的 HTML 标签
 	// 使用属性 `data-export-html` 导出时 `<style></style>` 标签丢失 https://github.com/siyuan-note/siyuan/issues/6228
 	luteEngine.SetSanitize(false)
+
+	// 使用实际主题样式值替换样式变量 Use real theme style value replace var in preview mode https://github.com/siyuan-note/siyuan/issues/11458
+	fillThemeStyleVar(tree)
+
 	renderer := render.NewProtyleExportRenderer(tree, luteEngine.RenderOptions)
 	dom = gulu.Str.FromBytes(renderer.Render())
 	return
@@ -1962,6 +1960,16 @@ func processKaTexMacros(n *ast.Node) {
 		depth := 1
 		expanded := resolveKaTexMacro(usedMacro, &macros, &keys, &depth)
 		expanded = unescapeKaTexSupportedFunctions(expanded)
+
+		idx := strings.Index(mathContent, usedMacro)
+		if idx < 0 {
+			continue
+		}
+
+		// 处理宏参数
+		fillKaTexMacrosParams(usedMacro, &mathContent, &expanded)
+
+		// 将宏展开替换到 mathContent 中
 		mathContent = strings.ReplaceAll(mathContent, usedMacro, expanded)
 	}
 	mathContent = unescapeKaTexSupportedFunctions(mathContent)
@@ -2156,7 +2164,15 @@ func exportTree(tree *parse.Tree, wysiwyg, expandKaTexMacros, keepFold bool,
 	if addTitle {
 		if root, _ := getBlock(id, tree); nil != root {
 			root.IAL["type"] = "doc"
-			title := &ast.Node{Type: ast.NodeHeading, HeadingLevel: 1, KramdownIAL: parse.Map2IAL(root.IAL)}
+			title := &ast.Node{Type: ast.NodeHeading, HeadingLevel: 1}
+			for k, v := range root.IAL {
+				if "type" == k {
+					continue
+				}
+				title.SetIALAttr(k, v)
+			}
+			title.InsertAfter(&ast.Node{Type: ast.NodeKramdownBlockIAL, Tokens: parse.IAL2Tokens(title.KramdownIAL)})
+
 			content := html.UnescapeString(root.Content)
 			title.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(content)})
 			ret.Root.PrependChild(title)
@@ -2297,7 +2313,7 @@ func exportTree(tree *parse.Tree, wysiwyg, expandKaTexMacros, keepFold bool,
 			return ast.WalkContinue
 		}
 
-		table, err := renderAttributeViewTable(attrView, view, "")
+		table, err := sql.RenderAttributeViewTable(attrView, view, "", GetBlockAttrsWithoutWaitWriting)
 		if nil != err {
 			logging.LogErrorf("render attribute view [%s] table failed: %s", avID, err)
 			return ast.WalkContinue

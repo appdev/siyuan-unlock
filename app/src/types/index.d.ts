@@ -23,6 +23,7 @@ type TOperation =
     | "updateAttrViewColTemplate"
     | "sortAttrViewRow"
     | "sortAttrViewCol"
+    | "sortAttrViewKey"
     | "setAttrViewColPin"
     | "setAttrViewColHidden"
     | "setAttrViewColWrap"
@@ -543,10 +544,7 @@ interface IPluginData {
 
 interface IPluginDockTab {
     position: TPluginDockPosition,
-    size: {
-        width: number,
-        height: number
-    },
+    size: Config.IUILayoutDockPanelSize,
     icon: string,
     hotkey?: string,
     title: string,

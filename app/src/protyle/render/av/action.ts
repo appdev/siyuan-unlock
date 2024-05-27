@@ -30,6 +30,7 @@ import {addView, openViewMenu} from "./view";
 import {isOnlyMeta, writeText} from "../../util/compatibility";
 import {openSearchAV} from "./relation";
 import {Constants} from "../../../constants";
+import {hideElements} from "../../ui/hideElements";
 
 export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLElement }) => {
     if (isOnlyMeta(event)) {
@@ -164,6 +165,7 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
             event.stopPropagation();
             return true;
         } else if (type === "block-more") {
+            window.siyuan.menus.menu.remove();
             protyle.toolbar.range = document.createRange();
             protyle.toolbar.range.selectNodeContents(target);
             focusByRange(protyle.toolbar.range);
@@ -231,6 +233,7 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
 };
 
 export const avContextmenu = (protyle: IProtyle, rowElement: HTMLElement, position: IPosition) => {
+    hideElements(["hint"], protyle);
     if (rowElement.classList.contains("av__row--header")) {
         return false;
     }
@@ -268,13 +271,6 @@ export const avContextmenu = (protyle: IProtyle, rowElement: HTMLElement, positi
             icon: "iconCopy",
             type: "submenu",
             submenu: copySubMenu(blockId)
-        });
-        menu.addItem({
-            label: window.siyuan.languages.unbindBlock,
-            icon: "iconLinkOff",
-            click() {
-                updateCellsValue(protyle, blockElement, keyCellElement.querySelector(".av__celltext").textContent, [keyCellElement]);
-            }
         });
     }
     if (!protyle.disabled) {
@@ -363,6 +359,15 @@ ${window.siyuan.languages.insertRowAfter.replace("${x}", '<span class="fn__space
                 }
             });
             menu.addSeparator();
+            if (keyCellElement.getAttribute("data-detached") !== "true") {
+                menu.addItem({
+                    label: window.siyuan.languages.unbindBlock,
+                    icon: "iconLinkOff",
+                    click() {
+                        updateCellsValue(protyle, blockElement, keyCellElement.querySelector(".av__celltext").textContent, [keyCellElement]);
+                    }
+                });
+            }
         }
         menu.addItem({
             icon: "iconTrashcan",

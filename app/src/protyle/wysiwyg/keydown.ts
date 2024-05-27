@@ -45,7 +45,6 @@ import {
     alignImgLeft,
     commonHotkey,
     downSelect,
-    duplicateBlock,
     getStartEndElement,
     upSelect
 } from "./commonHotkey";
@@ -67,7 +66,7 @@ import {avKeydown} from "../render/av/keydown";
 import {checkFold} from "../../util/noRelyPCFunction";
 import {AIActions} from "../../ai/actions";
 import {openLink} from "../../editor/openLink";
-import {onluProtyleCommand} from "../../boot/globalEvent/command/protyle";
+import {onlyProtyleCommand} from "../../boot/globalEvent/command/protyle";
 
 export const getContentByInlineHTML = (range: Range, cb: (content: string) => void) => {
     let html = "";
@@ -469,7 +468,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
 
         if (matchHotKey(window.siyuan.config.keymap.general.enter.custom, event)) {
-            onluProtyleCommand({
+            onlyProtyleCommand({
                 protyle,
                 command: "enter",
                 previousRange: range,
@@ -480,7 +479,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
 
         if (matchHotKey(window.siyuan.config.keymap.general.enterBack.custom, event)) {
-            onluProtyleCommand({
+            onlyProtyleCommand({
                 protyle,
                 command: "enterBack",
                 previousRange: range,
@@ -1242,7 +1241,8 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             const id = nodeElement.getAttribute("data-node-id");
             const html = nodeElement.outerHTML;
             const editElement = getContenteditableElement(nodeElement);
-            editElement.innerHTML = "```" + window.siyuan.storage[Constants.LOCAL_CODELANG] + "\n" + editElement.textContent + "<wbr>\n```";
+            // 需要 EscapeHTMLStr https://github.com/siyuan-note/siyuan/issues/11451
+            editElement.innerHTML = "```" + window.siyuan.storage[Constants.LOCAL_CODELANG] + "\n" + Lute.EscapeHTMLStr(editElement.textContent) + "<wbr>\n```";
             const newHTML = protyle.lute.SpinBlockDOM(nodeElement.outerHTML);
             nodeElement.outerHTML = newHTML;
             const newNodeElement = protyle.wysiwyg.element.querySelector(`[data-node-id="${id}"]`);
@@ -1436,17 +1436,6 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                 type: "BlocksMergeSuperBlock",
                 level: "col"
             });
-            return;
-        }
-
-        if (!event.repeat && matchHotKey(window.siyuan.config.keymap.editor.general.duplicate.custom, event)) {
-            event.preventDefault();
-            event.stopPropagation();
-            let selectsElement: HTMLElement[] = Array.from(protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select"));
-            if (selectsElement.length === 0) {
-                selectsElement = [nodeElement];
-            }
-            duplicateBlock(selectsElement, protyle);
             return;
         }
 
