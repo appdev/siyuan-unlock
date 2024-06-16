@@ -119,7 +119,11 @@ func getUpdatePkg() (downloadPkgURLs []string, checksum string, err error) {
 
 	var suffix string
 	if gulu.OS.IsWindows() {
-		suffix = "win.exe"
+		if "arm64" == runtime.GOARCH {
+			suffix = "win-arm64.exe"
+		} else {
+			suffix = "win.exe"
+		}
 	} else if gulu.OS.IsDarwin() {
 		if "arm64" == runtime.GOARCH {
 			suffix = "mac-arm64.dmg"
@@ -208,6 +212,10 @@ func GetAnnouncements() (ret []*Announcement) {
 
 func CheckUpdate(showMsg bool) {
 	return
+
+	if Conf.System.IsMicrosoftStore {
+		return
+	}
 
 	result, err := util.GetRhyResult(showMsg)
 	if nil != err {

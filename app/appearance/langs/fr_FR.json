@@ -1,4 +1,8 @@
 {
+  "copyMirror": "Copier le miroir",
+  "duplicateMirror": "Miroir en double",
+  "duplicateCompletely": "Dupliquer complètement",
+  "isMsStoreVerTip": "La version actuellement utilisée est la version du Microsoft Store, veuillez vérifier les mises à jour dans le Microsoft Store",
   "andSubFile": "Êtes-vous sûr de vouloir supprimer <b>${x}</b> et ses sous-documents ${y} ?",
   "confirmDeleteTip": "Êtes-vous sûr de supprimer <b>${x}</b> ?",
   "rollbackTip": "Après la suppression, il peut être restauré dans [Historique des données], conservé <code class= 'fn__code'>${x}</code> jours selon [Paramètres - Éditeur - Jours de rétention de l'historique]",
@@ -1285,7 +1289,7 @@
     "13": "Impossible de créer un fichier commençant par .",
     "14": "L'exportation a échoué : %s",
     "15": "Bloc de contenu avec l'identifiant [%s] introuvable",
-    "16": "Veuillez entrer le nom du fichier",
+    "16": "Sans titre",
     "17": "La synchronisation initiale a échoué au démarrage. Un écrasement imprévisible des données peut se produire si vous continuez à fonctionner. Veuillez d'abord effectuer une synchronisation.",
     "18": "Échec de la récupération du compte utilisateur communautaire",
     "19": "Les informations de l'utilisateur ont expiré, veuillez vous connecter à nouveau.",
@@ -1484,7 +1488,7 @@
     "212": "Il y a quelques défauts dans la version actuelle de la synchronisation des données cloud, veuillez mettre à niveau vers la dernière version. Désolé pour le désagrément",
     "213": "Échec de la vérification cloud, veuillez essayer de mettre à niveau vers la dernière version et de vous reconnecter avant de synchroniser",
     "214": "Cette fonction nécessite de vous connecter à votre compte et d'acheter des [PRO Features] ou un [Subscription] avant de pouvoir l'utiliser.",
-    "215": "TODO",
+    "215": "Veuillez vous référer au guide de l'utilisateur du bureau",
     "216": "Reconstruction de l'index des données du contenu des ressources, veuillez patienter...",
     "217": "[%d/%d] Création d'un index de données de contenu d'actif",
     "218": "Trop d'instantanés du référentiel de données ont été détectés, ce qui ralentit le démarrage du programme et la synchronisation des données. Veuillez envisager d'exécuter [Paramètres - À propos - Purge du référentiel de données]",
@@ -1509,13 +1513,14 @@
     "237": "[%d] packages Marketplace ont tous été mis à jour avec succès",
     "238": "La mise à jour du package Marketplace [%s] a échoué, veuillez réessayer plus tard",
     "239": "Les opérations associées sont en cours de traitement, veuillez réessayer plus tard",
-    "240": "Le déplacement du titre sous les blocs conteneurs dans la doc n'est pas pris en charge",
+    "240": "L'en-tête du glisser-déposer actuel se trouve dans le bloc conteneur et l'opération de glisser-déposer ne peut pas être effectuée",
     "241": "Le glisser vers son sous-titre n'est pas pris en charge",
     "242": "Le bloc de liaison existe déjà dans la base de données actuelle",
     "243": "Répertorier uniquement les [%d] premières balises (y compris les sous-balises). veuillez modifier [Paramètres - Arbre des documents - Nombre maximum de documents à lister].",
     "244": "Il ne s'est pas terminé normalement après la dernière utilisation. Il est recommandé d'exécuter [Doc Tree - Reconstruire l'index]. À l'avenir, veuillez quitter complètement le programme avant d'éteindre l'ordinateur",
     "245": "Il ne s'est pas terminé normalement après la dernière utilisation. Il est recommandé d'exécuter [Doc Tree - Reconstruire l'index]. À l'avenir, veuillez utiliser [Quitter l'application] dans le panneau de droite pour quitter normalement",
     "246": "Le titre du document ne peut pas contenir / et a été remplacé par _",
-    "247": "Le fichier [%s] est plus grand que la limite maximale [%s] et a été ignoré pour le téléchargement vers le cloud"
+    "247": "Le fichier [%s] est plus grand que la limite maximale [%s] et a été ignoré pour le téléchargement vers le cloud",
+    "248": "Le cap cible est situé dans le bloc conteneur et ne peut pas être utilisé comme point de dépôt"
   }
 }

@@ -52,7 +52,7 @@ import {setPosition} from "../../util/setPosition";
 import {avRender} from "../render/av/render";
 import {emitOpenMenu} from "../../plugin/EventBus";
 import {insertAttrViewBlockAnimation} from "../render/av/row";
-import {avContextmenu} from "../render/av/action";
+import {avContextmenu, duplicateCompletely} from "../render/av/action";
 import {getPlainText} from "../util/paste";
 import {Menu} from "../../plugin/Menu";
 import {addEditorToDatabase} from "../render/av/addToDatabase";
@@ -756,6 +756,7 @@ export class Gutter {
             }).element);
         }
         const copyMenu: IMenu[] = [{
+            iconHTML: "",
             label: window.siyuan.languages.copy,
             accelerator: "⌘C",
             click() {
@@ -767,6 +768,7 @@ export class Gutter {
                 document.execCommand("copy");
             }
         }, {
+            iconHTML: "",
             label: window.siyuan.languages.copyPlainText,
             accelerator: window.siyuan.config.keymap.editor.general.copyPlainText.custom,
             click() {
@@ -778,6 +780,7 @@ export class Gutter {
                 focusBlock(selectsElement[0]);
             }
         }, {
+            iconHTML: "",
             label: window.siyuan.languages.duplicate,
             accelerator: window.siyuan.config.keymap.editor.general.duplicate.custom,
             disabled: protyle.disabled,
@@ -1210,8 +1213,18 @@ export class Gutter {
                 }
             }).element);
         }
+
         const copyMenu = (copySubMenu(id, true, nodeElement) as IMenu[]).concat([{
-            label: window.siyuan.languages.copy,
+            iconHTML: "",
+            label: window.siyuan.languages.copyPlainText,
+            accelerator: window.siyuan.config.keymap.editor.general.copyPlainText.custom,
+            click() {
+                copyPlainText(getPlainText(nodeElement as HTMLElement).trimEnd());
+                focusBlock(nodeElement);
+            }
+        }, {
+            iconHTML: "",
+            label: type === "NodeAttributeView" ? window.siyuan.languages.copyMirror : window.siyuan.languages.copy,
             accelerator: "⌘C",
             click() {
                 if (isNotEditBlock(nodeElement)) {
@@ -1222,23 +1235,28 @@ export class Gutter {
                 document.execCommand("copy");
             }
         }, {
-            label: window.siyuan.languages.copyPlainText,
-            accelerator: window.siyuan.config.keymap.editor.general.copyPlainText.custom,
-            click() {
-                copyPlainText(getPlainText(nodeElement as HTMLElement).trimEnd());
-                focusBlock(nodeElement);
-            }
-        }, {
-            label: window.siyuan.languages.duplicate,
+            iconHTML: "",
+            label: type === "NodeAttributeView" ? window.siyuan.languages.duplicateMirror : window.siyuan.languages.duplicate,
             accelerator: window.siyuan.config.keymap.editor.general.duplicate.custom,
             disabled: protyle.disabled,
             click() {
                 duplicateBlock([nodeElement], protyle);
             }
         }]);
+        if (type === "NodeAttributeView") {
+            copyMenu.push({
+                iconHTML: "",
+                label: window.siyuan.languages.duplicateCompletely,
+                accelerator: window.siyuan.config.keymap.editor.general.duplicateCompletely.custom,
+                disabled: protyle.disabled,
+                click() {
+                    duplicateCompletely(protyle, nodeElement as HTMLElement);
+                }
+            });
+        }
         const copyTextRefMenu = this.genCopyTextRef([nodeElement]);
         if (copyTextRefMenu) {
-            copyMenu.splice(copyMenu.length - 1, 0, copyTextRefMenu);
+            copyMenu.splice(7, 0, copyTextRefMenu);
         }
         window.siyuan.menus.menu.append(new MenuItem({
             label: window.siyuan.languages.copy,
@@ -1980,6 +1998,7 @@ export class Gutter {
             return false;
         }
         return {
+            iconHTML: "",
             accelerator: window.siyuan.config.keymap.editor.general.copyText.custom,
             label: window.siyuan.languages.copyText,
             click() {
@@ -1993,8 +2012,7 @@ export class Gutter {
 
     public render(protyle: IProtyle, element: Element, wysiwyg: HTMLElement, target?: Element) {
         // https://github.com/siyuan-note/siyuan/issues/4659
-        const titleElement = wysiwyg.parentElement.querySelector(".protyle-title__input");
-        if (titleElement && titleElement.getAttribute("data-render") !== "true") {
+        if (protyle.title && protyle.title.element.getAttribute("data-render") !== "true") {
             return;
         }
         // 防止划选时触碰图标导致 hl 无法移除

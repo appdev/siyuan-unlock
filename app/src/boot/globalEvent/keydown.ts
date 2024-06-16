@@ -71,6 +71,7 @@ import {filterHotkey} from "./commonHotkey";
 import {setReadOnly} from "../../config/util/setReadOnly";
 import {copyPNGByLink} from "../../menus/util";
 import {globalCommand} from "./command/global";
+import {duplicateCompletely} from "../../protyle/render/av/action";
 
 const switchDialogEvent = (app: App, event: MouseEvent) => {
     event.preventDefault();
@@ -333,7 +334,8 @@ const editKeydown = (app: App, event: KeyboardEvent) => {
         return true;
     }
 
-    if (!isFileFocus && !event.repeat && matchHotKey(window.siyuan.config.keymap.editor.general.duplicate.custom, event)) {
+    if (!isFileFocus && !event.repeat && !protyle.disabled &&
+        matchHotKey(window.siyuan.config.keymap.editor.general.duplicate.custom, event)) {
         event.preventDefault();
         event.stopPropagation();
         let selectsElement: HTMLElement[] = Array.from(protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select"));
@@ -445,6 +447,15 @@ const editKeydown = (app: App, event: KeyboardEvent) => {
         } else {
             copyPlainText(range.toString());
         }
+        event.preventDefault();
+        return true;
+    }
+    if (matchHotKey(window.siyuan.config.keymap.editor.general.duplicateCompletely.custom, event)) {
+        const nodeElement = hasClosestBlock(range.startContainer);
+        if (!nodeElement || !nodeElement.classList.contains("av")) {
+            return false;
+        }
+        duplicateCompletely(protyle, nodeElement);
         event.preventDefault();
         return true;
     }
@@ -1561,6 +1572,16 @@ export const windowKeyDown = (app: App, event: KeyboardEvent) => {
     if (matchHotKey(window.siyuan.config.keymap.general.stickSearch.custom, event)) {
         globalCommand("stickSearch", app);
         event.preventDefault();
+        return;
+    }
+    if (matchHotKey(window.siyuan.config.keymap.general.unsplit.custom, event) && !event.repeat) {
+        event.preventDefault();
+        globalCommand("unsplit", app);
+        return;
+    }
+    if (matchHotKey(window.siyuan.config.keymap.general.unsplitAll.custom, event) && !event.repeat) {
+        event.preventDefault();
+        globalCommand("unsplitAll", app);
         return;
     }
     if (editKeydown(app, event)) {

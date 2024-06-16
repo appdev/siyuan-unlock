@@ -35,11 +35,116 @@ import (
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/av"
 	"github.com/siyuan-note/siyuan/kernel/cache"
+	"github.com/siyuan-note/siyuan/kernel/filesys"
 	"github.com/siyuan-note/siyuan/kernel/sql"
 	"github.com/siyuan-note/siyuan/kernel/treenode"
 	"github.com/siyuan-note/siyuan/kernel/util"
 	"github.com/xrash/smetrics"
 )
+
+func AppendAttributeViewDetachedBlocksWithValues(avID string, blocksValues [][]*av.Value) (err error) {
+	attrView, err := av.ParseAttributeView(avID)
+	if nil != err {
+		logging.LogErrorf("parse attribute view [%s] failed: %s", avID, err)
+		return
+	}
+
+	now := util.CurrentTimeMillis()
+	var blockIDs []string
+	for _, blockValues := range blocksValues {
+		blockID := ast.NewNodeID()
+		blockIDs = append(blockIDs, blockID)
+		for _, v := range blockValues {
+			keyValues, _ := attrView.GetKeyValues(v.KeyID)
+			if nil == keyValues {
+				err = fmt.Errorf("key [%s] not found", v.KeyID)
+				return
+			}
+
+			v.ID = ast.NewNodeID()
+			v.BlockID = blockID
+			v.Type = keyValues.Key.Type
+			if av.KeyTypeBlock == v.Type {
+				v.Block.ID = blockID
+				v.Block.Created = now
+				v.Block.Updated = now
+			}
+			v.IsDetached = true
+			v.CreatedAt = now
+			v.UpdatedAt = now
+
+			keyValues.Values = append(keyValues.Values, v)
+		}
+	}
+
+	for _, v := range attrView.Views {
+		switch v.LayoutType {
+		case av.LayoutTypeTable:
+			for _, addingBlockID := range blockIDs {
+				v.Table.RowIDs = append(v.Table.RowIDs, addingBlockID)
+			}
+		}
+	}
+
+	if err = av.SaveAttributeView(attrView); nil != err {
+		logging.LogErrorf("save attribute view [%s] failed: %s", avID, err)
+		return
+	}
+
+	util.PushReloadAttrView(avID)
+	return
+}
+
+func DuplicateDatabaseBlock(avID string) (newAvID, newBlockID string, err error) {
+	storageAvDir := filepath.Join(util.DataDir, "storage", "av")
+	oldAvPath := filepath.Join(storageAvDir, avID+".json")
+	newAvID, newBlockID = ast.NewNodeID(), ast.NewNodeID()
+
+	oldAv, err := av.ParseAttributeView(avID)
+	if nil != err {
+		return
+	}
+
+	data, err := filelock.ReadFile(oldAvPath)
+	if nil != err {
+		logging.LogErrorf("read attribute view [%s] failed: %s", avID, err)
+		return
+	}
+
+	data = bytes.ReplaceAll(data, []byte(avID), []byte(newAvID))
+	av.UpsertBlockRel(newAvID, newBlockID)
+
+	newAv := &av.AttributeView{}
+	if err = gulu.JSON.UnmarshalJSON(data, newAv); nil != err {
+		logging.LogErrorf("unmarshal attribute view [%s] failed: %s", newAvID, err)
+		return
+	}
+
+	newAv.Name = oldAv.Name + " (Duplicated " + time.Now().Format("2006-01-02 15:04:05") + ")"
+
+	for _, keyValues := range newAv.KeyValues {
+		if nil != keyValues.Key.Relation && keyValues.Key.Relation.IsTwoWay {
+			// 断开双向关联
+			keyValues.Key.Relation.IsTwoWay = false
+			keyValues.Key.Relation.BackKeyID = ""
+		}
+	}
+
+	data, err = gulu.JSON.MarshalJSON(newAv)
+	if nil != err {
+		logging.LogErrorf("marshal attribute view [%s] failed: %s", newAvID, err)
+		return
+	}
+
+	newAvPath := filepath.Join(storageAvDir, newAvID+".json")
+	if err = filelock.WriteFile(newAvPath, data); nil != err {
+		logging.LogErrorf("write attribute view [%s] failed: %s", newAvID, err)
+		return
+	}
+
+	updateBoundBlockAvsAttribute([]string{newAvID})
+	return
+}
 
 func GetAttributeViewKeysByAvID(avID string) (ret []*av.Key) {
 	ret = []*av.Key{}
@@ -522,9 +627,13 @@ func GetBlockAttributeViewKeys(blockID string) (ret []*BlockAttributeViewKeys) {
 			case av.KeyTypeTemplate:
 				if 0 < len(kv.Values) {
 					ial := map[string]string{}
-					block := getRowBlockValue(keyValues)
+					block := av.GetKeyBlockValue(keyValues)
 					if nil != block && !block.IsDetached {
 						ial = GetBlockAttrsWithoutWaitWriting(block.BlockID)
+					}
+
+					if nil == kv.Values[0].Template {
+						kv.Values[0] = av.GetAttributeViewDefaultValue(kv.Values[0].ID, kv.Key.ID, blockID, kv.Key.Type)
 					}
 
 					var renderErr error
@@ -540,6 +649,7 @@ func GetBlockAttributeViewKeys(blockID string) (ret []*BlockAttributeViewKeys) {
 		}
 
 		// 字段排序
+		refreshAttrViewKeyIDs(attrView)
 		sorts := map[string]int{}
 		for i, k := range attrView.KeyIDs {
 			sorts[k] = i
@@ -855,16 +965,6 @@ func renderAttributeView(attrView *av.AttributeView, viewID, query string, page,
 			end = len(table.Rows)
 		}
 		table.Rows = table.Rows[start:end]
-	}
-	return
-}
-
-func getRowBlockValue(keyValues []*av.KeyValues) (ret *av.Value) {
-	for _, kv := range keyValues {
-		if av.KeyTypeBlock == kv.Key.Type && 0 < len(kv.Values) {
-			ret = kv.Values[0]
-			break
-		}
 	}
 	return
 }
@@ -2350,11 +2450,7 @@ func SortAttributeViewKey(avID, keyID, previousKeyID string) (err error) {
 		return
 	}
 
-	if 1 > len(attrView.KeyIDs) {
-		for _, keyValues := range attrView.KeyValues {
-			attrView.KeyIDs = append(attrView.KeyIDs, keyValues.Key.ID)
-		}
-	}
+	refreshAttrViewKeyIDs(attrView)
 
 	var currentKeyID string
 	var idx, previousIndex int
@@ -2381,6 +2477,29 @@ func SortAttributeViewKey(avID, keyID, previousKeyID string) (err error) {
 
 	err = av.SaveAttributeView(attrView)
 	return
+}
+
+func refreshAttrViewKeyIDs(attrView *av.AttributeView) {
+	// 订正 keyIDs 数据
+
+	existKeyIDs := map[string]bool{}
+	for _, keyValues := range attrView.KeyValues {
+		existKeyIDs[keyValues.Key.ID] = true
+	}
+
+	for k, _ := range existKeyIDs {
+		if !gulu.Str.Contains(k, attrView.KeyIDs) {
+			attrView.KeyIDs = append(attrView.KeyIDs, k)
+		}
+	}
+
+	var tmp []string
+	for _, k := range attrView.KeyIDs {
+		if ok := existKeyIDs[k]; ok {
+			tmp = append(tmp, k)
+		}
+	}
+	attrView.KeyIDs = tmp
 }
 
 func (tx *Transaction) doAddAttrViewColumn(operation *Operation) (ret *TxErr) {
@@ -3272,5 +3391,75 @@ func replaceRelationAvValues(avID, previousID, nextID string) {
 			av.SaveAttributeView(srcAv)
 			util.PushReloadAttrView(srcAvID)
 		}
+	}
+}
+
+func updateBoundBlockAvsAttribute(avIDs []string) {
+	// 更新指定 avIDs 中绑定块的 avs 属性
+
+	cachedTrees, saveTrees := map[string]*parse.Tree{}, map[string]*parse.Tree{}
+	luteEngine := util.NewLute()
+	for _, avID := range avIDs {
+		attrView, _ := av.ParseAttributeView(avID)
+		if nil == attrView {
+			continue
+		}
+
+		blockKeyValues := attrView.GetBlockKeyValues()
+		for _, blockValue := range blockKeyValues.Values {
+			if blockValue.IsDetached {
+				continue
+			}
+			bt := treenode.GetBlockTree(blockValue.BlockID)
+			if nil == bt {
+				continue
+			}
+
+			tree := cachedTrees[bt.RootID]
+			if nil == tree {
+				tree, _ = filesys.LoadTree(bt.BoxID, bt.Path, luteEngine)
+				if nil == tree {
+					continue
+				}
+				cachedTrees[bt.RootID] = tree
+			}
+
+			node := treenode.GetNodeInTree(tree, blockValue.BlockID)
+			if nil == node {
+				continue
+			}
+
+			attrs := parse.IAL2Map(node.KramdownIAL)
+			if "" == attrs[av.NodeAttrNameAvs] {
+				attrs[av.NodeAttrNameAvs] = avID
+			} else {
+				nodeAvIDs := strings.Split(attrs[av.NodeAttrNameAvs], ",")
+				nodeAvIDs = append(nodeAvIDs, avID)
+				nodeAvIDs = gulu.Str.RemoveDuplicatedElem(nodeAvIDs)
+				attrs[av.NodeAttrNameAvs] = strings.Join(nodeAvIDs, ",")
+				saveTrees[bt.RootID] = tree
+			}
+
+			avNames := getAvNames(attrs[av.NodeAttrNameAvs])
+			if "" != avNames {
+				attrs[av.NodeAttrViewNames] = avNames
+			}
+
+			oldAttrs, setErr := setNodeAttrs0(node, attrs)
+			if nil != setErr {
+				continue
+			}
+			cache.PutBlockIAL(node.ID, parse.IAL2Map(node.KramdownIAL))
+			pushBroadcastAttrTransactions(oldAttrs, node)
+		}
+	}
+
+	for _, saveTree := range saveTrees {
+		if treeErr := indexWriteTreeUpsertQueue(saveTree); nil != treeErr {
+			logging.LogErrorf("index write tree upsert queue failed: %s", treeErr)
+		}
+
+		avNodes := saveTree.Root.ChildrenByType(ast.NodeAttributeView)
+		av.BatchUpsertBlockRel(avNodes)
 	}
 }
