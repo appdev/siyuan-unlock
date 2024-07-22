@@ -43,6 +43,7 @@ import (
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/httpclient"
 	"github.com/siyuan-note/logging"
+	"github.com/siyuan-note/siyuan/kernel/av"
 	"github.com/siyuan-note/siyuan/kernel/cache"
 	"github.com/siyuan-note/siyuan/kernel/filesys"
 	"github.com/siyuan-note/siyuan/kernel/search"
@@ -125,6 +126,10 @@ func NetImg2LocalAssets(rootID, originalURL string) (err error) {
 					// `Convert network images/assets to local` supports URL-encoded local file names https://github.com/siyuan-note/siyuan/issues/9929
 					u = unescaped
 				}
+				if strings.Contains(u, ":") {
+					u = strings.TrimPrefix(u, "/")
+				}
+
 				if !gulu.File.IsExist(u) || gulu.File.IsDir(u) {
 					return ast.WalkSkipChildren
 				}
@@ -299,6 +304,10 @@ func NetAssets2LocalAssets(rootID string) (err error) {
 				// `Convert network images/assets to local` supports URL-encoded local file names https://github.com/siyuan-note/siyuan/issues/9929
 				u = unescaped
 			}
+			if strings.Contains(u, ":") {
+				u = strings.TrimPrefix(u, "/")
+			}
+
 			if !gulu.File.IsExist(u) || gulu.File.IsDir(u) {
 				return ast.WalkContinue
 			}
@@ -547,6 +556,8 @@ func UploadAssets2Cloud(rootID string) (count int, err error) {
 	assets := assetsLinkDestsInTree(tree)
 	embedAssets := assetsLinkDestsInQueryEmbedNodes(tree)
 	assets = append(assets, embedAssets...)
+	avAssets := assetsLinkDestsInAttributeViewNodes(tree)
+	assets = append(assets, avAssets...)
 	assets = gulu.Str.RemoveDuplicatedElem(assets)
 	count, err = uploadAssets2Cloud(assets, bizTypeUploadAssets)
 	if nil != err {
@@ -688,6 +699,10 @@ func RemoveUnusedAssets() (ret []string) {
 	for _, p := range unusedAssets {
 		historyPath := filepath.Join(historyDir, p)
 		if p = filepath.Join(util.DataDir, p); filelock.IsExist(p) {
+			if filelock.IsHidden(p) {
+				continue
+			}
+
 			if err = filelock.Copy(p, historyPath); nil != err {
 				return
 			}
@@ -750,7 +765,7 @@ func RemoveUnusedAsset(p string) (ret string) {
 	return
 }
 
-func RenameAsset(oldPath, newName string) (err error) {
+func RenameAsset(oldPath, newName string) (newPath string, err error) {
 	util.PushEndlessProgress(Conf.Language(110))
 	defer util.PushClearProgress()
 
@@ -769,7 +784,7 @@ func RenameAsset(oldPath, newName string) (err error) {
 	}
 
 	newName = util.AssetName(newName + filepath.Ext(oldPath))
-	newPath := "assets/" + newName
+	newPath = "assets/" + newName
 	if err = filelock.Copy(filepath.Join(util.DataDir, oldPath), filepath.Join(util.DataDir, newPath)); nil != err {
 		logging.LogErrorf("copy asset [%s] failed: %s", oldPath, err)
 		return
@@ -821,7 +836,7 @@ func RenameAsset(oldPath, newName string) (err error) {
 					continue
 				}
 
-				treenode.IndexBlockTree(tree)
+				treenode.UpsertBlockTree(tree)
 				sql.UpsertTreeQueue(tree)
 
 				util.PushEndlessProgress(fmt.Sprintf(Conf.Language(111), util.EscapeHTML(tree.Root.IALAttr("title"))))
@@ -830,7 +845,6 @@ func RenameAsset(oldPath, newName string) (err error) {
 	}
 
 	IncSync()
-	util.ReloadUI()
 	return
 }
 
@@ -1079,6 +1093,46 @@ func emojisInTree(tree *parse.Tree) (ret []string) {
 			src := tokens[idx+len("src=\""):]
 			src = src[:bytes.Index(src, []byte("\""))]
 			ret = append(ret, string(src))
+		}
+		return ast.WalkContinue
+	})
+	ret = gulu.Str.RemoveDuplicatedElem(ret)
+	return
+}
+
+func assetsLinkDestsInAttributeViewNodes(tree *parse.Tree) (ret []string) {
+	// The images in the databases are not uploaded to the community hosting https://github.com/siyuan-note/siyuan/issues/11948
+
+	ret = []string{}
+	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering || ast.NodeAttributeView != n.Type {
+			return ast.WalkContinue
+		}
+
+		attrView, _ := av.ParseAttributeView(n.AttributeViewID)
+		if nil == attrView {
+			return ast.WalkContinue
+		}
+
+		for _, keyValues := range attrView.KeyValues {
+			if av.KeyTypeMAsset != keyValues.Key.Type {
+				continue
+			}
+
+			for _, value := range keyValues.Values {
+				if 1 > len(value.MAsset) {
+					continue
+				}
+
+				for _, asset := range value.MAsset {
+					dest := asset.Content
+					if !treenode.IsRelativePath([]byte(dest)) {
+						continue
+					}
+
+					ret = append(ret, strings.TrimSpace(dest))
+				}
+			}
 		}
 		return ast.WalkContinue
 	})

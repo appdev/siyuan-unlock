@@ -20,11 +20,11 @@ RUN rm -rf /var/lib/apt/lists/*
 FROM golang:alpine as GO_BUILD
 WORKDIR /go/src/github.com/appdev/siyuan-unlock/
 COPY --from=NODE_BUILD /go/src/github.com/appdev/siyuan-unlock/ /go/src/github.com/appdev/siyuan-unlock/
-ENV GO111MODULE=auto
+ENV GO111MODULE=on
 ENV CGO_ENABLED=1
 ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
 RUN apk add --no-cache gcc musl-dev && \
-    cd kernel && go build --tags fts5 -v -ldflags "-s -w -X github.com/appdev/siyuan-unlock/kernel/util.Mode=prod" && \
+    cd kernel && go build --tags fts5 -v -ldflags "-s -w" && \
     mkdir /opt/siyuan/ && \
     mv /go/src/github.com/appdev/siyuan-unlock/app/appearance/ /opt/siyuan/ && \
     mv /go/src/github.com/appdev/siyuan-unlock/app/stage/ /opt/siyuan/ && \

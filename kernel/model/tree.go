@@ -30,6 +30,7 @@ import (
 	"github.com/88250/lute/parse"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
+	"github.com/siyuan-note/siyuan/kernel/av"
 	"github.com/siyuan-note/siyuan/kernel/filesys"
 	"github.com/siyuan-note/siyuan/kernel/sql"
 	"github.com/siyuan-note/siyuan/kernel/task"
@@ -105,6 +106,23 @@ func resetTree(tree *parse.Tree, titleSuffix string) {
 		}
 		return ast.WalkContinue
 	})
+
+	var attrViewIDs []string
+	// 绑定镜像数据库
+	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering {
+			return ast.WalkContinue
+		}
+
+		if ast.NodeAttributeView == n.Type {
+			av.UpsertBlockRel(n.AttributeViewID, n.ID)
+			attrViewIDs = append(attrViewIDs, n.AttributeViewID)
+		}
+		return ast.WalkContinue
+	})
+
+	// 清空文档绑定的数据库
+	tree.Root.RemoveIALAttr(av.NodeAttrNameAvs)
 }
 
 func pagedPaths(localPath string, pageSize int) (ret map[int][]string) {
@@ -194,6 +212,11 @@ func LoadTreeByBlockID(id string) (ret *parse.Tree, err error) {
 		return nil, ErrTreeNotFound
 	}
 
+	ret, err = loadTreeByBlockTree(bt)
+	return
+}
+
+func loadTreeByBlockTree(bt *treenode.BlockTree) (ret *parse.Tree, err error) {
 	luteEngine := util.NewLute()
 	ret, err = filesys.LoadTree(bt.BoxID, bt.Path, luteEngine)
 	return
@@ -256,7 +279,7 @@ func searchTreeInFilesystem(rootID string) {
 		return
 	}
 
-	treenode.IndexBlockTree(tree)
+	treenode.UpsertBlockTree(tree)
 	sql.IndexTreeQueue(tree)
 	logging.LogInfof("reindexed tree by filesystem [rootID=%s]", rootID)
 }

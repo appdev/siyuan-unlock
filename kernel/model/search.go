@@ -311,7 +311,7 @@ func buildEmbedBlock(embedBlockID string, excludeIDs []string, headingMode int, 
 	return
 }
 
-func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets bool) (ret []*Block, newDoc bool) {
+func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets, isDatabase bool) (ret []*Block, newDoc bool) {
 	cachedTrees := map[string]*parse.Tree{}
 
 	onlyDoc := false
@@ -321,11 +321,19 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 
 	if "" == keyword {
 		// 查询为空时默认的块引排序规则按最近使用优先 https://github.com/siyuan-note/siyuan/issues/3218
-		refs := sql.QueryRefsRecent(onlyDoc)
+
+		ignoreLines := getRefSearchIgnoreLines()
+		refs := sql.QueryRefsRecent(onlyDoc, ignoreLines)
+		var btsID []string
+		for _, ref := range refs {
+			btsID = append(btsID, ref.DefBlockRootID)
+		}
+		btsID = gulu.Str.RemoveDuplicatedElem(btsID)
+		bts := treenode.GetBlockTrees(btsID)
 		for _, ref := range refs {
 			tree := cachedTrees[ref.DefBlockRootID]
 			if nil == tree {
-				tree, _ = LoadTreeByBlockID(ref.DefBlockRootID)
+				tree, _ = loadTreeByBlockTree(bts[ref.DefBlockRootID])
 			}
 			if nil == tree {
 				continue
@@ -358,10 +366,16 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 
 	ret = fullTextSearchRefBlock(keyword, beforeLen, onlyDoc)
 	tmp := ret[:0]
+	var btsID []string
+	for _, b := range ret {
+		btsID = append(btsID, b.RootID)
+	}
+	btsID = gulu.Str.RemoveDuplicatedElem(btsID)
+	bts := treenode.GetBlockTrees(btsID)
 	for _, b := range ret {
 		tree := cachedTrees[b.RootID]
 		if nil == tree {
-			tree, _ = LoadTreeByBlockID(b.RootID)
+			tree, _ = loadTreeByBlockTree(bts[b.RootID])
 		}
 		if nil == tree {
 			continue
@@ -374,7 +388,7 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 			// `((` 引用候选中排除当前块的父块 https://github.com/siyuan-note/siyuan/issues/4538
 			tree := cachedTrees[b.RootID]
 			if nil == tree {
-				tree, _ = LoadTreeByBlockID(b.RootID)
+				tree, _ = loadTreeByBlockTree(bts[b.RootID])
 				cachedTrees[b.RootID] = tree
 			}
 			if nil != tree {
@@ -398,9 +412,14 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 	}
 	ret = tmp
 
-	if block := treenode.GetBlockTree(id); nil != block {
-		p := path.Join(block.HPath, keyword)
-		newDoc = nil == treenode.GetBlockTreeRootByHPath(block.BoxID, p)
+	if !isDatabase {
+		// 如果非数据库中搜索块引，则不允许新建重名文档
+		if block := treenode.GetBlockTree(id); nil != block {
+			p := path.Join(block.HPath, keyword)
+			newDoc = nil == treenode.GetBlockTreeRootByHPath(block.BoxID, p)
+		}
+	} else { // 如果是数据库中搜索绑定块，则允许新建重名文档 https://github.com/siyuan-note/siyuan/issues/11713
+		newDoc = true
 	}
 
 	// 在 hPath 中加入笔记本名 Show notebooks in hpath of block ref search list results https://github.com/siyuan-note/siyuan/issues/9378
@@ -728,6 +747,22 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "text")
+					} else if n.IsTextMarkType("block-ref") {
+						if !replaceTypes["blockRef"] {
+							return ast.WalkContinue
+						}
+
+						if 0 == method {
+							if strings.Contains(n.TextMarkTextContent, keyword) {
+								n.TextMarkTextContent = strings.ReplaceAll(n.TextMarkTextContent, keyword, replacement)
+								n.TextMarkBlockRefSubtype = "s"
+							}
+						} else if 3 == method {
+							if nil != r && r.MatchString(n.TextMarkTextContent) {
+								n.TextMarkTextContent = r.ReplaceAllString(n.TextMarkTextContent, replacement)
+								n.TextMarkBlockRefSubtype = "s"
+							}
+						}
 					}
 				}
 				return ast.WalkContinue
@@ -882,11 +917,17 @@ func FullTextSearchBlock(query string, boxes, paths []string, types map[string]b
 		rootMap := map[string]bool{}
 		var rootIDs []string
 		contentSorts := map[string]int{}
+		var btsID []string
+		for _, b := range blocks {
+			btsID = append(btsID, b.RootID)
+		}
+		btsID = gulu.Str.RemoveDuplicatedElem(btsID)
+		bts := treenode.GetBlockTrees(btsID)
 		for _, b := range blocks {
 			if _, ok := rootMap[b.RootID]; !ok {
 				rootMap[b.RootID] = true
 				rootIDs = append(rootIDs, b.RootID)
-				tree, _ := LoadTreeByBlockID(b.RootID)
+				tree, _ := loadTreeByBlockTree(bts[b.RootID])
 				if nil == tree {
 					continue
 				}
@@ -1145,12 +1186,12 @@ func fullTextSearchRefBlock(keyword string, beforeLen int, onlyDoc bool) (ret []
 
 	if ignoreLines := getRefSearchIgnoreLines(); 0 < len(ignoreLines) {
 		// Support ignore search results https://github.com/siyuan-note/siyuan/issues/10089
-		notLike := bytes.Buffer{}
+		buf := bytes.Buffer{}
 		for _, line := range ignoreLines {
-			notLike.WriteString(" AND ")
-			notLike.WriteString(line)
+			buf.WriteString(" AND ")
+			buf.WriteString(line)
 		}
-		stmt += notLike.String()
+		stmt += buf.String()
 	}
 
 	orderBy := ` ORDER BY CASE
@@ -1265,12 +1306,12 @@ func fullTextSearchByFTS(query, boxFilter, pathFilter, typeFilter, orderBy strin
 
 	if ignoreLines := getSearchIgnoreLines(); 0 < len(ignoreLines) {
 		// Support ignore search results https://github.com/siyuan-note/siyuan/issues/10089
-		notLike := bytes.Buffer{}
+		buf := bytes.Buffer{}
 		for _, line := range ignoreLines {
-			notLike.WriteString(" AND ")
-			notLike.WriteString(line)
+			buf.WriteString(" AND ")
+			buf.WriteString(line)
 		}
-		stmt += notLike.String()
+		stmt += buf.String()
 	}
 
 	stmt += " " + orderBy
