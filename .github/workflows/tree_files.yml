@@ -12,5 +12,5 @@ jobs:
       - name: Install `tree`
         run: sudo apt-get install tree
 
-      - name: List directory structure using `tree`
-        run: tree
+      - name: List directory structure with depth 2
+        run: tree -L 2
