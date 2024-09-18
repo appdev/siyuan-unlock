@@ -147,9 +147,9 @@ jobs:
           ls -la
           echo "Directory structure:"
           if command -v tree &> /dev/null; then
-            tree -L 3 # Adjust the -L flag to set the depth of the tree
+            tree -L 6 # Adjust the -L flag to set the depth of the tree
           else
-            find . -maxdepth 3 -print | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
+            find . -maxdepth 6 -print | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
           fi
 
       
