@@ -49,11 +49,15 @@ jobs:
       - name: Gather Release Information
         id: release_info
         run: |
-          echo "release_title=Release v${{ steps.version.outputs.value }}" >> $GITHUB_OUTPUT
+          VERSION=${{ steps.version.outputs.value }}
+          TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+          RELEASE_VERSION="v${VERSION}-${TIMESTAMP}"
+          echo "release_version=${RELEASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "release_title=Release ${RELEASE_VERSION}" >> $GITHUB_OUTPUT
           changelog=$(git log -1 --pretty=%B)
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "release_body<<$EOF" >> $GITHUB_ENV
-          echo "Release version ${{ steps.version.outputs.value }}" >> $GITHUB_ENV
+          echo "Release version ${RELEASE_VERSION}" >> $GITHUB_ENV
           echo "Commit message: $changelog" >> $GITHUB_ENV
           echo "$EOF" >> $GITHUB_ENV
 
@@ -61,8 +65,8 @@ jobs:
         id: create_release
         uses: ncipollo/release-action@v1
         with:
-          name: v${{ steps.version.outputs.value }}
-          tag: v${{ steps.version.outputs.value }}
+          name: ${{ steps.release_info.outputs.release_title }}
+          tag: ${{ steps.release_info.outputs.release_version }}
           body: ${{ env.release_body }}
           draft: false
           prerelease: true
