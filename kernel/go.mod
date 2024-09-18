@@ -1,6 +1,6 @@
 module github.com/siyuan-note/siyuan/kernel
 
-        go 1.23
+        go 1.23.1
 
         toolchain go1.23.0
 
