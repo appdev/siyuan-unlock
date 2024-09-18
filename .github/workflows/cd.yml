@@ -1,12 +1,8 @@
 name: CD For SiYuan Unlock
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
-# ref https://docs.github.com/zh/actions/learn-github-actions/variables
 env:
   repo_name_android: "siyuan-android"
   repo_name: "siyuan-unlock"
@@ -32,15 +28,6 @@ jobs:
           python-version: "3.11"
       - run: pip install PyGithub
 
-      - id: thisLatestRelease
-        uses: pozetroninc/github-action-get-latest-release@master
-        with:
-          # owner: siyuan-note
-          # repo: siyuan
-          repository: ${{ github.repository }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          excludes: prerelease, draft
-
       - name: Extract version from package.json
         uses: sergeysova/jq-action@v2
         id: version
@@ -64,22 +51,19 @@ jobs:
         run: |
             echo "release_title=$(git show --format=%s --no-patch | head -1)" >> $GITHUB_OUTPUT
             echo "release_version=$(TZ=Asia/Shanghai date +'v%Y%m%d%H%M')" >> $GITHUB_OUTPUT
-            changelog_header=$(python scripts/parse-changelog-HEAD.py -t ${{ github.ref }} -b ${{ steps.thisLatestRelease.outputs.release }} -e ${{ steps.electronVersion.outputs.value }} ${{ env.repo_owner }}/${{ env.repo_name }})
-            changelog=$(python scripts/parse-changelog.py -t ${{ github.ref }} ${{ env.repo_owner }}/${{ env.repo_name }})
+            changelog=$(git log -1 --pretty=%B)
             EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
             echo "release_body<<$EOF" >> $GITHUB_ENV
-            echo "$changelog_header" >> $GITHUB_ENV
-            echo "$changelog" >> $GITHUB_ENV
+            echo "Release from latest master" >> $GITHUB_ENV
+            echo "Commit message: $changelog" >> $GITHUB_ENV
             echo "$EOF" >> $GITHUB_ENV
-        env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
         id: create_release
         uses: ncipollo/release-action@v1
         with:
           name: ${{ steps.release_info.outputs.release_version }}
-          tag: ${{ github.ref }}
+          tag: ${{ steps.release_info.outputs.release_version }}
           body: ${{ env.release_body }}
           draft: false
           prerelease: true
@@ -145,16 +129,6 @@ jobs:
       with:
         path: ${{ github.workspace }}/go/src/github.com/${{ env.repo_owner }}/${{ env.repo_name }}
 
-
-    
-    - name: Install `tree`
-      run: sudo apt-get install tree
-
-    - name: List directory structure with depth 2
-      run: tree -L 2
-    - name: Current Pwd
-      run: pwd
-      
     - name: Set up MingGW
       uses: msys2/setup-msys2@v2
       if: "contains( matrix.config.goos, 'windows')"
