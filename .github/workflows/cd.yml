@@ -135,6 +135,14 @@ jobs:
       with:
         install: p7zip mingw-w64-x86_64-lua
 
+    - name: Install `tree`
+      run: sudo apt-get install tree
+    - name: List directory structure with depth 2
+      run: tree -L 2
+    - name: Current Pwd
+      run: pwd
+
+      
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
