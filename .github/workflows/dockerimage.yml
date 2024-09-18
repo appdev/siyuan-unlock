@@ -7,9 +7,6 @@ on:
         description: '镜像标签，留空则使用 package.json 中的版本号。务必注意：请确认选择了正确的分支。完整输入示例：3.0.11-rc0 '
         required: true
         default: ''
-  push:
-    branches:
-      - master
 
 # ref https://docs.github.com/zh/actions/learn-github-actions/variables
 env:
