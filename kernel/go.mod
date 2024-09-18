@@ -1,4 +1,4 @@
-module github.com/siyuan-note/siyuan/kernel
+module github.com/appdev/siyuan-unlock/kernel
 
         go 1.23.1
 
