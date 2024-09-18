@@ -153,13 +153,13 @@ func pagedPaths(localPath string, pageSize int) (ret map[int][]string) {
 
 func loadTree(localPath string, luteEngine *lute.Lute) (ret *parse.Tree, err error) {
 	data, err := filelock.ReadFile(localPath)
-	if nil != err {
+	if err != nil {
 		logging.LogErrorf("get data [path=%s] failed: %s", localPath, err)
 		return
 	}
 
 	ret, err = filesys.ParseJSONWithoutFix(data, luteEngine.ParseOptions)
-	if nil != err {
+	if err != nil {
 		logging.LogErrorf("parse json to tree [%s] failed: %s", localPath, err)
 		return
 	}
@@ -215,7 +215,10 @@ func LoadTreeByBlockID(id string) (ret *parse.Tree, err error) {
 			return
 		}
 
-		logging.LogWarnf("block tree not found [id=%s], stack: [%s]", id, logging.ShortStack())
+		stack := logging.ShortStack()
+		if !strings.Contains(stack, "BuildBlockBreadcrumb") {
+			logging.LogWarnf("block tree not found [id=%s], stack: [%s]", id, stack)
+		}
 		return nil, ErrTreeNotFound
 	}
 
@@ -281,7 +284,7 @@ func searchTreeInFilesystem(rootID string) {
 	}
 
 	tree, err := filesys.LoadTree(boxID, treePath, util.NewLute())
-	if nil != err {
+	if err != nil {
 		logging.LogErrorf("load tree [%s] failed: %s", treePath, err)
 		return
 	}

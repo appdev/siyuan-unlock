@@ -1880,6 +1880,13 @@ export const tableMenu = (protyle: IProtyle, nodeElement: Element, cellElement: 
             setTableAlign(protyle, [cellElement], nodeElement, "right", range);
         }
     });
+    otherMenus.push({
+        icon: "",
+        label: window.siyuan.languages.useDefaultAlign,
+        click: () => {
+            setTableAlign(protyle, [cellElement], nodeElement, "", range);
+        }
+    });
     const menus: IMenu[] = [];
     menus.push(...otherMenus);
     menus.push({
@@ -2100,8 +2107,8 @@ export const setFold = (protyle: IProtyle, nodeElement: Element, isOpen?: boolea
         }
         nodeElement.removeAttribute("fold");
         // https://github.com/siyuan-note/siyuan/issues/4411
-        nodeElement.querySelectorAll(".protyle-linenumber").forEach((item: HTMLElement) => {
-            lineNumberRender(item);
+        nodeElement.querySelectorAll(".protyle-linenumber__rows").forEach((item: HTMLElement) => {
+            lineNumberRender(item.parentElement);
         });
     } else {
         if (typeof isOpen === "boolean" && isOpen) {

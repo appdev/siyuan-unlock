@@ -8,7 +8,7 @@ import {
 } from "./hasClosest";
 import {Constants} from "../../constants";
 import {paste} from "./paste";
-import {cancelSB, genEmptyElement, genSBElement} from "../../block/util";
+import {cancelSB, genEmptyElement, genSBElement, insertEmptyBlock} from "../../block/util";
 import {transaction} from "../wysiwyg/transaction";
 import {getTopAloneElement} from "../wysiwyg/getBlock";
 import {updateListOrder} from "../wysiwyg/list";
@@ -806,8 +806,19 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             const sourceElements: Element[] = [];
             const gutterTypes = gutterType.replace(Constants.SIYUAN_DROP_GUTTER, "").split(Constants.ZWSP);
             const selectedIds = gutterTypes[2].split(",");
+            if (event.altKey || event.shiftKey) {
+                if (event.y > protyle.wysiwyg.element.lastElementChild.getBoundingClientRect().bottom) {
+                    insertEmptyBlock(protyle, "afterend", protyle.wysiwyg.element.lastElementChild.getAttribute("data-node-id"));
+                } else {
+                    const range = getRangeByPoint(event.clientX, event.clientY);
+                    if (hasClosestByAttribute(range.startContainer, "data-type", "NodeBlockQueryEmbed")) {
+                        return;
+                    } else {
+                        focusByRange(range);
+                    }
+                }
+            }
             if (event.altKey) {
-                focusByRange(getRangeByPoint(event.clientX, event.clientY));
                 let html = "";
                 for (let i = 0; i < selectedIds.length; i++) {
                     const response = await fetchSyncPost("/api/block/getRefText", {id: selectedIds[i]});
@@ -815,7 +826,6 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 }
                 insertHTML(html, protyle);
             } else if (event.shiftKey) {
-                focusByRange(getRangeByPoint(event.clientX, event.clientY));
                 let html = "";
                 selectedIds.forEach(item => {
                     html += `{{select * from blocks where id='${item}'}}\n`;
@@ -1164,7 +1174,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
         // 编辑器内文字拖拽或资源文件拖拽或按住 alt/shift 拖拽反链图标进入编辑器时不能运行 event.preventDefault()， 否则无光标; 需放在 !window.siyuan.dragElement 之后
         event.preventDefault();
-        let targetElement = hasClosestByClassName(event.target, "av__row") || hasClosestBlock(event.target);
+        let targetElement = hasClosestByClassName(event.target, "av__row") || hasClosestByClassName(event.target, "av__row--util") || hasClosestBlock(event.target);
         const point = {x: event.clientX, y: event.clientY, className: ""};
         if (!targetElement) {
             if (event.clientY > editorElement.lastElementChild.getBoundingClientRect().bottom) {
@@ -1269,6 +1279,10 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             } else if (event.clientX > nodeRect.right - 32 && event.clientX < nodeRect.right &&
                 !targetElement.classList.contains("av__row")) {
                 targetElement.classList.add("dragover__right");
+            } else if (targetElement.classList.contains("av__row--header")) {
+                targetElement.classList.add("dragover__bottom");
+            } else if (targetElement.classList.contains("av__row--util")) {
+                targetElement.previousElementSibling.classList.add("dragover__bottom");
             } else {
                 if (event.clientY > nodeRect.top + nodeRect.height / 2 && disabledPosition !== "bottom") {
                     targetElement.classList.add("dragover__bottom");

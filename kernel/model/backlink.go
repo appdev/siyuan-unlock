@@ -68,7 +68,7 @@ type Backlink struct {
 	Expand     bool         `json:"expand"`
 }
 
-func GetBackmentionDoc(defID, refTreeID, keyword string) (ret []*Backlink) {
+func GetBackmentionDoc(defID, refTreeID, keyword string, containChildren bool) (ret []*Backlink) {
 	keyword = strings.TrimSpace(keyword)
 	ret = []*Backlink{}
 	beforeLen := 12
@@ -78,8 +78,8 @@ func GetBackmentionDoc(defID, refTreeID, keyword string) (ret []*Backlink) {
 	}
 	rootID := sqlBlock.RootID
 
-	refs := sql.QueryRefsByDefID(defID, true)
-	refs = removeDuplicatedRefs(refs) // 同一个块中引用多个相同块时反链去重 https://github.com/siyuan-note/siyuan/issues/3317
+	refs := sql.QueryRefsByDefID(defID, containChildren)
+	refs = removeDuplicatedRefs(refs)
 
 	linkRefs, _, excludeBacklinkIDs := buildLinkRefs(rootID, refs, keyword)
 	tmpMentions, mentionKeywords := buildTreeBackmention(sqlBlock, linkRefs, keyword, excludeBacklinkIDs, beforeLen)
@@ -114,7 +114,7 @@ func GetBackmentionDoc(defID, refTreeID, keyword string) (ret []*Backlink) {
 	return
 }
 
-func GetBacklinkDoc(defID, refTreeID, keyword string) (ret []*Backlink) {
+func GetBacklinkDoc(defID, refTreeID, keyword string, containChildren bool) (ret []*Backlink) {
 	keyword = strings.TrimSpace(keyword)
 	ret = []*Backlink{}
 	sqlBlock := sql.GetBlock(defID)
@@ -123,18 +123,18 @@ func GetBacklinkDoc(defID, refTreeID, keyword string) (ret []*Backlink) {
 	}
 	rootID := sqlBlock.RootID
 
-	tmpRefs := sql.QueryRefsByDefID(defID, true)
+	tmpRefs := sql.QueryRefsByDefID(defID, containChildren)
 	var refs []*sql.Ref
 	for _, ref := range tmpRefs {
 		if ref.RootID == refTreeID {
 			refs = append(refs, ref)
 		}
 	}
-	refs = removeDuplicatedRefs(refs) // 同一个块中引用多个相同块时反链去重 https://github.com/siyuan-note/siyuan/issues/3317
+	refs = removeDuplicatedRefs(refs)
 
 	linkRefs, _, _ := buildLinkRefs(rootID, refs, keyword)
 	refTree, err := LoadTreeByBlockID(refTreeID)
-	if nil != err {
+	if err != nil {
 		logging.LogWarnf("load ref tree [%s] failed: %s", refTreeID, err)
 		return
 	}
@@ -254,7 +254,7 @@ func GetBacklink2(id, keyword, mentionKeyword string, sortMode, mentionSortMode 
 	boxID = sqlBlock.Box
 
 	refs := sql.QueryRefsByDefID(id, true)
-	refs = removeDuplicatedRefs(refs) // 同一个块中引用多个相同块时反链去重 https://github.com/siyuan-note/siyuan/issues/3317
+	refs = removeDuplicatedRefs(refs)
 
 	linkRefs, linkRefsCount, excludeBacklinkIDs := buildLinkRefs(rootID, refs, keyword)
 	tmpBacklinks := toFlatTree(linkRefs, 0, "backlink", nil)
@@ -353,7 +353,7 @@ func GetBacklink(id, keyword, mentionKeyword string, beforeLen int) (boxID strin
 
 	var links []*Block
 	refs := sql.QueryRefsByDefID(id, true)
-	refs = removeDuplicatedRefs(refs) // 同一个块中引用多个相同块时反链去重 https://github.com/siyuan-note/siyuan/issues/3317
+	refs = removeDuplicatedRefs(refs)
 
 	// 为了减少查询，组装好 IDs 后一次查出
 	defSQLBlockIDs, refSQLBlockIDs := map[string]bool{}, map[string]bool{}
@@ -564,10 +564,13 @@ func buildLinkRefs(defRootID string, refs []*sql.Ref, keyword string) (ret []*Bl
 }
 
 func removeDuplicatedRefs(refs []*sql.Ref) (ret []*sql.Ref) {
+	// 同一个块中引用多个块后反链去重
+	// De-duplication of backlinks after referencing multiple blocks in the same block https://github.com/siyuan-note/siyuan/issues/12147
+
 	for _, ref := range refs {
 		contain := false
 		for _, r := range ret {
-			if ref.DefBlockID == r.DefBlockID && ref.BlockID == r.BlockID {
+			if ref.BlockID == r.BlockID {
 				contain = true
 				break
 			}

@@ -39,8 +39,13 @@ type Theme struct {
 func Themes() (ret []*Theme) {
 	ret = []*Theme{}
 
+	isOnline := isBazzarOnline()
+	if !isOnline {
+		return
+	}
+
 	stageIndex, err := getStageIndex("themes")
-	if nil != err {
+	if err != nil {
 		return
 	}
 	bazaarIndex := getBazaarIndex()
@@ -124,7 +129,7 @@ func InstalledThemes() (ret []*Theme) {
 	}
 
 	themeDirs, err := os.ReadDir(util.ThemesPath)
-	if nil != err {
+	if err != nil {
 		logging.LogWarnf("read appearance themes folder failed: %s", err)
 		return
 	}
@@ -190,7 +195,7 @@ func isBuiltInTheme(dirName string) bool {
 func InstallTheme(repoURL, repoHash, installPath string, systemID string) error {
 	repoURLHash := repoURL + "@" + repoHash
 	data, err := downloadPackage(repoURLHash, true, systemID)
-	if nil != err {
+	if err != nil {
 		return err
 	}
 	return installPackage(data, installPath, repoURLHash)

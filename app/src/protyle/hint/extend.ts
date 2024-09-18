@@ -43,15 +43,15 @@ export const hintSlash = (key: string, protyle: IProtyle) => {
         value: "{{",
         html: `<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconSQL"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.blockEmbed}</span><span class="b3-list-item__meta">{{</span></div>`,
     }, {
-        filter: ["ai chat"],
+        filter: ["人工智能", "ai", "rgzn"],
         value: Constants.ZWSP + 5,
-        html: '<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconSparkles"></use></svg><span class="b3-list-item__text">AI Chat</span></div>',
+        html: `<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconSparkles"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.aiWriting}</span></div>`,
     }, {
         filter: ["数据库", "视图", "shujuku", "shitu", "sjk", "st", "database", "view", "db"],
         value: '<div data-type="NodeAttributeView" data-av-type="table"></div>',
         html: `<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconDatabase"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.database}</span></div>`,
     }, {
-        filter: ["新建文档并引用", "xinjianwendangbingyinyong","xjwdbyy", "new doc"],
+        filter: ["新建文档并引用", "xinjianwendangbingyinyong", "xjwdbyy", "new doc"],
         value: Constants.ZWSP + 4,
         html: `<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconFile"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.newFileRef}</span></div>`,
     }, {
@@ -100,7 +100,7 @@ export const hintSlash = (key: string, protyle: IProtyle) => {
     }, {
         filter: ["引述", "yinshu", "ys", "bq", "blockquote"],
         value: "> " + Lute.Caret,
-        html: `<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconQuote"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.quote}</span><span class="b3-list-item__meta">&gt;</span></div>`,
+        html: `<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconQuote"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.quote}</span>${window.siyuan.config.keymap.editor.insert.quote.custom ? `<span class="b3-menu__accelerator">${updateHotkeyTip((window.siyuan.config.keymap.editor.insert.quote.custom))}</span>` : '<span class="b3-list-item__meta">&gt;</span>'}</div>`,
     }, {
         filter: ["代码块", "daimakuai", "dmk", "code block"],
         value: "```",
@@ -182,7 +182,7 @@ export const hintSlash = (key: string, protyle: IProtyle) => {
 <input class="b3-form__upload" type="file" ${protyle.options.upload.accept ? 'multiple="' + protyle.options.upload.accept + '"' : ""}></div>`,
     }, {
         filter: ["iframe", "嵌入网址", "qianruwangzhan", "qrwz"],
-        value: '<iframe sandbox="allow-forms allow-presentation allow-same-origin allow-scripts allow-modals" src="" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>',
+        value: '<iframe sandbox="allow-forms allow-presentation allow-same-origin allow-scripts allow-modals allow-popups" src="" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>',
         html: `<div class="b3-list-item__first"><svg class="b3-list-item__graphic"><use xlink:href="#iconLanguage"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.insertIframeURL}</span></div>`,
     }, {
         filter: ["插入图片链接", "insert image link", "charutupianlianjie", "crtptp"],

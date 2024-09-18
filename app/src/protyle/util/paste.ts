@@ -241,6 +241,10 @@ export const paste = async (protyle: IProtyle, event: (ClipboardEvent | DragEven
             files = event.dataTransfer.items;
         }
     }
+
+    // Improve the pasting of selected text in PDF rectangular annotation https://github.com/siyuan-note/siyuan/issues/11629
+    textPlain = textPlain.replace(/\r\n|\r|\u2028|\u2029/g, "\n");
+
     /// #if !BROWSER
     // 不再支持 PC 浏览器 https://github.com/siyuan-note/siyuan/issues/7206
     if (!siyuanHTML && !textHTML && !textPlain && ("clipboardData" in event)) {
@@ -339,13 +343,6 @@ export const paste = async (protyle: IProtyle, event: (ClipboardEvent | DragEven
     const range = getEditorRange(protyle.wysiwyg.element);
     if (nodeElement.getAttribute("data-type") === "NodeCodeBlock" ||
         protyle.toolbar.getCurrentType(range).includes("code")) {
-        // 粘贴在代码位置
-        // https://github.com/siyuan-note/siyuan/issues/9142
-        // https://github.com/siyuan-note/siyuan/issues/9323
-        // 需排除行内代码 https://github.com/siyuan-note/siyuan/issues/9369
-        if (nodeElement.querySelector(".protyle-action")?.contains(range.startContainer)) {
-            range.setStart(nodeElement.querySelector(".hljs").firstChild, 0);
-        }
         insertHTML(textPlain, protyle);
         return;
     } else if (siyuanHTML) {

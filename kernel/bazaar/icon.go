@@ -37,8 +37,13 @@ type Icon struct {
 func Icons() (icons []*Icon) {
 	icons = []*Icon{}
 
+	isOnline := isBazzarOnline()
+	if !isOnline {
+		return
+	}
+
 	stageIndex, err := getStageIndex("icons")
-	if nil != err {
+	if err != nil {
 		return
 	}
 	bazaarIndex := getBazaarIndex()
@@ -122,7 +127,7 @@ func InstalledIcons() (ret []*Icon) {
 	}
 
 	iconDirs, err := os.ReadDir(util.IconsPath)
-	if nil != err {
+	if err != nil {
 		logging.LogWarnf("read icons folder failed: %s", err)
 		return
 	}
@@ -188,7 +193,7 @@ func isBuiltInIcon(dirName string) bool {
 func InstallIcon(repoURL, repoHash, installPath string, systemID string) error {
 	repoURLHash := repoURL + "@" + repoHash
 	data, err := downloadPackage(repoURLHash, true, systemID)
-	if nil != err {
+	if err != nil {
 		return err
 	}
 	return installPackage(data, installPath, repoURLHash)

@@ -190,6 +190,7 @@ const processAV = (range: Range, html: string, protyle: IProtyle, blockElement: 
             updateCellsValue(protyle, blockElement as HTMLElement, text, undefined, columns, html);
         } else if (cellsElement.length > 0) {
             updateCellsValue(protyle, blockElement as HTMLElement, text, cellsElement, columns, html);
+            document.querySelector(".av__panel")?.remove();
         } else if (hasClosestByClassName(range.startContainer, "av__title")) {
             range.insertNode(document.createTextNode(text));
             range.collapse(false);
@@ -244,7 +245,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         range.collapse(false);
         range.insertNode(document.createElement("wbr"));
         if (isNodeCodeBlock) {
-            getContenteditableElement(blockElement).removeAttribute("data-render");
+            blockElement.querySelector('[data-render="true"]')?.removeAttribute("data-render");
             highlightRender(blockElement);
         } else {
             focusByWbr(blockElement, range);
