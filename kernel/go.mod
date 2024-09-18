@@ -1,6 +1,6 @@
-module github.com/appdev/siyuan-unlock/kernel
+module github.com/siyuan-note/siyuan/kernel
 
-        go 1.23.1
+        go 1.23
 
         toolchain go1.23.0
 
