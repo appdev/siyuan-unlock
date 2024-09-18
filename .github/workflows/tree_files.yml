@@ -14,3 +14,7 @@ jobs:
 
       - name: List directory structure with depth 2
         run: tree -L 2
+    
+      - name: Current Path
+        run: pwd
+
