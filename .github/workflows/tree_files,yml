@@ -1,0 +1,16 @@
+name: List Directory Structure
+
+on: [push]
+
+jobs:
+  list-directory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install `tree`
+        run: sudo apt-get install tree
+
+      - name: List directory structure using `tree`
+        run: tree
