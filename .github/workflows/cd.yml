@@ -156,7 +156,8 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version-file: ${{ github.workspace }}/go/src/github.com/${{ env.repo_owner }}/${{ env.repo_name }}/kernel/go.mod
+        go-version: '1.23'  # Specify the Go version you need
+        check-latest: true
     - run: go version
 
     - name: Set up goversioninfo
