@@ -27,6 +27,10 @@ export const initWindowEvent = (app: App) => {
             window.siyuan.layout.rightDock.hideDock();
             window.siyuan.layout.bottomDock.hideDock();
         }
+        document.querySelectorAll(".protyle-gutters").forEach(item => {
+            item.classList.add("fn__none");
+            item.innerHTML = "";
+        });
         hideTooltip();
     });
     let mouseIsEnter = false;
@@ -81,19 +85,13 @@ export const initWindowEvent = (app: App) => {
             target.classList.contains("protyle-background__icon")) {
             return;
         }
-        // 触摸屏背景和嵌入块按钮显示
-        const backgroundElement = hasClosestByClassName(target, "protyle-background");
-        if (backgroundElement) {
-            if (!globalTouchStart(event)) {
-                backgroundElement.classList.toggle("protyle-background--mobileshow");
-            }
-            return;
-        }
         const embedBlockElement = isInEmbedBlock(target);
         if (embedBlockElement) {
             embedBlockElement.firstElementChild.classList.toggle("protyle-icons--show");
             return;
         }
+        // 触摸屏背景和嵌入块按钮显示
+        globalTouchStart(event);
     }, false);
     document.addEventListener("touchend", (event) => {
         if (isIPad()) {

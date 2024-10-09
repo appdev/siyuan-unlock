@@ -17,7 +17,7 @@ import {isIPad, setStorageVal} from "../util/compatibility";
 import {mathRender} from "../render/mathRender";
 import {isMobile} from "../../util/functions";
 import {processRender} from "../util/processCode";
-import {hasClosestByClassName} from "../util/hasClosest";
+import {hasClosestByAttribute, hasClosestByClassName} from "../util/hasClosest";
 
 export const enter = (blockElement: HTMLElement, range: Range, protyle: IProtyle) => {
     if (hasClosestByClassName(blockElement, "protyle-wysiwyg__embed")) {
@@ -83,7 +83,7 @@ export const enter = (blockElement: HTMLElement, range: Range, protyle: IProtyle
             if (languageElement) {
                 if (window.siyuan.storage[Constants.LOCAL_CODELANG] && languageElement.textContent === "") {
                     languageElement.textContent = window.siyuan.storage[Constants.LOCAL_CODELANG];
-                } else {
+                } else if (!Constants.SIYUAN_RENDER_CODE_LANGUAGES.includes(languageElement.textContent)) {
                     window.siyuan.storage[Constants.LOCAL_CODELANG] = languageElement.textContent;
                     setStorageVal(Constants.LOCAL_CODELANG, window.siyuan.storage[Constants.LOCAL_CODELANG]);
                 }
@@ -198,7 +198,19 @@ export const enter = (blockElement: HTMLElement, range: Range, protyle: IProtyle
     range.insertNode(wbrElement);
     const html = blockElement.outerHTML;
     wbrElement.remove();
+
     if (range.toString() !== "") {
+        // 选中数学公式后回车取消选中 https://github.com/siyuan-note/siyuan/issues/12637#issuecomment-2381106949
+        const mathElement = hasClosestByAttribute(range.startContainer, "data-type", "inline-math")
+        if (mathElement) {
+            const nextSibling = hasNextSibling(mathElement);
+            if (nextSibling) {
+                range = getSelection().getRangeAt(0)
+                range.setEnd(nextSibling, nextSibling.textContent.startsWith(Constants.ZWSP) ? 1 : 0);
+                range.collapse(false);
+            }
+            return true;
+        }
         range.extractContents();
     }
     if (editableElement.lastChild) {

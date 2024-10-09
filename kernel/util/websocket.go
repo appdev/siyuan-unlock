@@ -254,7 +254,11 @@ func PushSaveDoc(rootID, typ string, sources interface{}) {
 	PushEvent(evt)
 }
 
-func PushProtyleReload(rootID string) {
+func PushReloadDocInfo(docInfo map[string]any) {
+	BroadcastByType("filetree", "reloadDocInfo", 0, "", docInfo)
+}
+
+func PushReloadProtyle(rootID string) {
 	BroadcastByType("protyle", "reload", 0, "", rootID)
 }
 
