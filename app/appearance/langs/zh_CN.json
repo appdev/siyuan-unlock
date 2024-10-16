@@ -1,4 +1,5 @@
 {
+  "exportPDFLowMemory": "系统可用内存不足，无法导出该 PDF，请减少内容或者增加可用内存后再尝试导出",
   "exportConf": "导出设置",
   "exportConfTip": "账号、访问授权码、同步、API token 和数据仓库密钥不会被导出",
   "importConf": "导入设置",
@@ -190,7 +191,7 @@
   "unlockEdit": "解除锁定",
   "enable": "启用",
   "disable": "禁用",
-  "removeWorkspacePhysically": "是否物理删除工作空间 ${x} 的数据？（物理删除无法恢复）",
+  "removeWorkspacePhysically": "工作空间已从列表中移除，接下来将永久删除该工作空间 ${x} 中的数据。此删除操作无法恢复，是否继续？",
   "mainMenu": "主菜单",
   "searchRemoveName": "是否删 ${x} 并将其查询条件赋值给 ${y}？",
   "searchUpdateName": "是否将查询名称 ${x} 更新为 ${y}？",
@@ -702,7 +703,6 @@
   "unitInches": "英寸",
   "unitMillimeters": "毫米",
   "additionalLayers": "其他图层",
-  "thumbPage": "页面 {{page}} 的缩略图",
   "thumbsTitle": "显示缩略图",
   "document_properties_page_size_name_a3": "A3",
   "document_properties_page_size_name_a4": "A4",

@@ -1,4 +1,5 @@
 {
+  "exportPDFLowMemory": "Mémoire disponible insuffisante pour exporter ce PDF, veuillez réduire le contenu ou augmenter la mémoire disponible et réessayer d'exporter",
   "exportConf": "Exporter les paramètres",
   "exportConfTip": "Les comptes, codes d'accès, synchronisation, tokens API et clés d'entrepôt de données ne seront pas exportés",
   "importConf": "Importer les paramètres",
@@ -190,7 +191,7 @@
   "marginLeft": "Gauche",
   "enable": "Activer",
   "disable": "Désactiver",
-  "removeWorkspacePhysically": "Voulez-vous supprimer physiquement les données de l'espace de travail ${x} ? (La suppression physique ne peut pas être récupérée)",
+  "removeWorkspacePhysically": "L'espace de travail a été retiré de la liste, et les données de cet espace de travail ${x} seront définitivement supprimées. Cette opération de suppression ne peut pas être annulée, souhaitez-vous continuer ?",
   "mainMenu": "Menu principal",
   "searchRemoveName": "Voulez-vous supprimer ${x} et affecter sa condition de requête à ${y} ?",
   "searchUpdateName": "Mettre à jour le nom ${x} en ${y} ?",
@@ -702,7 +703,6 @@
   "unitInches": "in",
   "unitMillimeters": "mm",
   "additionalLayers": "Calques additionnels",
-  "thumbPage": "Vignette de la page {{page}}",
   "thumbsTitle": "Afficher les vignettes",
   "document_properties_page_size_name_a3": "A3",
   "document_properties_page_size_name_a4": "A4",

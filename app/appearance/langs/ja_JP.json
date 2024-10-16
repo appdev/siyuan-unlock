@@ -1,4 +1,5 @@
 {
+  "exportPDFLowMemory": "システムの利用可能なメモリが不足しているため、このPDFをエクスポートできません。内容を減らすか、利用可能なメモリを増やしてから再試行してください",
   "exportConf": "設定のエクスポート",
   "exportConfTip": "アカウント、アクセス コード、同期、API トークン、データ ウェアハウス キーはエクスポートされません",
   "importConf": "設定のインポート",
@@ -190,7 +191,7 @@
   "unlockEdit": "ドキュメントを書き込み可能にする",
   "enable": "有効",
   "disable": "無効",
-  "removeWorkspacePhysically": "ワークスペース ${x} のデータを削除しますか？(この操作は元に戻せません)",
+  "removeWorkspacePhysically": "ワークスペースはリストから削除されました。これから、ワークスペース ${x} のデータが永久に削除されます。この削除操作は元に戻せませんが、続行しますか？",
   "mainMenu": "メインメニュー",
   "searchRemoveName": "${x} を削除して、そのクエリ条件を ${y} に割り当てますか？",
   "searchUpdateName": "名前 ${x} を ${y} に更新しますか？",
@@ -702,7 +703,6 @@
   "unitInches": "インチ",
   "unitMillimeters": "ミリ",
   "additionalLayers": "追加のレイヤー",
-  "thumbPage": "ページ {{page}} のサムネイル",
   "thumbsTitle": "サムネイルを表示",
   "document_properties_page_size_name_a3": "A3",
   "document_properties_page_size_name_a4": "A4",

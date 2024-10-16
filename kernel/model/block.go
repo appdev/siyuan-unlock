@@ -17,12 +17,14 @@
 package model
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/88250/gulu"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/parse"
 	"github.com/open-spaced-repetition/go-fsrs/v3"
@@ -298,7 +300,23 @@ func IsBlockFolded(id string) (isFolded, isRoot bool) {
 func RecentUpdatedBlocks() (ret []*Block) {
 	ret = []*Block{}
 
-	sqlBlocks := sql.QueryRecentUpdatedBlocks()
+	sqlStmt := "SELECT * FROM blocks WHERE type = 'p' AND length > 1"
+	if util.ContainerIOS == util.Container || util.ContainerAndroid == util.Container {
+		sqlStmt = "SELECT * FROM blocks WHERE type = 'd'"
+	}
+
+	if ignoreLines := getSearchIgnoreLines(); 0 < len(ignoreLines) {
+		// Support ignore search results https://github.com/siyuan-note/siyuan/issues/10089
+		buf := bytes.Buffer{}
+		for _, line := range ignoreLines {
+			buf.WriteString(" AND ")
+			buf.WriteString(line)
+		}
+		sqlStmt += buf.String()
+	}
+
+	sqlStmt += " ORDER BY updated DESC"
+	sqlBlocks := sql.SelectBlocksRawStmt(sqlStmt, 1, 16)
 	if 1 > len(sqlBlocks) {
 		return
 	}
@@ -346,7 +364,7 @@ func TransferBlockRef(fromID, toID string, refIDs []string) (err error) {
 		}
 	}
 
-	sql.WaitForWritingDatabase()
+	sql.FlushQueue()
 	return
 }
 
@@ -842,13 +860,30 @@ func getEmbeddedBlock(trees map[string]*parse.Tree, sqlBlock *sql.Block, heading
 	// 嵌入块查询结果中显示块引用计数 https://github.com/siyuan-note/siyuan/issues/7191
 	var defIDs []string
 	for _, n := range nodes {
-		defIDs = append(defIDs, n.ID)
+		ast.Walk(n, func(n *ast.Node, entering bool) ast.WalkStatus {
+			if !entering {
+				return ast.WalkContinue
+			}
+
+			if n.IsBlock() {
+				defIDs = append(defIDs, n.ID)
+			}
+			return ast.WalkContinue
+		})
 	}
+	defIDs = gulu.Str.RemoveDuplicatedElem(defIDs)
 	refCount := sql.QueryRefCount(defIDs)
 	for _, n := range nodes {
-		if cnt := refCount[n.ID]; 0 < cnt {
-			n.SetIALAttr("refcount", strconv.Itoa(cnt))
-		}
+		ast.Walk(n, func(n *ast.Node, entering bool) ast.WalkStatus {
+			if !entering || !n.IsBlock() {
+				return ast.WalkContinue
+			}
+
+			if cnt := refCount[n.ID]; 0 < cnt {
+				n.SetIALAttr("refcount", strconv.Itoa(cnt))
+			}
+			return ast.WalkContinue
+		})
 	}
 
 	luteEngine := NewLute()
