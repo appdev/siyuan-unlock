@@ -43,7 +43,7 @@ import mobile.Mobile;
  *
  * @author <a href="https://88250.b3log.org">Liang Ding</a>
  * @author <a href="https://github.com/Soltus">绛亽</a>
- * @version 1.1.3.1, May 3, 2024
+ * @version 1.1.4.0, Aug 9, 2024
  * @since 1.0.0
  */
 public final class JSAndroid {
@@ -89,6 +89,18 @@ public final class JSAndroid {
     }
 
     @JavascriptInterface
+    public String readHTMLClipboard() {
+        final ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+        final ClipData clipData = clipboard.getPrimaryClip();
+        if (null == clipData) {
+            return "";
+        }
+
+        final ClipData.Item item = clipData.getItemAt(0);
+        return item.getHtmlText();
+    }
+
+    @JavascriptInterface
     public void writeImageClipboard(final String uri) {
         final ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
         final ClipData clip = ClipData.newUri(activity.getContentResolver(), "Copied img from SiYuan", Uri.parse("http://127.0.0.1:6806/" + uri));
@@ -99,6 +111,13 @@ public final class JSAndroid {
     public void writeClipboard(final String content) {
         final ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
         final ClipData clip = ClipData.newPlainText("Copied text from SiYuan", content);
+        clipboard.setPrimaryClip(clip);
+    }
+
+    @JavascriptInterface
+    public void writeHTMLClipboard(final String text, final String html) {
+        final ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+        final ClipData clip = ClipData.newHtmlText("Copied html from SiYuan", text, html);
         clipboard.setPrimaryClip(clip);
     }
 

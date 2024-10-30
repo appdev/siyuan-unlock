@@ -18,6 +18,9 @@
 package org.b3log.siyuan;
 
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -43,7 +46,7 @@ import java.util.Set;
  * 引导启动.
  *
  * @author <a href="https://88250.b3log.org">Liang Ding</a>
- * @version 1.1.0.4, Feb 13, 2024
+ * @version 1.1.0.6, Sep 20, 2024
  * @since 1.0.0
  */
 public class BootActivity extends AppCompatActivity {
@@ -55,7 +58,7 @@ public class BootActivity extends AppCompatActivity {
 
         // Privacy policy solicitation will no longer pop up when Android starts for the first time
         // https://github.com/siyuan-note/siyuan/issues/10348
-        ApplicationInfo applicationInfo = null;
+        ApplicationInfo applicationInfo;
         try {
             applicationInfo = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
         } catch (PackageManager.NameNotFoundException e) {
@@ -63,50 +66,28 @@ public class BootActivity extends AppCompatActivity {
         }
 
         // 从配置清单获取 CHANNEL 的值，用于判断是哪个渠道包
-        final String channel = "googleplay";
+        final String channel = applicationInfo.metaData.getString("CHANNEL");
 
-        // 渠道集合
-        final Set<String> requiredChannels = new HashSet<>();
-        requiredChannels.add("googleplay");
-        requiredChannels.add("official");
-
-        // 判断 CHANNEL 值是否在 requiredChannels 集合中
-        final boolean isChannelVersion = requiredChannels.contains(channel);
-
-        // 不存在且第一次运行
-        if (!isChannelVersion && isFirstRun()) {
+        // 首次运行需要弹出用户协议的渠道集合
+        final Set<String> showAgreementChannels = new HashSet<>();
+        showAgreementChannels.add("cn");
+        showAgreementChannels.add("huawei");
+        final boolean needShowAgreement = showAgreementChannels.contains(channel);
+        if (needShowAgreement && isFirstRun()) {
             // 首次运行弹窗提示用户隐私条款和使用授权
             setContentView(R.layout.activity_agreement);
             showAgreements();
             return;
         }
 
-        // 获取可能存在的 block URL（通过 siyuan://blocks/xxx 打开应用时传递的）
-        final String blockURL = getBlockURL();
         // 启动主界面
-        startMainActivity(blockURL);
+        startMainActivity();
     }
 
     @Override
     protected void onDestroy() {
         Log.i("boot", "destroy boot activity");
         super.onDestroy();
-    }
-
-    private String getBlockURL() {
-        String ret = "";
-        try {
-            final Intent intent = getIntent();
-            final Uri blockURLUri = intent.getData();
-            if (null != blockURLUri) {
-                Log.i("boot", "block URL [" + blockURLUri + "]");
-                ret = blockURLUri.toString();
-            }
-        } catch (final Exception e) {
-            Utils.LogError("boot", "gets block URL failed", e);
-        }
-
-        return ret;
     }
 
     private boolean isFirstRun() {
@@ -116,10 +97,53 @@ public class BootActivity extends AppCompatActivity {
         return !appDirFile.exists();
     }
 
-    private void startMainActivity(final String blockURL) {
-        final Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-        intent.putExtra("blockURL", blockURL);
-        startActivity(intent);
+    private void startMainActivity() {
+        final Intent intent = getIntent();
+        // 获取可能存在的 block URL（通过 siyuan://blocks/xxx 打开应用时传递的）
+        String blockURL = "";
+        try {
+            final Uri blockURLUri = intent.getData();
+            if (null != blockURLUri && blockURLUri.toString().toLowerCase().startsWith("siyuan://")) {
+                Log.i("boot", "block URL [" + blockURLUri + "]");
+                blockURL = blockURLUri.toString();
+            }
+        } catch (final Exception e) {
+            Utils.LogError("boot", "gets block URL failed", e);
+        }
+
+        // 获取可能存在的分享数据
+        final String action = intent.getAction();
+        final String type = intent.getType();
+        if (Intent.ACTION_SEND.equals(action) && type != null) {
+            if ("text/plain".equals(type)) {
+                String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+                if (text != null) {
+                    Log.i("boot", "Received shared text [" + text + "]");
+
+                    if (Utils.isURL(text)) {
+                        text = "[" + text + "](" + text + ")";
+                    } else {
+                        if (text.startsWith("\"") && text.contains("\"\n http") && text.contains("#:~:text=")) {
+                            final int start = text.indexOf("\"");
+                            final int end = text.indexOf("\"\n http");
+                            text = text.substring(start + 1, end);
+                        }
+                    }
+
+                    final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(ClipData.newHtmlText("Copied text from shared", text, text));
+                }
+            } else if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/") || type.startsWith("application/")) {
+                final Uri assetUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+                if (assetUri != null) {
+                    Log.i("boot", "Received shared asset [" + assetUri + "]");
+                }
+            }
+        }
+
+        final Intent startMainIntent = new Intent(getApplicationContext(), MainActivity.class);
+        startMainIntent.putExtra("blockURL", blockURL);
+        startActivity(startMainIntent);
     }
 
     private AlertDialog agreementDialog;
@@ -130,7 +154,7 @@ public class BootActivity extends AppCompatActivity {
             final String cmd = msg.getData().getString("cmd");
             if ("agreement-y".equals(cmd)) {
                 agreementDialog.dismiss();
-                startMainActivity("");
+                startMainActivity();
             } else if ("agreement-n".equals(cmd)) {
                 final String dataDir = getFilesDir().getAbsolutePath();
                 final String appDir = dataDir + "/app";

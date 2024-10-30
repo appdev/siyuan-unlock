@@ -15,10 +15,12 @@ bin/
 gen/
 out/
 release/
+debug/
 
 # Gradle files
 .gradle/
 build/
+build-release/
 
 # Local configuration file (sdk path, etc)
 local.properties
