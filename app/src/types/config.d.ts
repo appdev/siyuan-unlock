@@ -312,6 +312,10 @@ declare namespace Config {
          * Whether to enable the inline math
          */
         inlineMath: boolean;
+        /**
+         * Whether to enable the inline strikethrough
+         */
+        inlineStrikethrough: boolean;
     }
 
     /**
@@ -337,6 +341,10 @@ declare namespace Config {
          * The default number of backlinks to mention
          */
         backmentionExpandCount: number;
+        /**
+         * Whether the backlink contains children
+         */
+        backlinkContainChildren: boolean;
         /**
          * The maximum length of the dynamic anchor text for block references
          */
@@ -1381,6 +1389,10 @@ declare namespace Config {
          * Timeout (unit: seconds)
          */
         timeout: number;
+        /**
+         * Concurrent requests.
+         */
+        concurrentReqs: number;
     }
 
     /**
@@ -1403,6 +1415,10 @@ declare namespace Config {
          * Timeout (unit: seconds)
          */
         timeout: number;
+        /**
+         * Concurrent requests.
+         */
+        concurrentReqs: number;
         /**
          * Username
          */
@@ -1766,6 +1782,10 @@ declare namespace Config {
          * Tab title
          */
         title?: string;
+        /**
+         * Tab recent view time
+         */
+        activeTime?: string;
     }
 
     /**

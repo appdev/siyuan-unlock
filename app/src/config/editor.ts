@@ -191,6 +191,14 @@ export const editor = {
     <span class="fn__space"></span>
     <input class="b3-text-field fn__flex-center fn__size200" id="backmentionExpandCount" type="number" min="-1" max="512" value="${window.siyuan.config.editor.backmentionExpandCount}"/>
 </div>
+<label class="fn__flex b3-label">
+    <div class="fn__flex-1">
+        ${window.siyuan.languages.backlinkContainChildren}
+        <div class="b3-label__text">${window.siyuan.languages.backlinkContainChildrenTip}</div>
+    </div>
+    <span class="fn__space"></span>
+    <input class="b3-switch fn__flex-center" id="backlinkContainChildren" type="checkbox"${window.siyuan.config.editor.backlinkContainChildren ? " checked" : ""}/>
+</label>
 <div class="fn__flex b3-label config__item">
     <div class="fn__flex-1">
         ${window.siyuan.languages.generateHistory}
@@ -319,6 +327,14 @@ export const editor = {
     </div>
     <span class="fn__space"></span>
     <input class="b3-switch fn__flex-center" id="editorMarkdownInlineMath" type="checkbox"${window.siyuan.config.editor.markdown.inlineMath ? " checked" : ""}/>
+</label>
+<label class="fn__flex b3-label">
+    <div class="fn__flex-1">
+        ${window.siyuan.languages.editorMarkdownInlineStrikethrough}
+        <div class="b3-label__text">${window.siyuan.languages.editorMarkdownInlineStrikethroughTip}</div>
+    </div>
+    <span class="fn__space"></span>
+    <input class="b3-switch fn__flex-center" id="editorMarkdownInlineStrikethrough" type="checkbox"${window.siyuan.config.editor.markdown.inlineStrikethrough ? " checked" : ""}/>
 </label>`;
     },
     bindEvent: () => {
@@ -353,7 +369,8 @@ export const editor = {
                     inlineSup: (editor.element.querySelector("#editorMarkdownInlineSup") as HTMLInputElement).checked,
                     inlineSub: (editor.element.querySelector("#editorMarkdownInlineSub") as HTMLInputElement).checked,
                     inlineTag: (editor.element.querySelector("#editorMarkdownInlineTag") as HTMLInputElement).checked,
-                    inlineMath: (editor.element.querySelector("#editorMarkdownInlineMath") as HTMLInputElement).checked
+                    inlineMath: (editor.element.querySelector("#editorMarkdownInlineMath") as HTMLInputElement).checked,
+                    inlineStrikethrough: (editor.element.querySelector("#editorMarkdownInlineStrikethrough") as HTMLInputElement).checked
                 },
                 allowHTMLBLockScript: (editor.element.querySelector("#allowHTMLBLockScript") as HTMLInputElement).checked,
                 justify: (editor.element.querySelector("#justify") as HTMLInputElement).checked,
@@ -377,6 +394,7 @@ export const editor = {
                 blockRefDynamicAnchorTextMaxLen: parseInt((editor.element.querySelector("#blockRefDynamicAnchorTextMaxLen") as HTMLInputElement).value),
                 backlinkExpandCount: parseInt((editor.element.querySelector("#backlinkExpandCount") as HTMLInputElement).value),
                 backmentionExpandCount: parseInt((editor.element.querySelector("#backmentionExpandCount") as HTMLInputElement).value),
+                backlinkContainChildren: (editor.element.querySelector("#backlinkContainChildren") as HTMLInputElement).checked,
                 dynamicLoadBlocks: dynamicLoadBlocks,
                 codeLigatures: (editor.element.querySelector("#codeLigatures") as HTMLInputElement).checked,
                 codeTabSpaces: parseInt((editor.element.querySelector("#codeTabSpaces") as HTMLInputElement).value),

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/88250/lute/parse"
 	"github.com/88250/lute/render"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/panjf2000/ants/v2"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/cache"
@@ -43,16 +45,14 @@ func LoadTrees(ids []string) (ret map[string]*parse.Tree) {
 	luteEngine := util.NewLute()
 	var boxIDs []string
 	var paths []string
-	blockIDs := map[string]string{}
-	seen := map[string]bool{}
+	blockIDs := map[string][]string{}
 	for _, bt := range bts {
-		key := bt.BoxID + bt.Path
-		if !seen[key] {
-			seen[key] = true
-			boxIDs = append(boxIDs, bt.BoxID)
-			paths = append(paths, bt.Path)
-			blockIDs[bt.RootID] = bt.ID
+		boxIDs = append(boxIDs, bt.BoxID)
+		paths = append(paths, bt.Path)
+		if _, ok := blockIDs[bt.RootID]; !ok {
+			blockIDs[bt.RootID] = []string{}
 		}
+		blockIDs[bt.RootID] = append(blockIDs[bt.RootID], bt.ID)
 	}
 
 	trees, errs := batchLoadTrees(boxIDs, paths, luteEngine)
@@ -64,8 +64,10 @@ func LoadTrees(ids []string) (ret map[string]*parse.Tree) {
 			continue
 		}
 
-		id := blockIDs[tree.Root.ID]
-		ret[id] = tree
+		bIDs := blockIDs[tree.Root.ID]
+		for _, bID := range bIDs {
+			ret[bID] = tree
+		}
 	}
 	return
 }
@@ -83,23 +85,37 @@ func LoadTree(boxID, p string, luteEngine *lute.Lute) (ret *parse.Tree, err erro
 }
 
 func batchLoadTrees(boxIDs, paths []string, luteEngine *lute.Lute) (ret []*parse.Tree, errs []error) {
-	var wg sync.WaitGroup
+	waitGroup := sync.WaitGroup{}
 	lock := sync.Mutex{}
-	for i := range paths {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-
-			boxID := boxIDs[i]
-			path := paths[i]
-			tree, err := LoadTree(boxID, path, luteEngine)
-			lock.Lock()
-			ret = append(ret, tree)
-			errs = append(errs, err)
-			lock.Unlock()
-		}(i)
+	poolSize := runtime.NumCPU()
+	if 8 < poolSize {
+		poolSize = 8
 	}
-	wg.Wait()
+	p, _ := ants.NewPoolWithFunc(poolSize, func(arg interface{}) {
+		defer waitGroup.Done()
+
+		i := arg.(int)
+		boxID := boxIDs[i]
+		path := paths[i]
+		tree, err := LoadTree(boxID, path, luteEngine)
+		lock.Lock()
+		ret = append(ret, tree)
+		errs = append(errs, err)
+		lock.Unlock()
+	})
+	loaded := map[string]bool{}
+	for i := range paths {
+		if loaded[boxIDs[i]+paths[i]] {
+			continue
+		}
+
+		loaded[boxIDs[i]+paths[i]] = true
+
+		waitGroup.Add(1)
+		p.Invoke(i)
+	}
+	waitGroup.Wait()
+	p.Release()
 	return
 }
 

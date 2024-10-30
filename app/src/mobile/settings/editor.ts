@@ -20,7 +20,8 @@ const setEditor = (modelMainElement: Element) => {
         inlineSup: (modelMainElement.querySelector("#editorMarkdownInlineSup") as HTMLInputElement).checked,
         inlineSub: (modelMainElement.querySelector("#editorMarkdownInlineSub") as HTMLInputElement).checked,
         inlineTag: (modelMainElement.querySelector("#editorMarkdownInlineTag") as HTMLInputElement).checked,
-        inlineMath: (modelMainElement.querySelector("#editorMarkdownInlineMath") as HTMLInputElement).checked
+        inlineMath: (modelMainElement.querySelector("#editorMarkdownInlineMath") as HTMLInputElement).checked,
+        inlineStrikethrough: (modelMainElement.querySelector("#editorMarkdownInlineStrikethrough") as HTMLInputElement).checked
     };
     window.siyuan.config.editor.allowHTMLBLockScript = (modelMainElement.querySelector("#allowHTMLBLockScript") as HTMLInputElement).checked;
     window.siyuan.config.editor.dynamicLoadBlocks = dynamicLoadBlocks;
@@ -44,6 +45,7 @@ const setEditor = (modelMainElement: Element) => {
     window.siyuan.config.editor.blockRefDynamicAnchorTextMaxLen = parseInt((modelMainElement.querySelector("#blockRefDynamicAnchorTextMaxLen") as HTMLInputElement).value);
     window.siyuan.config.editor.backlinkExpandCount = parseInt((modelMainElement.querySelector("#backlinkExpandCount") as HTMLInputElement).value);
     window.siyuan.config.editor.backmentionExpandCount = parseInt((modelMainElement.querySelector("#backmentionExpandCount") as HTMLInputElement).value);
+    window.siyuan.config.editor.backlinkContainChildren = (modelMainElement.querySelector("#backlinkContainChildren") as HTMLInputElement).checked;
     window.siyuan.config.editor.codeLigatures = (modelMainElement.querySelector("#codeLigatures") as HTMLInputElement).checked;
     window.siyuan.config.editor.codeTabSpaces = parseInt((modelMainElement.querySelector("#codeTabSpaces") as HTMLInputElement).value);
     window.siyuan.config.editor.fontSize = parseInt((modelMainElement.querySelector("#fontSize") as HTMLInputElement).value);
@@ -219,6 +221,14 @@ export const initEditor = () => {
     <input class="b3-text-field fn__block" id="backmentionExpandCount" type="number" min="-1" max="512" value="${window.siyuan.config.editor.backmentionExpandCount}"/>
     <div class="b3-label__text">${window.siyuan.languages.backmentionExpandTip}</div>
 </div>
+<label class="fn__flex b3-label">
+    <div class="fn__flex-1">
+        ${window.siyuan.languages.backlinkContainChildren}
+        <div class="b3-label__text">${window.siyuan.languages.backlinkContainChildrenTip}</div>
+    </div>
+    <span class="fn__space"></span>
+    <input class="b3-switch fn__flex-center" id="backlinkContainChildren" type="checkbox"${window.siyuan.config.editor.backlinkContainChildren ? " checked" : ""}/>
+</label>
 <div class="b3-label">
     ${window.siyuan.languages.generateHistory}
     <span class="fn__hr"></span>
@@ -312,6 +322,14 @@ export const initEditor = () => {
     </div>
     <span class="fn__space"></span>
     <input class="b3-switch fn__flex-center" id="editorMarkdownInlineMath" type="checkbox"${window.siyuan.config.editor.markdown.inlineMath ? " checked" : ""}/>
+</label>
+<label class="fn__flex b3-label">
+    <div class="fn__flex-1">
+       ${window.siyuan.languages.editorMarkdownInlineStrikethrough}
+        <div class="b3-label__text">${window.siyuan.languages.editorMarkdownInlineStrikethroughTip}</div>
+    </div>
+    <span class="fn__space"></span>
+    <input class="b3-switch fn__flex-center" id="editorMarkdownInlineStrikethrough" type="checkbox"${window.siyuan.config.editor.markdown.inlineStrikethrough ? " checked" : ""}/>
 </label>`,
         bindEvent(modelMainElement: HTMLElement) {
             modelMainElement.querySelector("#clearHistory").addEventListener("click", () => {

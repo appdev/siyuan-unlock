@@ -1303,7 +1303,10 @@ export const imgMenu = (protyle: IProtyle, range: Range, assetElement: HTMLEleme
         window.siyuan.menus.menu.append(new MenuItem({type: "separator"}).element);
         openMenu(protyle.app, imgSrc, false, false);
     }
-    window.siyuan.menus.menu.append(new MenuItem(exportAsset(imgElement.getAttribute("data-src"))).element);
+    const dataSrc = imgElement.getAttribute("data-src");
+    if (dataSrc && dataSrc.startsWith("assets/")) {
+        window.siyuan.menus.menu.append(new MenuItem(exportAsset(dataSrc)).element);
+    }
     if (protyle?.app?.plugins) {
         emitOpenMenu({
             plugins: protyle.app.plugins,
@@ -1321,7 +1324,7 @@ export const imgMenu = (protyle: IProtyle, range: Range, assetElement: HTMLEleme
     window.siyuan.menus.menu.element.setAttribute("data-from", popoverElement ? popoverElement.dataset.level + "popover" : "app");
     if (!protyle.disabled) {
         const textElements = window.siyuan.menus.menu.element.querySelectorAll("textarea");
-        textElements[0].focus();
+        textElements[1].select();
         window.siyuan.menus.menu.removeCB = () => {
             const ocrElement = window.siyuan.menus.menu.element.querySelector('[data-type="ocr"]') as HTMLTextAreaElement;
             if (ocrElement && ocrElement.dataset.ocrText !== ocrElement.value) {
@@ -1582,7 +1585,7 @@ export const linkMenu = (protyle: IProtyle, linkElement: HTMLElement, focusText 
     if (protyle.disabled) {
         return;
     }
-    if (focusText || protyle.lute.GetLinkDest(linkAddress)) {
+    if (focusText || protyle.lute.GetLinkDest(linkAddress) || linkAddress?.startsWith("assets/")) {
         inputElements[1].select();
     } else {
         inputElements[0].select();
@@ -1935,7 +1938,7 @@ export const videoMenu = (protyle: IProtyle, nodeElement: Element, type: string)
         }
     }];
     const src = videoElement.getAttribute("src");
-    if (src.startsWith("assets/")) {
+    if (src && src.startsWith("assets/")) {
         subMenus.push({
             type: "separator"
         });
@@ -1948,16 +1951,17 @@ export const videoMenu = (protyle: IProtyle, nodeElement: Element, type: string)
             }
         });
     }
-    const VideoSrc = videoElement.getAttribute("src");
-    if (VideoSrc) {
+    if (src) {
         subMenus.push({
             id: "openBy",
             label: window.siyuan.languages.openBy,
             icon: "iconOpen",
-            submenu: openMenu(protyle.app, VideoSrc, true, false) as IMenu[]
+            submenu: openMenu(protyle.app, src, true, false) as IMenu[]
         });
     }
-    subMenus.push(exportAsset(src));
+    if (src && src.startsWith("assets/")) {
+        subMenus.push(exportAsset(src));
+    }
     return subMenus;
 };
 

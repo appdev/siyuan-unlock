@@ -130,26 +130,8 @@ type BlockTreeInfo struct {
 
 func GetBlockTreeInfos(ids []string) (ret map[string]*BlockTreeInfo) {
 	ret = map[string]*BlockTreeInfo{}
-	luteEngine := util.NewLute()
-	treeCache := map[string]*parse.Tree{}
-	for _, id := range ids {
-		bt := treenode.GetBlockTree(id)
-		if nil == bt {
-			ret[id] = &BlockTreeInfo{ID: id}
-			continue
-		}
-
-		tree := treeCache[bt.RootID]
-		if nil == tree {
-			tree, _ = filesys.LoadTree(bt.BoxID, bt.Path, luteEngine)
-			if nil == tree {
-				ret[id] = &BlockTreeInfo{ID: id}
-				continue
-			}
-
-			treeCache[bt.RootID] = tree
-		}
-
+	trees := filesys.LoadTrees(ids)
+	for id, tree := range trees {
 		node := treenode.GetNodeInTree(tree, id)
 		if nil == node {
 			ret[id] = &BlockTreeInfo{ID: id}
@@ -343,11 +325,13 @@ func TransferBlockRef(fromID, toID string, refIDs []string) (err error) {
 	if 1 > len(refIDs) { // 如果不指定 refIDs，则转移所有引用了 fromID 的块
 		refIDs, _ = sql.QueryRefIDsByDefID(fromID, false)
 	}
-	for _, refID := range refIDs {
-		tree, _ := LoadTreeByBlockID(refID)
+
+	trees := filesys.LoadTrees(refIDs)
+	for refID, tree := range trees {
 		if nil == tree {
 			continue
 		}
+
 		node := treenode.GetNodeInTree(tree, refID)
 		textMarks := node.ChildrenByType(ast.NodeTextMark)
 		for _, textMark := range textMarks {
@@ -903,7 +887,7 @@ func getEmbeddedBlock(trees map[string]*parse.Tree, sqlBlock *sql.Block, heading
 	}
 
 	if breadcrumb {
-		blockPaths = buildBlockBreadcrumb(def, nil)
+		blockPaths = buildBlockBreadcrumb(def, nil, true)
 	}
 	if 1 > len(blockPaths) {
 		blockPaths = []*BlockPath{}

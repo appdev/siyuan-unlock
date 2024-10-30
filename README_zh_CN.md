@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-<a href="README.md">English</a>
+<a href="README.md">English</a> | <a href="README_ja_JP.md">日本語</a>
 </p>
 
 ## 💡 简介

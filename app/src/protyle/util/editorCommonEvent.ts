@@ -10,7 +10,7 @@ import {
 import {Constants} from "../../constants";
 import {paste} from "./paste";
 import {cancelSB, genEmptyElement, genSBElement, insertEmptyBlock} from "../../block/util";
-import {transaction} from "../wysiwyg/transaction";
+import {transaction, turnsIntoOneTransaction} from "../wysiwyg/transaction";
 import {getTopAloneElement} from "../wysiwyg/getBlock";
 import {updateListOrder} from "../wysiwyg/list";
 import {fetchPost, fetchSyncPost} from "../../util/fetch";
@@ -28,6 +28,9 @@ import {insertAttrViewBlockAnimation} from "../render/av/row";
 import {dragUpload} from "../render/av/asset";
 import * as dayjs from "dayjs";
 import {zoomOut} from "../../menus/protyle";
+/// #if !BROWSER
+import {webUtils} from "electron";
+/// #endif
 
 const moveToNew = (protyle: IProtyle, sourceElements: Element[], targetElement: Element, newSourceElement: Element,
                    isSameDoc: boolean, isBottom: boolean, isCopy: boolean) => {
@@ -268,6 +271,7 @@ const dragSb = async (protyle: IProtyle, sourceElements: Element[], targetElemen
         previousID: sbElement.previousElementSibling?.getAttribute("data-node-id"),
         parentID: sbElement.parentElement.getAttribute("data-node-id") || protyle.block.parentID || protyle.block.rootID
     }];
+    let hasFoldHeading = false;
     if (newSourceElement) {
         const newSourceId = newSourceElement.getAttribute("data-node-id");
         sbElement.insertAdjacentElement("afterbegin", targetElement);
@@ -366,9 +370,12 @@ const dragSb = async (protyle: IProtyle, sourceElements: Element[], targetElemen
             if (index === 0) {
                 afterPreviousID = isCopy ? copyId : id;
             }
-            if (isCopy && item.getAttribute("data-type") === "NodeHeading" && item.getAttribute("fold") === "1") {
-                item.removeAttribute("fold");
-                foldHeadingIds.push({id, parentID});
+            if (item.getAttribute("data-type") === "NodeHeading" && item.getAttribute("fold") === "1") {
+                if (isCopy) {
+                    item.removeAttribute("fold");
+                    foldHeadingIds.push({id, parentID});
+                }
+                hasFoldHeading = true;
             }
             if (isCopy) {
                 undoOperations.push({
@@ -566,6 +573,24 @@ const dragSb = async (protyle: IProtyle, sourceElements: Element[], targetElemen
         // 跨文档不支持撤销
         transaction(protyle, doOperations);
     }
+    if (!isCopy && direct === "col") {
+        if (targetElement.getAttribute("data-type") === "NodeHeading" && targetElement.getAttribute("fold") === "1") {
+            turnsIntoOneTransaction({
+                protyle,
+                selectsElement: [targetElement],
+                type: "BlocksMergeSuperBlock",
+                level: "row"
+            });
+        }
+        if ((sourceElements.length > 1 || hasFoldHeading)) {
+            turnsIntoOneTransaction({
+                protyle,
+                selectsElement: sourceElements.reverse(),
+                type: "BlocksMergeSuperBlock",
+                level: "row"
+            });
+        }
+    }
     focusBlock(sourceElements[0]);
 };
 
@@ -749,6 +774,23 @@ const dragSame = async (protyle: IProtyle, sourceElements: Element[], targetElem
     } else {
         // 跨文档不支持撤销
         transaction(protyle, doOperations);
+    }
+    let hasFoldHeading = false;
+    sourceElements.find(item => {
+        if (item.getAttribute("data-type") === "NodeHeading" && item.getAttribute("fold") === "1") {
+            hasFoldHeading = true;
+            return true;
+        }
+    });
+    if (!isCopy && (sourceElements.length > 1 || hasFoldHeading) &&
+        sourceElements[0].parentElement.classList.contains("sb") &&
+        sourceElements[0].parentElement.getAttribute("data-sb-layout") === "col") {
+        turnsIntoOneTransaction({
+            protyle,
+            selectsElement: sourceElements.reverse(),
+            type: "BlocksMergeSuperBlock",
+            level: "row"
+        });
     }
     focusBlock(sourceElements[0]);
 };
@@ -1124,7 +1166,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 if (event.dataTransfer.types[0] === "Files" && !isBrowser()) {
                     const files: string[] = [];
                     for (let i = 0; i < event.dataTransfer.files.length; i++) {
-                        files.push(event.dataTransfer.files[i].path);
+                        files.push(webUtils.getPathForFile(event.dataTransfer.files[i]));
                     }
                     uploadLocalFiles(files, protyle, !event.altKey);
                 } else {
@@ -1137,7 +1179,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     if (cellType === "mAsset" && event.dataTransfer.types[0] === "Files" && !isBrowser()) {
                         const files: string[] = [];
                         for (let i = 0; i < event.dataTransfer.files.length; i++) {
-                            files.push(event.dataTransfer.files[i].path);
+                            files.push(webUtils.getPathForFile(event.dataTransfer.files[i]));
                         }
                         dragUpload(files, protyle, cellElement);
                     }
