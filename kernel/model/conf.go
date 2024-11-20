@@ -307,6 +307,10 @@ func InitConf() {
 		Conf.System.ID = util.GetDeviceID()
 		Conf.System.Name = util.GetDeviceName()
 	}
+	Conf.System.DisabledFeatures = util.DisabledFeatures
+	if 1 > len(Conf.System.DisabledFeatures) {
+		Conf.System.DisabledFeatures = []string{}
+	}
 
 	if nil == Conf.Snippet {
 		Conf.Snippet = conf.NewSnpt()
@@ -339,7 +343,7 @@ func InitConf() {
 		Conf.Sync.Mode = 1
 	}
 	if nil == Conf.Sync.S3 {
-		Conf.Sync.S3 = &conf.S3{SkipTlsVerify: true}
+		Conf.Sync.S3 = &conf.S3{PathStyle: true, SkipTlsVerify: true}
 	}
 	Conf.Sync.S3.Endpoint = util.NormalizeEndpoint(Conf.Sync.S3.Endpoint)
 	Conf.Sync.S3.Timeout = util.NormalizeTimeout(Conf.Sync.S3.Timeout)
@@ -380,6 +384,12 @@ func InitConf() {
 	}
 	if 12000 > Conf.Repo.SyncIndexTiming {
 		Conf.Repo.SyncIndexTiming = 12 * 1000
+	}
+	if 1 > Conf.Repo.IndexRetentionDays {
+		Conf.Repo.IndexRetentionDays = 180
+	}
+	if 1 > Conf.Repo.RetentionIndexesDaily {
+		Conf.Repo.RetentionIndexesDaily = 2
 	}
 
 	if nil == Conf.Search {
@@ -597,7 +607,7 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int) {
 
 	logging.LogInfof("exiting kernel [force=%v, setCurrentWorkspace=%v, execInstallPkg=%d]", force, setCurrentWorkspace, execInstallPkg)
 	util.PushMsg(Conf.Language(95), 10000*60)
-	WaitForWritingFiles()
+	FlushTxQueue()
 
 	if !force {
 		if Conf.Sync.Enabled && 3 != Conf.Sync.Mode &&

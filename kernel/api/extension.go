@@ -123,6 +123,12 @@ func extensionCopy(c *gin.Context) {
 	}
 
 	luteEngine := util.NewLute()
+	luteEngine.SetSup(true)
+	luteEngine.SetSub(true)
+	luteEngine.SetMark(true)
+	luteEngine.SetGFMStrikethrough(true)
+	luteEngine.SetInlineAsterisk(true)
+	luteEngine.SetInlineUnderscore(true)
 	var md string
 	var withMath bool
 	if nil != form.Value["href"] {
@@ -174,16 +180,19 @@ func extensionCopy(c *gin.Context) {
 		}
 	}
 
+	var tree *parse.Tree
 	if "" == md {
-		md, withMath, _ = model.HTML2Markdown(dom)
+		tree, withMath = model.HTML2Tree(dom, luteEngine)
+		if nil == tree {
+			md, withMath, _ = model.HTML2Markdown(dom, luteEngine)
+			if withMath {
+				luteEngine.SetInlineMath(true)
+			}
+			tree = parse.Parse("", []byte(md), luteEngine.ParseOptions)
+		}
 	}
 
-	md = strings.TrimSpace(md)
-	if withMath {
-		luteEngine.SetInlineMath(true)
-	}
 	var unlinks []*ast.Node
-	tree := parse.Parse("", []byte(md), luteEngine.ParseOptions)
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering {
 			return ast.WalkContinue
@@ -211,6 +220,7 @@ func extensionCopy(c *gin.Context) {
 		unlink.Unlink()
 	}
 
+	parse.TextMarks2Inlines(tree) // 先将 TextMark 转换为 Inlines https://github.com/siyuan-note/siyuan/issues/13056
 	parse.NestedInlines2FlattedSpansHybrid(tree, false)
 
 	md, _ = lute.FormatNodeSync(tree.Root, luteEngine.ParseOptions, luteEngine.RenderOptions)

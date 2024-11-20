@@ -1,7 +1,11 @@
 import {isMobile} from "../util/functions";
 import {Dialog} from "./index";
+import {Constants} from "../constants";
 
-export const confirmDialog = (title: string, text: string, confirm?: (dialog?: Dialog) => void, cancel?: (dialog: Dialog) => void) => {
+export const confirmDialog = (title: string, text: string,
+                              confirm?: (dialog?: Dialog) => void,
+                              cancel?: (dialog: Dialog) => void,
+                              isDelete = false) => {
     if (!text && !title) {
         confirm();
         return;
@@ -13,7 +17,7 @@ export const confirmDialog = (title: string, text: string, confirm?: (dialog?: D
 </div>
 <div class="b3-dialog__action">
     <button class="b3-button b3-button--cancel">${window.siyuan.languages.cancel}</button><div class="fn__space"></div>
-    <button class="b3-button b3-button--text" id="confirmDialogConfirmBtn">${window.siyuan.languages.confirm}</button>
+    <button class="b3-button ${isDelete ? "b3-button--remove" : "b3-button--text"}" id="confirmDialogConfirmBtn">${window.siyuan.languages[isDelete ? "delete" : "confirm"]}</button>
 </div>`,
         width: isMobile() ? "92vw" : "520px",
     });
@@ -30,4 +34,5 @@ export const confirmDialog = (title: string, text: string, confirm?: (dialog?: D
         }
         dialog.destroy();
     });
+    dialog.element.setAttribute("data-key", Constants.DIALOG_CONFIRM);
 };

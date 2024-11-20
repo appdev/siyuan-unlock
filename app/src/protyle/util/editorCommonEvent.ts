@@ -61,6 +61,13 @@ const moveToNew = (protyle: IProtyle, sourceElements: Element[], targetElement: 
             topSourceElement = getTopAloneElement(item);
             if (topSourceElement.isSameNode(item)) {
                 topSourceElement = undefined;
+                // 单个缩放或反链面板中的列表项拖拽到包含该列表的编辑器中会导致残留的 list
+                Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${item.getAttribute("data-node-id")}"]`)).find((targetItem: HTMLElement) => {
+                    if (!isInEmbedBlock(targetItem) && targetItem.parentElement.querySelectorAll(".li").length === 1) {
+                        topSourceElement = targetItem.parentElement;
+                        return true;
+                    }
+                });
             }
         }
         const copyId = Lute.NewNodeID();
@@ -1208,9 +1215,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             });
         }
         // 设置了的话 drop 就无法监听 shift/control event.dataTransfer.dropEffect = "move";
-        if (event.dataTransfer.types.includes("Files") && event.target.classList.contains("protyle-wysiwyg")) {
-            // 文档底部拖拽文件需 preventDefault，否则无法触发 drop 事件 https://github.com/siyuan-note/siyuan/issues/2665
-            event.preventDefault();
+        if (event.dataTransfer.types.includes("Files")) {
+            // 使用 event.preventDefault(); 会导致无光标 https://github.com/siyuan-note/siyuan/issues/12857
             return;
         }
         let gutterType = "";

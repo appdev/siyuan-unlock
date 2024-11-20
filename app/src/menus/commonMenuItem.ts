@@ -21,6 +21,7 @@ import {exportImage} from "../protyle/export/util";
 import {App} from "../index";
 import {renderAVAttribute} from "../protyle/render/av/blockAttr";
 import {openAssetNewWindow} from "../window/openNewWindow";
+import {escapeHtml} from "../util/escape";
 
 const bindAttrInput = (inputElement: HTMLInputElement, id: string) => {
     inputElement.addEventListener("change", () => {
@@ -326,7 +327,7 @@ export const openFileAttr = (attrs: IObject, focusName = "bookmark", protyle?: I
                 });
                 btnsElement[1].addEventListener("click", () => {
                     if (!isValidAttrName(inputElement.value)) {
-                        showMessage(window.siyuan.languages.attrName + " <b>" + inputElement.value + "</b> " + window.siyuan.languages.invalid);
+                        showMessage(window.siyuan.languages.attrName + " <b>" + escapeHtml(inputElement.value) + "</b> " + window.siyuan.languages.invalid);
                         return false;
                     }
                     target.parentElement.insertAdjacentHTML("beforebegin", `<div class="b3-label b3-label--noborder">
@@ -446,6 +447,9 @@ export const copySubMenu = (id: string, accelerator = true, focusElement?: Eleme
 };
 
 export const exportMd = (id: string) => {
+    if (window.siyuan.isPublish) {
+        return;
+    }
     return new MenuItem({
         id: "export",
         label: window.siyuan.languages.export,

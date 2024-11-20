@@ -38,7 +38,7 @@ import {insertEmptyBlock} from "../../block/util";
 import {matchHotKey} from "../util/hotKey";
 import {hideElements} from "../ui/hideElements";
 import {electronUndo} from "../undo";
-import {previewTemplate} from "./util";
+import {previewTemplate, toolbarKeyToMenu} from "./util";
 import {hideMessage, showMessage} from "../../dialog/message";
 import {InlineMath} from "./InlineMath";
 import {InlineMemo} from "./InlineMemo";
@@ -68,8 +68,22 @@ export class Toolbar {
         this.subElement.className = "protyle-util fn__none";
         /// #endif
         this.toolbarHeight = 29;
-
+        protyle.app.plugins.forEach(item => {
+            options.toolbar = toolbarKeyToMenu(item.updateProtyleToolbar(options.toolbar));
+        });
         options.toolbar.forEach((menuItem: IMenuItem) => {
+            const itemElement = this.genItem(protyle, menuItem);
+            this.element.appendChild(itemElement);
+        });
+    }
+
+    public update(protyle: IProtyle) {
+        this.element.innerHTML = "";
+        protyle.options.toolbar = toolbarKeyToMenu(Constants.PROTYLE_TOOLBAR);
+        protyle.app.plugins.forEach(item => {
+            protyle.options.toolbar = toolbarKeyToMenu(item.updateProtyleToolbar(protyle.options.toolbar));
+        });
+        protyle.options.toolbar.forEach((menuItem: IMenuItem) => {
             const itemElement = this.genItem(protyle, menuItem);
             this.element.appendChild(itemElement);
         });
@@ -197,72 +211,6 @@ export class Toolbar {
         return types;
     }
 
-    private genItem(protyle: IProtyle, menuItem: IMenuItem) {
-        let menuItemObj;
-        switch (menuItem.name) {
-            case "strong":
-            case "em":
-            case "s":
-            case "code":
-            case "mark":
-            case "tag":
-            case "u":
-            case "sup":
-            case "clear":
-            case "sub":
-            case "kbd":
-                menuItemObj = new ToolbarItem(protyle, menuItem);
-                break;
-            case "block-ref":
-                menuItemObj = new BlockRef(protyle, menuItem);
-                break;
-            case "inline-math":
-                menuItemObj = new InlineMath(protyle, menuItem);
-                break;
-            case "inline-memo":
-                menuItemObj = new InlineMemo(protyle, menuItem);
-                break;
-            case "|":
-                menuItemObj = new Divider();
-                break;
-            case "text":
-                menuItemObj = new Font(protyle, menuItem);
-                break;
-            case "a":
-                menuItemObj = new Link(protyle, menuItem);
-                break;
-            default:
-                menuItemObj = new ToolbarItem(protyle, menuItem);
-                break;
-        }
-        if (!menuItemObj) {
-            return;
-        }
-        return menuItemObj.element;
-    }
-
-    // 合并多个 text 为一个 text
-    private mergeNode(nodes: NodeListOf<ChildNode>) {
-        for (let i = 0; i < nodes.length; i++) {
-            if (nodes[i].nodeType !== 3 && (nodes[i] as HTMLElement).tagName === "WBR") {
-                nodes[i].remove();
-                i--;
-            }
-        }
-        for (let i = 0; i < nodes.length; i++) {
-            if (nodes[i].nodeType === 3) {
-                if (nodes[i].textContent === "") {
-                    nodes[i].remove();
-                    i--;
-                } else if (nodes[i + 1] && nodes[i + 1].nodeType === 3) {
-                    nodes[i].textContent = nodes[i].textContent + nodes[i + 1].textContent;
-                    nodes[i + 1].remove();
-                    i--;
-                }
-            }
-        }
-    }
-
     public setInlineMark(protyle: IProtyle, type: string, action: "range" | "toolbar", textObj?: ITextOption) {
         const nodeElement = hasClosestBlock(this.range.startContainer);
         if (!nodeElement) {
@@ -277,6 +225,12 @@ export class Toolbar {
             this.range = setLastNodeRange(getContenteditableElement(nodeElement), this.range, false);
         }
         const rangeTypes = this.getCurrentType(this.range);
+
+        // https://github.com/siyuan-note/siyuan/issues/6501
+        // https://github.com/siyuan-note/siyuan/issues/12877
+        if (rangeTypes.length === 1 && ["block-ref", "file-annotation-ref", "a", "inline-memo", "inline-math", "tag"].includes(rangeTypes[0]) && type === "clear") {
+            return;
+        }
         const selectText = this.range.toString();
         fixTableRange(this.range);
         let previousElement: HTMLElement;
@@ -487,12 +441,20 @@ export class Toolbar {
                             hasSameTextStyle(item, nextElement, textObj)) {
                             nextIndex = item.textContent.length;
                             nextElement.innerHTML = item.textContent + nextElement.innerHTML;
-                        } else  if (item.textContent !== Constants.ZWSP) {
+                        } else if (
+                            // 图片会有零宽空格，但图片不进行处理 https://github.com/siyuan-note/siyuan/issues/12840
+                            item.textContent !== Constants.ZWSP ||
+                            // tag 会有零宽空格 https://github.com/siyuan-note/siyuan/issues/12922
+                            (item.textContent === Constants.ZWSP && !rangeTypes.includes("img"))) {
                             const inlineElement = document.createElement("span");
                             inlineElement.setAttribute("data-type", type);
                             inlineElement.textContent = item.textContent;
                             setFontStyle(inlineElement, textObj);
-                            newNodes.push(inlineElement);
+                            if (type === "text" && !inlineElement.getAttribute("style")) {
+                                newNodes.push(item);
+                            } else {
+                                newNodes.push(inlineElement);
+                            }
                         } else {
                             newNodes.push(item);
                         }
@@ -581,7 +543,18 @@ export class Toolbar {
                         } else if (item.tagName !== "BR" && item.tagName !== "IMG") {
                             item.setAttribute("data-type", types.join(" "));
                             setFontStyle(item, textObj);
-                            newNodes.push(item);
+                            if (types.includes("text") && !item.getAttribute("style")) {
+                                if (types.length === 1) {
+                                    const tempText = document.createTextNode(item.textContent);
+                                    newNodes.push(tempText);
+                                } else {
+                                    types.splice(types.indexOf("text"), 1);
+                                    item.setAttribute("data-type", types.join(" "));
+                                    newNodes.push(item);
+                                }
+                            } else {
+                                newNodes.push(item);
+                            }
                         } else {
                             newNodes.push(item);
                         }
@@ -887,7 +860,7 @@ export class Toolbar {
     <span class="fn__space"></span>
     <button data-type="pin" class="block__icon block__icon--show b3-tooltips b3-tooltips__nw" aria-label="${isPin ? window.siyuan.languages.unpin : window.siyuan.languages.pin}"><svg><use xlink:href="#icon${isPin ? "Unpin" : "Pin"}"></use></svg></button>
     <span class="fn__space"></span>
-    <button data-type="close" class="block__icon block__icon--show b3-tooltips b3-tooltips__nw" aria-label="${window.siyuan.languages.close}"><svg style="width: 10px"><use xlink:href="#iconClose"></use></svg></button>
+    <button data-type="close" class="block__icon block__icon--show b3-tooltips b3-tooltips__nw" aria-label="${window.siyuan.languages.close}"><svg style="width: 10px;margin: 0 2px;"><use xlink:href="#iconClose"></use></svg></button>
 </div>
 <textarea ${protyle.disabled ? " readonly" : ""} spellcheck="false" class="b3-text-field b3-text-field--text fn__block" placeholder="${placeholder}" style="${isMobile() ? "" : "width:" + Math.max(480, renderElement.clientWidth * 0.7) + "px"};max-height:calc(80vh - 44px);min-height: 48px;min-width: 268px;border-radius: 0 0 var(--b3-border-radius-b) var(--b3-border-radius-b);font-family: var(--b3-font-family-code);"></textarea></div>`;
         const autoHeight = () => {
@@ -1187,34 +1160,11 @@ export class Toolbar {
         protyle.app.plugins.forEach(item => {
             item.eventBus.emit("open-noneditableblock", {
                 protyle,
-                toolbar: this
+                toolbar: this,
+                blockElement: nodeElement,
+                renderElement,
             });
         });
-    }
-
-    private updateLanguage(languageElement: HTMLElement, protyle: IProtyle, id: string, nodeElement: HTMLElement, oldHtml: string, selectedLang: string) {
-        languageElement.textContent = selectedLang === window.siyuan.languages.clear ? "" : selectedLang;
-        if (!Constants.SIYUAN_RENDER_CODE_LANGUAGES.includes(languageElement.textContent)) {
-            window.siyuan.storage[Constants.LOCAL_CODELANG] = languageElement.textContent;
-            setStorageVal(Constants.LOCAL_CODELANG, window.siyuan.storage[Constants.LOCAL_CODELANG]);
-        }
-        const editElement = getContenteditableElement(nodeElement);
-        if (Constants.SIYUAN_RENDER_CODE_LANGUAGES.includes(languageElement.textContent)) {
-            nodeElement.dataset.content = editElement.textContent.trim();
-            nodeElement.dataset.subtype = languageElement.textContent;
-            nodeElement.className = "render-node";
-            nodeElement.innerHTML = `<div spin="1"></div><div class="protyle-attr" contenteditable="false">${Constants.ZWSP}</div>`;
-            processRender(nodeElement);
-        } else {
-            (editElement as HTMLElement).textContent = editElement.textContent;
-            editElement.parentElement.removeAttribute("data-render");
-            highlightRender(nodeElement);
-        }
-        nodeElement.setAttribute("updated", dayjs().format("YYYYMMDDHHmmss"));
-        updateTransaction(protyle, id, nodeElement.outerHTML, oldHtml);
-        this.subElement.classList.add("fn__none");
-        focusByRange(this.range);
-        return nodeElement.outerHTML;
     }
 
     public showCodeLanguage(protyle: IProtyle, languageElement: HTMLElement) {
@@ -1663,5 +1613,96 @@ ${item.name}
         this.element.classList.add("fn__none");
         const rangePosition = getSelectionPosition(nodeElement, range);
         setPosition(this.subElement, rangePosition.left, rangePosition.top - 48, Constants.SIZE_TOOLBAR_HEIGHT);
+    }
+
+    private genItem(protyle: IProtyle, menuItem: IMenuItem) {
+        let menuItemObj;
+        switch (menuItem.name) {
+            case "strong":
+            case "em":
+            case "s":
+            case "code":
+            case "mark":
+            case "tag":
+            case "u":
+            case "sup":
+            case "clear":
+            case "sub":
+            case "kbd":
+                menuItemObj = new ToolbarItem(protyle, menuItem);
+                break;
+            case "block-ref":
+                menuItemObj = new BlockRef(protyle, menuItem);
+                break;
+            case "inline-math":
+                menuItemObj = new InlineMath(protyle, menuItem);
+                break;
+            case "inline-memo":
+                menuItemObj = new InlineMemo(protyle, menuItem);
+                break;
+            case "|":
+                menuItemObj = new Divider();
+                break;
+            case "text":
+                menuItemObj = new Font(protyle, menuItem);
+                break;
+            case "a":
+                menuItemObj = new Link(protyle, menuItem);
+                break;
+            default:
+                menuItemObj = new ToolbarItem(protyle, menuItem);
+                break;
+        }
+        if (!menuItemObj) {
+            return;
+        }
+        return menuItemObj.element;
+    }
+
+    // 合并多个 text 为一个 text
+    private mergeNode(nodes: NodeListOf<ChildNode>) {
+        for (let i = 0; i < nodes.length; i++) {
+            if (nodes[i].nodeType !== 3 && (nodes[i] as HTMLElement).tagName === "WBR") {
+                nodes[i].remove();
+                i--;
+            }
+        }
+        for (let i = 0; i < nodes.length; i++) {
+            if (nodes[i].nodeType === 3) {
+                if (nodes[i].textContent === "") {
+                    nodes[i].remove();
+                    i--;
+                } else if (nodes[i + 1] && nodes[i + 1].nodeType === 3) {
+                    nodes[i].textContent = nodes[i].textContent + nodes[i + 1].textContent;
+                    nodes[i + 1].remove();
+                    i--;
+                }
+            }
+        }
+    }
+
+    private updateLanguage(languageElement: HTMLElement, protyle: IProtyle, id: string, nodeElement: HTMLElement, oldHtml: string, selectedLang: string) {
+        languageElement.textContent = selectedLang === window.siyuan.languages.clear ? "" : selectedLang;
+        if (!Constants.SIYUAN_RENDER_CODE_LANGUAGES.includes(languageElement.textContent)) {
+            window.siyuan.storage[Constants.LOCAL_CODELANG] = languageElement.textContent;
+            setStorageVal(Constants.LOCAL_CODELANG, window.siyuan.storage[Constants.LOCAL_CODELANG]);
+        }
+        const editElement = getContenteditableElement(nodeElement);
+        if (Constants.SIYUAN_RENDER_CODE_LANGUAGES.includes(languageElement.textContent)) {
+            nodeElement.dataset.content = editElement.textContent.trim();
+            nodeElement.dataset.subtype = languageElement.textContent;
+            nodeElement.className = "render-node";
+            nodeElement.innerHTML = `<div spin="1"></div><div class="protyle-attr" contenteditable="false">${Constants.ZWSP}</div>`;
+            processRender(nodeElement);
+        } else {
+            (editElement as HTMLElement).textContent = editElement.textContent;
+            editElement.parentElement.removeAttribute("data-render");
+            highlightRender(nodeElement);
+        }
+        nodeElement.setAttribute("updated", dayjs().format("YYYYMMDDHHmmss"));
+        updateTransaction(protyle, id, nodeElement.outerHTML, oldHtml);
+        this.subElement.classList.add("fn__none");
+        focusByRange(this.range);
+        return nodeElement.outerHTML;
     }
 }

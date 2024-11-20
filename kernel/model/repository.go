@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	mathRand "math/rand"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -58,6 +60,111 @@ import (
 	"github.com/studio-b12/gowebdav"
 )
 
+// AutoPurgeRepoJob 自动清理数据仓库 https://github.com/siyuan-note/siyuan/issues/13091
+func AutoPurgeRepoJob() {
+	task.AppendTaskWithTimeout(task.RepoAutoPurge, 12*time.Hour, autoPurgeRepo, true)
+}
+
+var (
+	autoPurgeRepoAfterFirstSync = false
+	lastAutoPurgeRepo           = time.Time{}
+)
+
+func autoPurgeRepo(cron bool) {
+	if cron && !autoPurgeRepoAfterFirstSync {
+		return
+	}
+	if time.Since(lastAutoPurgeRepo) < 6*time.Hour {
+		return
+	}
+
+	autoPurgeRepoAfterFirstSync = true
+	defer func() {
+		lastAutoPurgeRepo = time.Now()
+	}()
+
+	if 1 > len(Conf.Repo.Key) {
+		return
+	}
+
+	repo, err := newRepository()
+	if err != nil {
+		return
+	}
+
+	now := time.Now()
+
+	dateGroupedIndexes := map[string][]*entity.Index{} // 按照日期分组
+	// 收集指定日期内需要保留的索引
+	var date string
+	page := 1
+	for {
+		indexes, pageCount, _, err := repo.GetIndexes(page, 512)
+		if nil != err {
+			logging.LogErrorf("get data repo index logs failed: %s", err)
+			return
+		}
+		if 1 > len(indexes) {
+			break
+		}
+
+		tooOld := false
+		for _, index := range indexes {
+			if now.UnixMilli()-index.Created <= int64(Conf.Repo.IndexRetentionDays)*24*60*60*1000 {
+				date = time.UnixMilli(index.Created).Format("2006-01-02")
+				if _, ok := dateGroupedIndexes[date]; !ok {
+					dateGroupedIndexes[date] = []*entity.Index{}
+				}
+				dateGroupedIndexes[date] = append(dateGroupedIndexes[date], index)
+			} else {
+				tooOld = true
+				break
+			}
+		}
+		if tooOld {
+			break
+		}
+		page++
+		if page > pageCount {
+			break
+		}
+	}
+
+	todayDate := now.Format("2006-01-02")
+	// 筛选出每日需要保留的索引
+	var retentionIndexIDs []string
+	for date, indexes := range dateGroupedIndexes {
+		if len(indexes) <= Conf.Repo.RetentionIndexesDaily || todayDate == date {
+			for _, index := range indexes {
+				retentionIndexIDs = append(retentionIndexIDs, index.ID)
+			}
+			continue
+		}
+
+		keepIndexes := hashset.New()
+		keepIndexes.Add(indexes[0]) // 每天最后一个固定保留
+		// 随机保留指定数量的索引
+		for i := 0; i < Conf.Repo.RetentionIndexesDaily*7; i++ {
+			keepIndexes.Add(indexes[mathRand.Intn(len(indexes)-1)])
+			if keepIndexes.Size() >= Conf.Repo.RetentionIndexesDaily {
+				break
+			}
+		}
+
+		for _, keepIndex := range keepIndexes.Values() {
+			retentionIndexIDs = append(retentionIndexIDs, keepIndex.(*entity.Index).ID)
+		}
+	}
+
+	retentionIndexIDs = gulu.Str.RemoveDuplicatedElem(retentionIndexIDs)
+	if 3 > len(retentionIndexIDs) {
+		logging.LogInfof("no index to purge [ellapsed=%.2fs]", time.Since(now).Seconds())
+		return
+	}
+
+	_, err = repo.Purge(retentionIndexIDs...)
+}
+
 func GetRepoFile(fileID string) (ret []byte, p string, err error) {
 	if 1 > len(Conf.Repo.Key) {
 		err = errors.New(Conf.Language(26))
@@ -79,7 +186,7 @@ func GetRepoFile(fileID string) (ret []byte, p string, err error) {
 	return
 }
 
-func OpenRepoSnapshotDoc(fileID string) (content string, isProtyleDoc bool, updated int64, err error) {
+func OpenRepoSnapshotDoc(fileID string) (title, content string, displayInText bool, updated int64, err error) {
 	if 1 > len(Conf.Repo.Key) {
 		err = errors.New(Conf.Language(26))
 		return
@@ -105,15 +212,15 @@ func OpenRepoSnapshotDoc(fileID string) (content string, isProtyleDoc bool, upda
 	if strings.HasSuffix(file.Path, ".sy") {
 		luteEngine := NewLute()
 		var snapshotTree *parse.Tree
-		isProtyleDoc, snapshotTree, err = parseTreeInSnapshot(data, luteEngine)
+		displayInText, snapshotTree, err = parseTreeInSnapshot(data, luteEngine)
 		if err != nil {
 			logging.LogErrorf("parse tree from snapshot file [%s] failed", fileID)
 			return
 		}
+		title = snapshotTree.Root.IALAttr("title")
 
-		if !isProtyleDoc {
+		if !displayInText {
 			renderTree := &parse.Tree{Root: &ast.Node{Type: ast.NodeDocument}}
-
 			var unlinks []*ast.Node
 			ast.Walk(snapshotTree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 				if !entering {
@@ -141,7 +248,7 @@ func OpenRepoSnapshotDoc(fileID string) (content string, isProtyleDoc bool, upda
 		}
 
 		luteEngine.RenderOptions.ProtyleContenteditable = false
-		if isProtyleDoc {
+		if displayInText {
 			util.PushMsg(Conf.Language(36), 5000)
 			formatRenderer := render.NewFormatRenderer(snapshotTree, luteEngine.RenderOptions)
 			content = gulu.Str.FromBytes(formatRenderer.Render())
@@ -149,8 +256,11 @@ func OpenRepoSnapshotDoc(fileID string) (content string, isProtyleDoc bool, upda
 			content = luteEngine.Tree2BlockDOM(snapshotTree, luteEngine.RenderOptions)
 		}
 	} else {
-		isProtyleDoc = true
-		if strings.HasSuffix(file.Path, ".json") {
+		displayInText = true
+		title = file.Path
+		if mimeType := mime.TypeByExtension(filepath.Ext(file.Path)); strings.HasPrefix(mimeType, "text/") || strings.Contains(mimeType, "json") {
+			// 如果是文本文件，直接返回文本内容
+			// All plain text formats are supported when comparing data snapshots https://github.com/siyuan-note/siyuan/issues/12975
 			content = gulu.Str.FromBytes(data)
 		} else {
 			if strings.Contains(file.Path, "assets/") { // 剔除笔记本级或者文档级资源文件路径前缀
@@ -326,8 +436,8 @@ func parseTitleInSnapshot(fileID string, repo *dejavu.Repo, luteEngine *lute.Lut
 	return
 }
 
-func parseTreeInSnapshot(data []byte, luteEngine *lute.Lute) (isProtyleDoc bool, tree *parse.Tree, err error) {
-	isProtyleDoc = 1024*1024*1 <= len(data)
+func parseTreeInSnapshot(data []byte, luteEngine *lute.Lute) (isLargeDoc bool, tree *parse.Tree, err error) {
+	isLargeDoc = 1024*1024*1 <= len(data)
 	tree, err = filesys.ParseJSONWithoutFix(data, luteEngine.ParseOptions)
 	if err != nil {
 		return
@@ -628,7 +738,7 @@ func checkoutRepo(id string) {
 	}
 
 	util.PushEndlessProgress(Conf.Language(63))
-	WaitForWritingFiles()
+	FlushTxQueue()
 	CloseWatchAssets()
 	defer WatchAssets()
 	CloseWatchEmojis()
@@ -641,6 +751,7 @@ func checkoutRepo(id string) {
 
 	// 回滚快照时默认为当前数据创建一个快照
 	// When rolling back a snapshot, a snapshot is created for the current data by default https://github.com/siyuan-note/siyuan/issues/12470
+	FlushTxQueue()
 	_, err = repo.Index("Backup before checkout", map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBarAndProgress})
 	if err != nil {
 		logging.LogErrorf("index repository failed: %s", err)
@@ -962,7 +1073,7 @@ func IndexRepo(memo string) (err error) {
 
 	start := time.Now()
 	latest, _ := repo.Latest()
-	WaitForWritingFiles()
+	FlushTxQueue()
 	index, err := repo.Index(memo, map[string]interface{}{
 		eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBarAndProgress,
 	})
@@ -1343,8 +1454,12 @@ func syncRepo(exit, byHand bool) (dataChanged bool, err error) {
 	processSyncMergeResult(exit, byHand, mergeResult, trafficStat, "a", elapsed)
 
 	if !exit {
-		// 首次数据同步执行完成后再执行索引订正 Index fixing should not be performed before data synchronization https://github.com/siyuan-note/siyuan/issues/10761
-		go checkIndex()
+		go func() {
+			// 首次数据同步执行完成后再执行索引订正 Index fixing should not be performed before data synchronization https://github.com/siyuan-note/siyuan/issues/10761
+			checkIndex()
+			// 索引订正结束后执行数据仓库清理 Automatic purge for local data repo https://github.com/siyuan-note/siyuan/issues/13091
+			autoPurgeRepo(false)
+		}()
 	}
 	return
 }
@@ -1623,7 +1738,9 @@ var promotedPurgeDataRepo bool
 
 func indexRepoBeforeCloudSync(repo *dejavu.Repo) (beforeIndex, afterIndex *entity.Index, err error) {
 	start := time.Now()
+
 	beforeIndex, _ = repo.Latest()
+	FlushTxQueue()
 	afterIndex, err = repo.Index("[Sync] Cloud sync", map[string]interface{}{
 		eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar,
 	})

@@ -56,19 +56,10 @@ func IsMoveOutlineHeading(transactions *[]*Transaction) bool {
 	return false
 }
 
-func WaitForWritingFiles() {
-	var printLog bool
-	var lastPrintLog bool
-	for i := 0; isWritingFiles(); i++ {
-		time.Sleep(5 * time.Millisecond)
-		if 2000 < i && !printLog { // 10s 后打日志
-			logging.LogWarnf("file is writing: \n%s", logging.ShortStack())
-			printLog = true
-		}
-		if 12000 < i && !lastPrintLog { // 60s 后打日志
-			logging.LogWarnf("file is still writing")
-			lastPrintLog = true
-		}
+func FlushTxQueue() {
+	time.Sleep(time.Duration(50) * time.Millisecond)
+	for 0 < len(txQueue) || isFlushing {
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -78,20 +69,17 @@ var (
 	isFlushing = false
 )
 
-func isWritingFiles() bool {
-	time.Sleep(time.Duration(50) * time.Millisecond)
-	return 0 < len(txQueue) || isFlushing
+func init() {
+	go flushQueue()
 }
 
-func init() {
-	go func() {
-		for {
-			select {
-			case tx := <-txQueue:
-				flushTx(tx)
-			}
+func flushQueue() {
+	for {
+		select {
+		case tx := <-txQueue:
+			flushTx(tx)
 		}
-	}()
+	}
 }
 
 func flushTx(tx *Transaction) {
@@ -228,6 +216,8 @@ func performTx(tx *Transaction) (ret *TxErr) {
 			ret = tx.doSetAttrViewColumnPin(op)
 		case "setAttrViewColIcon":
 			ret = tx.doSetAttrViewColumnIcon(op)
+		case "setAttrViewColDesc":
+			ret = tx.doSetAttrViewColumnDesc(op)
 		case "insertAttrViewBlock":
 			ret = tx.doInsertAttrViewBlock(op)
 		case "removeAttrViewBlock":
@@ -252,6 +242,8 @@ func performTx(tx *Transaction) (ret *TxErr) {
 			ret = tx.doRemoveAttrViewColOption(op)
 		case "updateAttrViewColOption":
 			ret = tx.doUpdateAttrViewColOption(op)
+		case "setAttrViewColOptionDesc":
+			ret = tx.doSetAttrViewColOptionDesc(op)
 		case "setAttrViewColCalc":
 			ret = tx.doSetAttrViewColCalc(op)
 		case "updateAttrViewColNumberFormat":
@@ -268,6 +260,8 @@ func performTx(tx *Transaction) (ret *TxErr) {
 			ret = tx.doSetAttrViewViewName(op)
 		case "setAttrViewViewIcon":
 			ret = tx.doSetAttrViewViewIcon(op)
+		case "setAttrViewViewDesc":
+			ret = tx.doSetAttrViewViewDesc(op)
 		case "duplicateAttrViewView":
 			ret = tx.doDuplicateAttrViewView(op)
 		case "sortAttrViewView":
@@ -364,6 +358,10 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 			return
 		}
 
+		if isMovingParentIntoChild(srcNode, targetNode) {
+			return
+		}
+
 		for i := len(headingChildren) - 1; -1 < i; i-- {
 			c := headingChildren[i]
 			targetNode.InsertAfter(c)
@@ -410,6 +408,10 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 	}
 
 	if isMovingFoldHeadingIntoSelf(targetNode, headingChildren) {
+		return
+	}
+
+	if isMovingParentIntoChild(srcNode, targetNode) {
 		return
 	}
 
@@ -474,6 +476,15 @@ func isMovingFoldHeadingIntoSelf(targetNode *ast.Node, headingChildren []*ast.No
 	for _, headingChild := range headingChildren {
 		if headingChild.ID == targetNode.ID {
 			// 不能将折叠标题移动到自己下方节点的前或后 https://github.com/siyuan-note/siyuan/issues/7163
+			return true
+		}
+	}
+	return false
+}
+
+func isMovingParentIntoChild(srcNode, targetNode *ast.Node) bool {
+	for parent := targetNode.Parent; nil != parent; parent = parent.Parent {
+		if parent.ID == srcNode.ID {
 			return true
 		}
 	}
@@ -1112,6 +1123,19 @@ func (tx *Transaction) doInsert(operation *Operation) (ret *TxErr) {
 		ReloadAttrView(avID)
 	}
 
+	// 插入数据库块时需要重新绑定其中已经存在的块
+	// 比如剪切操作时，会先进行 delete 数据库解绑块，这里需要重新绑定 https://github.com/siyuan-note/siyuan/issues/13031
+	if ast.NodeAttributeView == insertedNode.Type {
+		attrView, parseErr := av.ParseAttributeView(insertedNode.AttributeViewID)
+		if nil == parseErr {
+			trees, toBindNodes := tx.getAttrViewBoundNodes(attrView)
+			for _, toBindNode := range toBindNodes {
+				t := trees[toBindNode.ID]
+				bindBlockAv0(tx, insertedNode.AttributeViewID, toBindNode, t)
+			}
+		}
+	}
+
 	operation.ID = insertedNode.ID
 	operation.ParentID = insertedNode.Parent.ID
 
@@ -1247,7 +1271,7 @@ func getRefDefIDs(node *ast.Node) (refDefIDs []string) {
 }
 
 func upsertAvBlockRel(node *ast.Node) {
-	var avIDs []string
+	var affectedAvIDs []string
 	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering {
 			return ast.WalkContinue
@@ -1256,15 +1280,39 @@ func upsertAvBlockRel(node *ast.Node) {
 		if ast.NodeAttributeView == n.Type {
 			avID := n.AttributeViewID
 			if changed := av.UpsertBlockRel(avID, n.ID); changed {
-				avIDs = append(avIDs, avID)
+				affectedAvIDs = append(affectedAvIDs, avID)
 			}
 		}
 		return ast.WalkContinue
 	})
-	avIDs = gulu.Str.RemoveDuplicatedElem(avIDs)
-	for _, avID := range avIDs {
-		ReloadAttrView(avID)
+
+	updatedNodes := []*ast.Node{node}
+	var parents []*ast.Node
+	for parent := node.Parent; nil != parent && ast.NodeDocument != parent.Type; parent = parent.Parent {
+		parents = append(parents, parent)
 	}
+	updatedNodes = append(updatedNodes, parents...)
+	for _, updatedNode := range updatedNodes {
+		ast.Walk(updatedNode, func(n *ast.Node, entering bool) ast.WalkStatus {
+			avs := n.IALAttr(av.NodeAttrNameAvs)
+			if "" == avs {
+				return ast.WalkContinue
+			}
+
+			avIDs := strings.Split(avs, ",")
+			affectedAvIDs = append(affectedAvIDs, avIDs...)
+			return ast.WalkContinue
+		})
+	}
+
+	affectedAvIDs = gulu.Str.RemoveDuplicatedElem(affectedAvIDs)
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		sql.FlushQueue()
+		for _, avID := range affectedAvIDs {
+			ReloadAttrView(avID)
+		}
+	}()
 }
 
 func (tx *Transaction) doUpdateUpdated(operation *Operation) (ret *TxErr) {

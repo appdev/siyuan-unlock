@@ -223,7 +223,7 @@ func heading2Doc(c *gin.Context) {
 		return
 	}
 
-	model.WaitForWritingFiles()
+	model.FlushTxQueue()
 	luteEngine := util.NewLute()
 	tree, err := filesys.LoadTree(targetNotebook, targetPath, luteEngine)
 	if err != nil {
@@ -268,7 +268,7 @@ func li2Doc(c *gin.Context) {
 		return
 	}
 
-	model.WaitForWritingFiles()
+	model.FlushTxQueue()
 	luteEngine := util.NewLute()
 	tree, err := filesys.LoadTree(targetNotebook, targetPath, luteEngine)
 	if err != nil {
@@ -531,6 +531,37 @@ func renameDoc(c *gin.Context) {
 	return
 }
 
+func renameDocByID(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+	if nil == arg["id"] {
+		return
+	}
+
+	id := arg["id"].(string)
+	title := arg["title"].(string)
+
+	tree, err := model.LoadTreeByBlockID(id)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		ret.Data = map[string]interface{}{"closeTimeout": 7000}
+		return
+	}
+
+	err = model.RenameDoc(tree.Box, tree.Path, title)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		return
+	}
+}
+
 func duplicateDoc(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
@@ -591,7 +622,7 @@ func createDoc(c *gin.Context) {
 		return
 	}
 
-	model.WaitForWritingFiles()
+	model.FlushTxQueue()
 	box := model.Conf.Box(notebook)
 	pushCreate(box, p, tree.Root.ID, arg)
 
@@ -621,7 +652,7 @@ func createDailyNote(c *gin.Context) {
 		return
 	}
 
-	model.WaitForWritingFiles()
+	model.FlushTxQueue()
 	box := model.Conf.Box(notebook)
 	luteEngine := util.NewLute()
 	tree, err := filesys.LoadTree(box.ID, p, luteEngine)
@@ -711,8 +742,13 @@ func createDocWithMd(c *gin.Context) {
 	if nil != withMathArg {
 		withMath = withMathArg.(bool)
 	}
+	clippingHref := ""
+	clippingHrefArg := arg["clippingHref"]
+	if nil != clippingHrefArg {
+		clippingHref = clippingHrefArg.(string)
+	}
 
-	id, err := model.CreateWithMarkdown(tags, notebook, hPath, markdown, parentID, id, withMath)
+	id, err := model.CreateWithMarkdown(tags, notebook, hPath, markdown, parentID, id, withMath, clippingHref)
 	if err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
@@ -720,7 +756,7 @@ func createDocWithMd(c *gin.Context) {
 	}
 	ret.Data = id
 
-	model.WaitForWritingFiles()
+	model.FlushTxQueue()
 	box := model.Conf.Box(notebook)
 	b, _ := model.GetBlock(id, nil)
 	p := b.Path

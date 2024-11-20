@@ -57,13 +57,19 @@ func html2BlockDOM(c *gin.Context) {
 	}
 
 	dom := arg["dom"].(string)
-	markdown, withMath, err := model.HTML2Markdown(dom)
+	luteEngine := util.NewLute()
+	luteEngine.SetSup(true)
+	luteEngine.SetSub(true)
+	luteEngine.SetMark(true)
+	luteEngine.SetGFMStrikethrough(true)
+	luteEngine.SetInlineAsterisk(true)
+	luteEngine.SetInlineUnderscore(true)
+	markdown, withMath, err := model.HTML2Markdown(dom, luteEngine)
 	if err != nil {
 		ret.Data = "Failed to convert"
 		return
 	}
 
-	luteEngine := util.NewLute()
 	if withMath {
 		luteEngine.SetInlineMath(true)
 	}
@@ -76,7 +82,7 @@ func html2BlockDOM(c *gin.Context) {
 		}
 
 		if ast.NodeListItem == n.Type && nil == n.FirstChild {
-			newNode := treenode.NewParagraph()
+			newNode := treenode.NewParagraph("")
 			n.AppendChild(newNode)
 			n.SetIALAttr("updated", util.TimeFromID(newNode.ID))
 			return ast.WalkSkipChildren
@@ -100,7 +106,7 @@ func html2BlockDOM(c *gin.Context) {
 				row := head.FirstChild
 				if nil != row.FirstChild && nil == row.FirstChild.Next {
 					cell := row.FirstChild
-					p := treenode.NewParagraph()
+					p := treenode.NewParagraph("")
 					var contents []*ast.Node
 					for c := cell.FirstChild; nil != c; c = c.Next {
 						contents = append(contents, c)
@@ -164,6 +170,7 @@ func html2BlockDOM(c *gin.Context) {
 		})
 	}
 
+	parse.TextMarks2Inlines(tree) // 先将 TextMark 转换为 Inlines https://github.com/siyuan-note/siyuan/issues/13056
 	parse.NestedInlines2FlattedSpansHybrid(tree, false)
 
 	renderer := render.NewProtyleRenderer(tree, luteEngine.RenderOptions)

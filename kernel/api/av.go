@@ -569,6 +569,7 @@ func renderAttributeView(c *gin.Context) {
 			"id":               v.ID,
 			"icon":             v.Icon,
 			"name":             v.Name,
+			"desc":             v.Desc,
 			"hideAttrViewName": v.HideAttrViewName,
 			"type":             v.LayoutType,
 			"pageSize":         pSize,
@@ -614,9 +615,8 @@ func setAttributeViewBlockAttr(c *gin.Context) {
 	avID := arg["avID"].(string)
 	keyID := arg["keyID"].(string)
 	rowID := arg["rowID"].(string)
-	cellID := arg["cellID"].(string)
 	value := arg["value"].(interface{})
-	updatedVal, err := model.UpdateAttributeViewCell(nil, avID, keyID, rowID, cellID, value)
+	updatedVal, err := model.UpdateAttributeViewCell(nil, avID, keyID, rowID, value)
 	if err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()

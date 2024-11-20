@@ -101,7 +101,7 @@ export const bazaar = {
             </div>
             <div class="fn__space"></div>
             <div class="fn__flex-1"></div>
-            <input ${window.siyuan.config.bazaar.petalDisabled ? "" : " checked"} data-type="plugins-enable" type="checkbox" class="b3-switch" style="margin: 8px 16px">
+            <input ${window.siyuan.config.bazaar.petalDisabled ? "" : " checked"} data-type="plugins-enable" type="checkbox" class="b3-switch fn__flex-center" style="margin-right: 8px">
             <div class="counter counter--bg fn__none fn__flex-center b3-tooltips b3-tooltips__w" aria-label="${window.siyuan.languages.total}"></div>
         </div>
         <div id="configBazaarDownloaded" class="config-bazaar__content">
@@ -575,11 +575,11 @@ export const bazaar = {
 <div class="item__main">
     <div class="item__preview" style="background-image: url(${data.previewURL})"></div>
     <div class="b3-typography${data.preferredDesc ? "" : " fn__none"}">
-        <div data-type="NodeBlockquote" class="bq" data-node-id>
-            <div data-type="NodeParagraph" class="p" data-node-id>
+        <blockquote>
+            <p>
                 ${data.preferredDesc || ""}
-            </div>
-         </div>
+            </p>
+         </blockquote>
     </div>
     <div class="item__readme b3-typography b3-typography--default">
         <img data-type="img-loading" style="height: 64px;width: 100%;padding: 16px 0;" src="/stage/loading-pure.svg">

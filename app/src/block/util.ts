@@ -35,6 +35,10 @@ export const cancelSB = (protyle: IProtyle, nodeElement: Element) => {
                 id,
             });
             nodeElement.lastElementChild.remove();
+            // 超级块中的 html 块需要反转义再赋值 https://github.com/siyuan-note/siyuan/issues/13155
+            nodeElement.querySelectorAll("protyle-html").forEach(item => {
+                item.setAttribute("data-content" , item.getAttribute("data-content").replace(/&lt;/g, "<").replace(/&gt;/g, ">"));
+            });
             nodeElement.outerHTML = nodeElement.innerHTML;
             return;
         }
@@ -85,10 +89,10 @@ export const jumpToParent = (protyle: IProtyle, nodeElement: Element, type: "par
         openFileById({
             app: protyle.app,
             id: targetId,
-            action: [Constants.CB_GET_FOCUS, targetId !== protyle.block.rootID && protyle.block.showAll ? Constants.CB_GET_ALL : ""]
+            action: targetId !== protyle.block.rootID && protyle.block.showAll ? [Constants.CB_GET_ALL, Constants.CB_GET_FOCUS] : [Constants.CB_GET_FOCUS]
         });
         /// #else
-        openMobileFileById(protyle.app, targetId, [Constants.CB_GET_FOCUS, targetId !== protyle.block.rootID && protyle.block.showAll ? Constants.CB_GET_ALL : ""]);
+        openMobileFileById(protyle.app, targetId, targetId !== protyle.block.rootID && protyle.block.showAll ? [Constants.CB_GET_ALL, Constants.CB_GET_FOCUS] : [Constants.CB_GET_FOCUS]);
         /// #endif
     });
 };

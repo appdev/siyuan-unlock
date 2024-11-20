@@ -22,7 +22,7 @@
     position: relative;
 
     &[custom-riff-decks] {
-      box-shadow: 3px 0 0 -1px var(--b3-protyle-inline-mark-background) inset;
+      box-shadow: 2px 0 0 0 var(--b3-protyle-inline-mark-background) inset;
     }
 
     [spellcheck] {
@@ -68,7 +68,7 @@
     }
 
     &.list {
-      padding-left: 0;
+      padding: 0;
 
       .dragover {
         &__top:not(.av__row) {
@@ -84,6 +84,8 @@
     &.li {
       padding: 0;
       margin: 0;
+      display: flex;
+      flex-direction: column;
 
       &:before {
         content: "";
@@ -155,24 +157,21 @@
       }
 
       & > div:nth-child(2) {
-        margin-top: 0 !important;
+        margin-top: 0;
+      }
+
+      & > div:nth-last-child(2) {
+        margin-bottom: 0;
       }
 
       & > [data-node-id] {
-        margin-left: 34px !important;
+        margin-left: 34px;
         padding-right: 0;
 
         &.code-block {
           margin-top: 4px;
           margin-bottom: 4px;
         }
-      }
-
-      & > .list {
-        margin-left: 18px !important;
-        padding-left: 16px;
-        padding-top: 0;
-        padding-bottom: 0;
       }
     }
 
@@ -281,8 +280,9 @@
 
       &[data-type="NodeBlockQueryEmbed"] {
         background-color: var(--b3-embed-background);
-        border-left: 1px dashed var(--b3-theme-surface-lighter);
+        border: 1px dashed var(--b3-theme-surface-lighter);
         max-width: 100%;
+        padding: 2px 4px;
 
         // https://github.com/siyuan-note/siyuan/issues/8715 & https://ld246.com/article/1689063197687 第一点无法进行以下设置
         //.protyle-attr--refcount {right: 0;}
@@ -295,10 +295,6 @@
           .code-block:hover .protyle-icon,
           .render-node:hover .protyle-icons {
             opacity: 0 !important;
-          }
-
-          & > .list {
-            margin-left: -4px;
           }
         }
 
@@ -322,7 +318,7 @@
         top: 1px;
         z-index: 2;
         box-shadow: 0 -1px 0 var(--b3-border-color) inset, 0 -1px 0 0 var(--b3-border-color);
-        background-color: var(--b3-theme-background);
+        background-color: var(--b3-parent-background);
 
         th {
           border-top: 0;
@@ -467,70 +463,29 @@
     }
   }
 
-  &--select {
-    background-color: var(--b3-theme-primary-lightest) !important;
-
-    [data-node-id][style*="background-color: var(--b3-font-background1)"] {
-      background-color: var(--b3-font-background1-rgba) !important;
+  &--select,
+  &--hl {
+    &:after {
+      background-color: var(--b3-theme-primary-lightest);
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      content: " ";
+      left: 0;
+      top: 0;
+      border-radius: var(--b3-border-radius);
+      z-index: 3;
+      pointer-events: none;
     }
+  }
 
-    [data-node-id][style*="background-color: var(--b3-font-background2)"] {
-      background-color: var(--b3-font-background2-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background3)"] {
-      background-color: var(--b3-font-background3-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background4)"] {
-      background-color: var(--b3-font-background4-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background5)"] {
-      background-color: var(--b3-font-background5-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background6)"] {
-      background-color: var(--b3-font-background6-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background7)"] {
-      background-color: var(--b3-font-background7-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background8)"] {
-      background-color: var(--b3-font-background8-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background9)"] {
-      background-color: var(--b3-font-background9-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background10)"] {
-      background-color: var(--b3-font-background10-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background11)"] {
-      background-color: var(--b3-font-background11-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background12)"] {
-      background-color: var(--b3-font-background12-rgba) !important;
-    }
-
-    [data-node-id][style*="background-color: var(--b3-font-background13)"] {
-      background-color: var(--b3-font-background13-rgba) !important;
-    }
+  &--hl {
+    transition: var(--b3-background-transition);
   }
 
   // https://github.com/siyuan-note/siyuan/issues/11589
   .hljs wbr {
     display: none;
-  }
-
-  &--hl {
-    transition: var(--b3-background-transition);
-    background-color: var(--b3-theme-primary-lightest) !important;
   }
 
   .dragover {

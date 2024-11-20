@@ -71,7 +71,7 @@ export const reloadSync = (
         }
     }
     setNoteBook(() => {
-        window.siyuan.mobile.files.init(false);
+        window.siyuan.mobile.docks.file.init(false);
     });
     /// #else
     const allModels = getAllModels();
@@ -125,7 +125,7 @@ export const reloadSync = (
             }
         }
     });
-    if (onlyUpdateDoc) {
+    if (!onlyUpdateDoc) {
         allModels.files.forEach(item => {
             setNoteBook(() => {
                 item.init(false);
@@ -173,6 +173,9 @@ export const setDefRefCount = (data: {
 }) => {
     getAllEditor().forEach(editor => {
         if (data.rootID === data.blockID && editor.protyle.block.rootID === data.rootID) {
+            if (!editor.protyle.title) {
+                return;
+            }
             const attrElement = editor.protyle.title.element.querySelector(".protyle-attr");
             const countElement = attrElement.querySelector(".protyle-attr--refcount");
             if (countElement) {
@@ -215,7 +218,7 @@ export const setDefRefCount = (data: {
 
     let liElement;
     /// #if MOBILE
-    liElement = window.siyuan.mobile.files.element.querySelector(`li[data-node-id="${data.rootID}"]`);
+    liElement = window.siyuan.mobile.docks.file.element.querySelector(`li[data-node-id="${data.rootID}"]`);
     /// #else
     liElement = (getDockByType("file").data.file as Files).element.querySelector(`li[data-node-id="${data.rootID}"]`);
     /// #endif
@@ -434,7 +437,7 @@ export const progressLoading = (data: IWebSocketData) => {
 <div class="b3-dialog__loading">
     <div style="text-align: right">${data.data.current}/${data.data.total}</div>
     <div style="margin: 8px 0;height: 8px;border-radius: var(--b3-border-radius);overflow: hidden;background-color:#fff;"><div style="width: ${data.data.current / data.data.total * 100}%;transition: var(--b3-transition);background-color: var(--b3-theme-primary);height: 8px;"></div></div>
-    <div>${data.msg}</div>
+    <div class="ft__breakword">${data.msg}</div>
 </div>`;
     } else if (data.code === 1) {
         if (progressElement.lastElementChild) {
@@ -443,7 +446,7 @@ export const progressLoading = (data: IWebSocketData) => {
             progressElement.innerHTML = `<div class="b3-dialog__scrim" style="opacity: 1"></div>
 <div class="b3-dialog__loading">
     <div style="margin: 8px 0;height: 8px;border-radius: var(--b3-border-radius);overflow: hidden;background-color:#fff;"><div style="background-color: var(--b3-theme-primary);height: 8px;background-image: linear-gradient(-45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 75%, transparent 75%, transparent);animation: stripMove 450ms linear infinite;background-size: 50px 50px;"></div></div>
-    <div>${data.msg}</div>
+    <div class="ft__breakword">${data.msg}</div>
 </div>`;
         }
     }

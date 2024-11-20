@@ -395,7 +395,7 @@ func SwapBlockRef(refID, defID string, includeChildren bool) (err error) {
 	refreshUpdated(defNode)
 	refreshUpdated(refNode)
 
-	refPivot := treenode.NewParagraph()
+	refPivot := treenode.NewParagraph("")
 	refNode.InsertBefore(refPivot)
 
 	if ast.NodeListItem == defNode.Type {
@@ -463,7 +463,7 @@ func SwapBlockRef(refID, defID string, includeChildren bool) (err error) {
 			return
 		}
 	}
-	WaitForWritingFiles()
+	FlushTxQueue()
 	util.ReloadUI()
 	return
 }

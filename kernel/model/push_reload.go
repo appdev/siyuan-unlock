@@ -88,12 +88,16 @@ func refreshDocInfo0(tree *parse.Tree, size uint64) {
 	docInfo := map[string]interface{}{
 		"rootID":       tree.ID,
 		"name":         tree.Root.IALAttr("title"),
+		"alias":        tree.Root.IALAttr("alias"),
+		"name1":        tree.Root.IALAttr("name"),
+		"memo":         tree.Root.IALAttr("memo"),
+		"bookmark":     tree.Root.IALAttr("bookmark"),
 		"size":         size,
 		"hSize":        humanize.BytesCustomCeil(size, 2),
 		"mtime":        mTime.Unix(),
 		"ctime":        cTime.Unix(),
-		"hMtime":       cTime.Format("2006-01-02 15:04:05") + ", " + util.HumanizeTime(mTime, Conf.Lang),
-		"hCtime":       mTime.Format("2006-01-02 15:04:05") + ", " + util.HumanizeTime(cTime, Conf.Lang),
+		"hMtime":       mTime.Format("2006-01-02 15:04:05") + ", " + util.HumanizeTime(mTime, Conf.Lang),
+		"hCtime":       cTime.Format("2006-01-02 15:04:05") + ", " + util.HumanizeTime(cTime, Conf.Lang),
 		"subFileCount": subFileCount,
 	}
 

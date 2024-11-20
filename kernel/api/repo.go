@@ -29,6 +29,40 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
+func setRepoIndexRetentionDays(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+	days := int(arg["days"].(float64))
+	if 1 > days {
+		days = 180
+	}
+
+	model.Conf.Repo.IndexRetentionDays = days
+	model.Conf.Save()
+}
+
+func setRetentionIndexesDaily(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+	indexes := int(arg["indexes"].(float64))
+	if 1 > indexes {
+		indexes = 180
+	}
+
+	model.Conf.Repo.RetentionIndexesDaily = indexes
+	model.Conf.Save()
+}
+
 func getRepoFile(c *gin.Context) {
 	// Add internal kernel API `/api/repo/getRepoFile` https://github.com/siyuan-note/siyuan/issues/10101
 
@@ -70,7 +104,7 @@ func openRepoSnapshotDoc(c *gin.Context) {
 	}
 
 	id := arg["id"].(string)
-	content, isProtyleDoc, updated, err := model.OpenRepoSnapshotDoc(id)
+	title, content, displayInText, updated, err := model.OpenRepoSnapshotDoc(id)
 	if err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
@@ -78,9 +112,10 @@ func openRepoSnapshotDoc(c *gin.Context) {
 	}
 
 	ret.Data = map[string]interface{}{
-		"content":      content,
-		"isProtyleDoc": isProtyleDoc,
-		"updated":      updated,
+		"title":         title,
+		"content":       content,
+		"displayInText": displayInText,
+		"updated":       updated,
 	}
 }
 
