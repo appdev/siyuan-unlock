@@ -64,22 +64,6 @@ public class BootActivity extends AppCompatActivity {
         } catch (PackageManager.NameNotFoundException e) {
             throw new RuntimeException(e);
         }
-
-        // 从配置清单获取 CHANNEL 的值，用于判断是哪个渠道包
-        final String channel = applicationInfo.metaData.getString("CHANNEL");
-
-        // 首次运行需要弹出用户协议的渠道集合
-        final Set<String> showAgreementChannels = new HashSet<>();
-        showAgreementChannels.add("cn");
-        showAgreementChannels.add("huawei");
-        final boolean needShowAgreement = showAgreementChannels.contains(channel);
-        if (needShowAgreement && isFirstRun()) {
-            // 首次运行弹窗提示用户隐私条款和使用授权
-            setContentView(R.layout.activity_agreement);
-            showAgreements();
-            return;
-        }
-
         // 启动主界面
         startMainActivity();
     }
@@ -88,13 +72,6 @@ public class BootActivity extends AppCompatActivity {
     protected void onDestroy() {
         Log.i("boot", "destroy boot activity");
         super.onDestroy();
-    }
-
-    private boolean isFirstRun() {
-        final String dataDir = getFilesDir().getAbsolutePath();
-        final String appDir = dataDir + "/app";
-        final File appDirFile = new File(appDir);
-        return !appDirFile.exists();
     }
 
     private void startMainActivity() {

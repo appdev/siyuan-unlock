@@ -40,6 +40,15 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
+            resValue "string", "app_name", "SiYuan"
+            resValue "string", "app_package_name", "org.b3log.siyuan"
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            minifyEnabled false
+            resValue "string", "app_name", "SiYuan-Debug"
+            resValue "string", "app_package_name", "org.b3log.siyuan.debug"
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

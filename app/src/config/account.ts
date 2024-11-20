@@ -474,6 +474,6 @@ ${renewHTML}
                 html += `<div class="toolbar__item ariaLabel" aria-label="${item.name}：${item.desc}">${item.icon}</div>`;
             });
         }
-        document.getElementById("toolbarVIP").innerHTML = html;
+        document.getElementById("toolbarVIP").innerHTML = "";
     }
 };
