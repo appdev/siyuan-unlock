@@ -214,8 +214,15 @@ func heading2Doc(c *gin.Context) {
 
 	srcHeadingID := arg["srcHeadingID"].(string)
 	targetNotebook := arg["targetNoteBook"].(string)
-	targetPath := arg["targetPath"].(string)
-	srcRootBlockID, targetPath, err := model.Heading2Doc(srcHeadingID, targetNotebook, targetPath)
+	var targetPath string
+	if arg["targetPath"] != nil {
+		targetPath = arg["targetPath"].(string)
+	}
+	var previousPath string
+	if arg["previousPath"] != nil {
+		previousPath = arg["previousPath"].(string)
+	}
+	srcRootBlockID, targetPath, err := model.Heading2Doc(srcHeadingID, targetNotebook, targetPath, previousPath)
 	if err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
@@ -259,8 +266,15 @@ func li2Doc(c *gin.Context) {
 
 	srcListItemID := arg["srcListItemID"].(string)
 	targetNotebook := arg["targetNoteBook"].(string)
-	targetPath := arg["targetPath"].(string)
-	srcRootBlockID, targetPath, err := model.ListItem2Doc(srcListItemID, targetNotebook, targetPath)
+	var targetPath string
+	if arg["targetPath"] != nil {
+		targetPath = arg["targetPath"].(string)
+	}
+	var previousPath string
+	if arg["previousPath"] != nil {
+		previousPath = arg["previousPath"].(string)
+	}
+	srcRootBlockID, targetPath, err := model.ListItem2Doc(srcListItemID, targetNotebook, targetPath, previousPath)
 	if err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
@@ -458,10 +472,63 @@ func moveDocs(c *gin.Context) {
 	if util.InvalidIDPattern(toNotebook, ret) {
 		return
 	}
-
 	callback := arg["callback"]
-
 	err := model.MoveDocs(fromPaths, toNotebook, toPath, callback)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		ret.Data = map[string]interface{}{"closeTimeout": 7000}
+		return
+	}
+}
+
+func moveDocsByID(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	fromIDsArg := arg["fromIDs"].([]any)
+	var fromIDs []string
+	for _, fromIDArg := range fromIDsArg {
+		fromID := fromIDArg.(string)
+		if util.InvalidIDPattern(fromID, ret) {
+			return
+		}
+		fromIDs = append(fromIDs, fromID)
+	}
+	toID := arg["toID"].(string)
+	if util.InvalidIDPattern(toID, ret) {
+		return
+	}
+
+	var fromPaths []string
+	for _, fromID := range fromIDs {
+		tree, err := model.LoadTreeByBlockID(fromID)
+		if err != nil {
+			ret.Code = -1
+			ret.Msg = err.Error()
+			ret.Data = map[string]interface{}{"closeTimeout": 7000}
+			return
+		}
+		fromPaths = append(fromPaths, tree.Path)
+	}
+	fromPaths = gulu.Str.RemoveDuplicatedElem(fromPaths)
+
+	toTree, err := model.LoadTreeByBlockID(toID)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		ret.Data = map[string]interface{}{"closeTimeout": 7000}
+		return
+	}
+	toNotebook := toTree.Box
+	toPath := toTree.Path
+	callback := arg["callback"]
+	err = model.MoveDocs(fromPaths, toNotebook, toPath, callback)
 	if err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
@@ -486,6 +553,31 @@ func removeDoc(c *gin.Context) {
 
 	p := arg["path"].(string)
 	model.RemoveDoc(notebook, p)
+}
+
+func removeDocByID(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	id := arg["id"].(string)
+	if util.InvalidIDPattern(id, ret) {
+		return
+	}
+
+	tree, err := model.LoadTreeByBlockID(id)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		ret.Data = map[string]interface{}{"closeTimeout": 7000}
+		return
+	}
+
+	model.RemoveDoc(tree.Box, tree.Path)
 }
 
 func removeDocs(c *gin.Context) {
@@ -544,6 +636,10 @@ func renameDocByID(c *gin.Context) {
 	}
 
 	id := arg["id"].(string)
+	if util.InvalidIDPattern(id, ret) {
+		return
+	}
+
 	title := arg["title"].(string)
 
 	tree, err := model.LoadTreeByBlockID(id)
@@ -1018,8 +1114,14 @@ func getDoc(c *gin.Context) {
 	if nil != isBacklinkArg {
 		isBacklink = isBacklinkArg.(bool)
 	}
+	highlightArg := arg["highlight"]
+	highlight := true
+	if nil != highlightArg {
+		highlight = highlightArg.(bool)
+	}
 
-	blockCount, content, parentID, parent2ID, rootID, typ, eof, scroll, boxID, docPath, isBacklinkExpand, err := model.GetDoc(startID, endID, id, index, query, queryTypes, queryMethod, mode, size, isBacklink)
+	blockCount, content, parentID, parent2ID, rootID, typ, eof, scroll, boxID, docPath, isBacklinkExpand, keywords, err :=
+		model.GetDoc(startID, endID, id, index, query, queryTypes, queryMethod, mode, size, isBacklink, highlight)
 	if model.ErrBlockNotFound == err {
 		ret.Code = 3
 		return
@@ -1049,6 +1151,8 @@ func getDoc(c *gin.Context) {
 		"path":             docPath,
 		"isSyncing":        isSyncing,
 		"isBacklinkExpand": isBacklinkExpand,
+		"keywords":         keywords,
+		"reqId":            arg["reqId"],
 	}
 }
 

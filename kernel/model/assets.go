@@ -123,7 +123,6 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 
 				name := filepath.Base(u)
 				name = util.FilterUploadFileName(name)
-				name = util.TruncateLenFileName(name)
 				name = "network-asset-" + name
 				name = util.AssetName(name)
 				writePath := filepath.Join(assetsDirPath, name)
@@ -205,23 +204,28 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 					name = name[:strings.Index(name, "#")]
 				}
 				name, _ = url.PathUnescape(name)
-				ext := path.Ext(name)
+				name = util.FilterUploadFileName(name)
+				ext := util.Ext(name)
 				if "" == ext {
 					if mtype := mimetype.Detect(data); nil != mtype {
 						ext = mtype.Extension()
+						name += ext
 					}
+				}
+				if "" == ext && bytes.HasPrefix(data, []byte("<svg ")) && bytes.HasSuffix(data, []byte("</svg>")) {
+					ext = ".svg"
+					name += ext
 				}
 				if "" == ext {
 					contentType := resp.Header.Get("Content-Type")
 					exts, _ := mime.ExtensionsByType(contentType)
 					if 0 < len(exts) {
 						ext = exts[0]
+						name += ext
 					}
 				}
-				name = strings.TrimSuffix(name, ext)
-				name = util.FilterUploadFileName(name)
-				name = util.TruncateLenFileName(name)
-				name = "network-asset-" + name + "-" + ast.NewNodeID() + ext
+				name = util.AssetName(name)
+				name = "network-asset-" + name
 				writePath := filepath.Join(assetsDirPath, name)
 				if err = filelock.WriteFile(writePath, data); err != nil {
 					logging.LogErrorf("write downloaded network asset [%s] to local asset [%s] failed: %s", u, writePath, err)
@@ -249,7 +253,9 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 
 func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 	ret = []*cache.Asset{}
+	keywords := strings.Split(keyword, " ")
 
+	pathHitCount := map[string]int{}
 	count := 0
 	filterByExt := 0 < len(exts)
 	for _, asset := range cache.GetAssets() {
@@ -269,16 +275,24 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 
 		lowerHName := strings.ToLower(asset.HName)
 		lowerPath := strings.ToLower(asset.Path)
-		lowerKeyword := strings.ToLower(keyword)
-		hitName := strings.Contains(lowerHName, lowerKeyword)
-		hitPath := strings.Contains(lowerPath, lowerKeyword)
-		if !hitName && !hitPath {
-			continue
+		var hitNameCount, hitPathCount int
+		for _, k := range keywords {
+			lowerKeyword := strings.ToLower(k)
+			hitNameCount += strings.Count(lowerHName, lowerKeyword)
+			hitPathCount += strings.Count(lowerPath, lowerKeyword)
+			if 1 > hitNameCount && 1 > hitPathCount {
+				continue
+			}
 		}
 
+		if 1 > hitNameCount+hitPathCount {
+			continue
+		}
+		pathHitCount[asset.Path] += hitNameCount + hitPathCount
+
 		hName := asset.HName
-		if hitName {
-			_, hName = search.MarkText(asset.HName, keyword, 64, Conf.Search.CaseSensitive)
+		if 0 < hitNameCount {
+			_, hName = search.MarkText(asset.HName, strings.Join(keywords, search.TermSep), 64, Conf.Search.CaseSensitive)
 		}
 		ret = append(ret, &cache.Asset{
 			HName:   hName,
@@ -291,9 +305,15 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 		}
 	}
 
-	sort.Slice(ret, func(i, j int) bool {
-		return ret[i].Updated > ret[j].Updated
-	})
+	if 0 < len(pathHitCount) {
+		sort.Slice(ret, func(i, j int) bool {
+			return pathHitCount[ret[i].Path] > pathHitCount[ret[j].Path]
+		})
+	} else {
+		sort.Slice(ret, func(i, j int) bool {
+			return ret[i].Updated > ret[j].Updated
+		})
+	}
 	return
 }
 
@@ -311,9 +331,9 @@ func GetAssetAbsPath(relativePath string) (ret string, err error) {
 	// 在笔记本下搜索
 	for _, notebook := range notebooks {
 		notebookAbsPath := filepath.Join(util.DataDir, notebook.ID)
-		filelock.Walk(notebookAbsPath, func(path string, info fs.FileInfo, _ error) error {
-			if isSkipFile(info.Name()) {
-				if info.IsDir() {
+		filelock.Walk(notebookAbsPath, func(path string, d fs.DirEntry, err error) error {
+			if isSkipFile(d.Name()) {
+				if d.IsDir() {
 					return filepath.SkipDir
 				}
 				return nil
@@ -591,7 +611,7 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 	defer util.PushClearProgress()
 
 	newName = strings.TrimSpace(newName)
-	newName = gulu.Str.RemoveInvisible(newName)
+	newName = util.FilterFileName(newName)
 	if path.Base(oldPath) == newName {
 		return
 	}
@@ -1270,12 +1290,12 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 	// 笔记本 assets
 	for _, notebook := range notebooks {
 		notebookAbsPath := filepath.Join(util.DataDir, notebook.ID)
-		filelock.Walk(notebookAbsPath, func(path string, info fs.FileInfo, err error) error {
+		filelock.Walk(notebookAbsPath, func(path string, d fs.DirEntry, err error) error {
 			if notebookAbsPath == path {
 				return nil
 			}
-			if isSkipFile(info.Name()) {
-				if info.IsDir() {
+			if isSkipFile(d.Name()) {
+				if d.IsDir() {
 					return filepath.SkipDir
 				}
 				return nil
@@ -1286,20 +1306,20 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 				return nil
 			}
 
-			if info.IsDir() && "assets" == info.Name() {
-				filelock.Walk(path, func(assetPath string, info fs.FileInfo, err error) error {
+			if d.IsDir() && "assets" == d.Name() {
+				filelock.Walk(path, func(assetPath string, d fs.DirEntry, err error) error {
 					if path == assetPath {
 						return nil
 					}
-					if isSkipFile(info.Name()) {
-						if info.IsDir() {
+					if isSkipFile(d.Name()) {
+						if d.IsDir() {
 							return filepath.SkipDir
 						}
 						return nil
 					}
 					relPath := filepath.ToSlash(assetPath)
 					relPath = relPath[strings.Index(relPath, "assets/"):]
-					if info.IsDir() {
+					if d.IsDir() {
 						relPath += "/"
 					}
 					assetsAbsPathMap[relPath] = assetPath
@@ -1313,13 +1333,13 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 
 	// 全局 assets
 	dataAssetsAbsPath := util.GetDataAssetsAbsPath()
-	filelock.Walk(dataAssetsAbsPath, func(assetPath string, info fs.FileInfo, err error) error {
+	filelock.Walk(dataAssetsAbsPath, func(assetPath string, d fs.DirEntry, err error) error {
 		if dataAssetsAbsPath == assetPath {
 			return nil
 		}
 
-		if isSkipFile(info.Name()) {
-			if info.IsDir() {
+		if isSkipFile(d.Name()) {
+			if d.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
@@ -1332,7 +1352,7 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 
 		relPath := filepath.ToSlash(assetPath)
 		relPath = relPath[strings.Index(relPath, "assets/"):]
-		if info.IsDir() {
+		if d.IsDir() {
 			relPath += "/"
 		}
 		assetsAbsPathMap[relPath] = assetPath
@@ -1356,14 +1376,12 @@ func copyDocAssetsToDataAssets(boxID, parentDocPath string) {
 
 func copyAssetsToDataAssets(rootPath string) {
 	var assetsDirPaths []string
-	filelock.Walk(rootPath, func(path string, info fs.FileInfo, err error) error {
-		if rootPath == path || nil == info {
+	filelock.Walk(rootPath, func(path string, d fs.DirEntry, err error) error {
+		if nil != err || rootPath == path || nil == d {
 			return nil
 		}
 
-		isDir := info.IsDir()
-		name := info.Name()
-
+		isDir, name := d.IsDir(), d.Name()
 		if isSkipFile(name) {
 			if isDir {
 				return filepath.SkipDir

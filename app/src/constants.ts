@@ -194,10 +194,10 @@ export abstract class Constants {
     public static readonly HELP_PATH = {
         zh_CN: "20210808180117-czj9bvb",
         zh_CHT: "20211226090932-5lcq56f",
+        ja_JP: "20240530133126-axarxgx",
         en_US: "20210808180117-6v0mkxr",
         fr_FR: "20210808180117-6v0mkxr",
         es_ES: "20210808180117-6v0mkxr",
-        ja_JP: "20240530133126-axarxgx",
         it_IT: "20210808180117-6v0mkxr",
         de_DE: "20210808180117-6v0mkxr",
         he_IL: "20210808180117-6v0mkxr",
@@ -649,7 +649,7 @@ export abstract class Constants {
 
     // assets
     public static readonly SIYUAN_ASSETS_IMAGE: string[] = [".apng", ".ico", ".cur", ".jpg", ".jpe", ".jpeg", ".jfif", ".pjp", ".pjpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".avif"];
-    public static readonly SIYUAN_ASSETS_AUDIO: string[] = [".mp3", ".wav", ".ogg", ".m4a", ".aac"];
+    public static readonly SIYUAN_ASSETS_AUDIO: string[] = [".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"];
     public static readonly SIYUAN_ASSETS_VIDEO: string[] = [".mov", ".weba", ".mkv", ".mp4", ".webm"];
     public static readonly SIYUAN_ASSETS_EXTS: string[] = [".pdf"].concat(Constants.SIYUAN_ASSETS_IMAGE).concat(Constants.SIYUAN_ASSETS_AUDIO).concat(Constants.SIYUAN_ASSETS_VIDEO);
     public static readonly SIYUAN_ASSETS_SEARCH: string[] = [".txt", ".md", ".markdown", ".docx", ".xlsx", ".pptx", ".pdf", ".json", ".log", ".sql", ".html", ".xml", ".java", ".h", ".c",

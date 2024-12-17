@@ -268,7 +268,18 @@ declare namespace Config {
      * User interface language
      * Same as {@link IAppearance.lang}
      */
-    export type TLang = "en_US" | "es_ES" | "fr_FR" | "zh_CHT" | "zh_CN" | "ja_JP" | "it_IT" | "de_DE" | "he_IL" | "ru_RU" | "pl_PL";
+    export type TLang =
+        "en_US"
+        | "es_ES"
+        | "fr_FR"
+        | "zh_CHT"
+        | "zh_CN"
+        | "ja_JP"
+        | "it_IT"
+        | "de_DE"
+        | "he_IL"
+        | "ru_RU"
+        | "pl_PL";
 
     /**
      * SiYuan bazaar related configuration
@@ -1540,9 +1551,10 @@ declare namespace Config {
      * - `docker`: Docker container
      * - `android`: Android device
      * - `ios`: iOS device
+     * - `harmony`: HarmonyOS device
      * - `std`: Desktop Electron environment
      */
-    export type TSystemContainer = "docker" | "android" | "ios" | "std";
+    export type TSystemContainer = "docker" | "android" | "ios" | "harmony" | "std";
 
     /**
      * SiYuan Network proxy configuration

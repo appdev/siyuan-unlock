@@ -360,8 +360,8 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets,
 			ret = []*Block{}
 		}
 
-		// 在 hPath 中加入笔记本名 Show notebooks in hpath of block ref search list results https://github.com/siyuan-note/siyuan/issues/9378
 		prependNotebookNameInHPath(ret)
+		filterSelfHPath(ret)
 		return
 	}
 
@@ -423,12 +423,25 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets,
 		newDoc = true
 	}
 
-	// 在 hPath 中加入笔记本名 Show notebooks in hpath of block ref search list results https://github.com/siyuan-note/siyuan/issues/9378
 	prependNotebookNameInHPath(ret)
+	filterSelfHPath(ret)
 	return
 }
 
+func filterSelfHPath(blocks []*Block) {
+	// 简化搜索结果列表中的文档块路径 Simplify document block paths in search results https://github.com/siyuan-note/siyuan/issues/13364
+	// 文档块不显示自己的路径（最后一层）
+
+	for _, b := range blocks {
+		if b.IsDoc() {
+			b.HPath = strings.TrimSuffix(b.HPath, path.Base(b.HPath))
+		}
+	}
+}
+
 func prependNotebookNameInHPath(blocks []*Block) {
+	// 在 hPath 中加入笔记本名 Show notebooks in hpath of block ref search list results https://github.com/siyuan-note/siyuan/issues/9378
+
 	var boxIDs []string
 	for _, b := range blocks {
 		boxIDs = append(boxIDs, b.Box)
@@ -625,6 +638,10 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 								n.TextMarkTextContent = escapedR.ReplaceAllString(n.TextMarkTextContent, util.EscapeHTML(replacement))
 							}
 						}
+
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("a") {
 						if replaceTypes["aText"] {
 							if 0 == method {
@@ -635,6 +652,9 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 								if nil != r && r.MatchString(n.TextMarkTextContent) {
 									n.TextMarkTextContent = r.ReplaceAllString(n.TextMarkTextContent, replacement)
 								}
+							}
+							if "" == n.TextMarkTextContent {
+								unlinks = append(unlinks, n)
 							}
 						}
 
@@ -661,61 +681,87 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 								}
 							}
 						}
-
 					} else if n.IsTextMarkType("em") {
 						if !replaceTypes["em"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "em")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("strong") {
 						if !replaceTypes["strong"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "strong")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("kbd") {
 						if !replaceTypes["kbd"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "kbd")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("mark") {
 						if !replaceTypes["mark"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "mark")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("s") {
 						if !replaceTypes["s"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "s")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("sub") {
 						if !replaceTypes["sub"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "sub")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("sup") {
 						if !replaceTypes["sup"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "sup")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("tag") {
 						if !replaceTypes["tag"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "tag")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("u") {
 						if !replaceTypes["u"] {
 							return ast.WalkContinue
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "u")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("inline-math") {
 						if !replaceTypes["inlineMath"] {
 							return ast.WalkContinue
@@ -729,6 +775,10 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 							if nil != r && r.MatchString(n.TextMarkInlineMathContent) {
 								n.TextMarkInlineMathContent = r.ReplaceAllString(n.TextMarkInlineMathContent, replacement)
 							}
+						}
+
+						if "" == n.TextMarkInlineMathContent {
+							unlinks = append(unlinks, n)
 						}
 					} else if n.IsTextMarkType("inline-memo") {
 						if !replaceTypes["inlineMemo"] {
@@ -744,6 +794,10 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 								n.TextMarkInlineMemoContent = r.ReplaceAllString(n.TextMarkInlineMemoContent, replacement)
 							}
 						}
+
+						if "" == n.TextMarkInlineMemoContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("text") {
 						// Search and replace fails in some cases https://github.com/siyuan-note/siyuan/issues/10016
 						if !replaceTypes["text"] {
@@ -751,6 +805,9 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 						}
 
 						replaceNodeTextMarkTextContent(n, method, keyword, replacement, r, "text")
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("block-ref") {
 						if !replaceTypes["blockRef"] {
 							return ast.WalkContinue
@@ -767,6 +824,10 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 								n.TextMarkBlockRefSubtype = "s"
 							}
 						}
+
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
+						}
 					} else if n.IsTextMarkType("file-annotation-ref") {
 						if !replaceTypes["fileAnnotationRef"] {
 							return ast.WalkContinue
@@ -780,6 +841,9 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 							if nil != r && r.MatchString(n.TextMarkTextContent) {
 								n.TextMarkTextContent = r.ReplaceAllString(n.TextMarkTextContent, replacement)
 							}
+						}
+						if "" == n.TextMarkTextContent {
+							unlinks = append(unlinks, n)
 						}
 					}
 				}
@@ -925,6 +989,7 @@ func FullTextSearchBlock(query string, boxes, paths []string, types map[string]b
 		return
 	}
 
+	query = filterQueryInvisibleChars(query)
 	trimQuery := strings.TrimSpace(query)
 	if "" != trimQuery {
 		query = trimQuery
@@ -1058,6 +1123,8 @@ func FullTextSearchBlock(query string, boxes, paths []string, types map[string]b
 	if 1 > len(ret) {
 		ret = []*Block{}
 	}
+
+	filterSelfHPath(ret)
 	return
 }
 
@@ -1172,7 +1239,6 @@ func buildTypeFilter(types map[string]bool) string {
 }
 
 func searchBySQL(stmt string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
-	stmt = filterQueryInvisibleChars(stmt)
 	stmt = strings.TrimSpace(stmt)
 	blocks := sql.SelectBlocksRawStmt(stmt, page, pageSize)
 	ret = fromSQLBlocks(&blocks, "", beforeLen)
@@ -1297,7 +1363,6 @@ func extractID(content string) (ret string) {
 }
 
 func fullTextSearchByQuerySyntax(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderBy string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
-	query = filterQueryInvisibleChars(query)
 	if ast.IsNodeIDPattern(query) {
 		ret, matchedBlockCount, matchedRootCount = searchBySQL("SELECT * FROM `blocks` WHERE `id` = '"+query+"'", beforeLen, page, pageSize)
 		return
@@ -1306,7 +1371,6 @@ func fullTextSearchByQuerySyntax(query, boxFilter, pathFilter, typeFilter, ignor
 }
 
 func fullTextSearchByKeyword(query, boxFilter, pathFilter, typeFilter, ignoreFilter string, orderBy string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
-	query = filterQueryInvisibleChars(query)
 	if ast.IsNodeIDPattern(query) {
 		ret, matchedBlockCount, matchedRootCount = searchBySQL("SELECT * FROM `blocks` WHERE `id` = '"+query+"'", beforeLen, page, pageSize)
 		return
@@ -1315,8 +1379,6 @@ func fullTextSearchByKeyword(query, boxFilter, pathFilter, typeFilter, ignoreFil
 }
 
 func fullTextSearchByRegexp(exp, boxFilter, pathFilter, typeFilter, ignoreFilter, orderBy string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
-	exp = filterQueryInvisibleChars(exp)
-
 	fieldFilter := fieldRegexp(exp)
 	stmt := "SELECT * FROM `blocks` WHERE " + fieldFilter + " AND type IN " + typeFilter
 	stmt += boxFilter + pathFilter + ignoreFilter + " " + orderBy
@@ -1397,8 +1459,7 @@ func fullTextSearchCountByFTS(query, boxFilter, pathFilter, typeFilter, ignoreFi
 }
 
 func fullTextSearchByLikeWithRoot(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderBy string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
-	query = strings.ReplaceAll(query, "'", "''")
-	query = strings.ReplaceAll(query, "\"", "\"\"")
+	query = strings.ReplaceAll(query, "'", "''") // 不需要转义双引号，因为条件都是通过单引号包裹的，只需要转义单引号即可
 	keywords := strings.Split(query, " ")
 	contentField := columnConcat()
 	var likeFilter string
@@ -1942,7 +2003,7 @@ func getRefSearchIgnoreLines() (ret []string) {
 
 func filterQueryInvisibleChars(query string) string {
 	query = strings.ReplaceAll(query, "　", "_@full_width_space@_")
-	query = gulu.Str.RemoveInvisible(query)
+	query = util.RemoveInvalid(query)
 	query = strings.ReplaceAll(query, "_@full_width_space@_", "　")
 	return query
 }

@@ -35,6 +35,23 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
+func reloadUI(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	util.ReloadUI()
+}
+
+func getWorkspaceInfo(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	ret.Data = map[string]any{
+		"workspaceDir": util.WorkspaceDir,
+		"siyuanVer":    util.Ver,
+	}
+}
+
 func getNetwork(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
@@ -539,7 +556,7 @@ func setFollowSystemLockScreen(c *gin.Context) {
 func getSysFonts(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
-	ret.Data = util.GetSysFonts(model.Conf.Lang)
+	ret.Data = util.LoadSysFonts()
 }
 
 func version(c *gin.Context) {
