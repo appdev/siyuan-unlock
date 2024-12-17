@@ -298,6 +298,10 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
     if (!isBlock &&
         (isNodeCodeBlock || protyle.toolbar.getCurrentType(range).includes("code"))) {
         range.deleteContents();
+        // 代码块需保持至少一个 \n https://github.com/siyuan-note/siyuan/pull/13271#issuecomment-2502672155
+        if (isNodeCodeBlock && getContenteditableElement(blockElement).textContent === "") {
+            html += "\n";
+        }
         range.insertNode(document.createTextNode(html.replace(/\r\n|\r|\u2028|\u2029/g, "\n")));
         range.collapse(false);
         range.insertNode(document.createElement("wbr"));
@@ -409,6 +413,10 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         }
     }
     (insertBefore ? Array.from(tempElement.content.children) : Array.from(tempElement.content.children).reverse()).forEach((item) => {
+        // https://github.com/siyuan-note/siyuan/issues/13232
+        if (item.getAttribute("data-type") === "NodeHeading" && item.getAttribute("fold") === "1") {
+            item.removeAttribute("fold");
+        }
         let addId = item.getAttribute("data-node-id");
         if (addId === id) {
             doOperation.push({

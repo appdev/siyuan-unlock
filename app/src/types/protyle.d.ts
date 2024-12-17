@@ -458,8 +458,6 @@ interface IProtyleOptions {
     }
     /** 内部调试时使用 */
     _lutePath?: string;
-    /** 是否显示日志。默认值: false */
-    debugger?: boolean;
     /** 是否启用打字机模式。默认值: false */
     typewriterMode?: boolean;
     /** 多语言。默认值: 'zh_CN' */
@@ -482,6 +480,13 @@ interface IProtyleOptions {
 }
 
 interface IProtyle {
+    highlight: {
+        mark: Highlight
+        markHL: Highlight
+        ranges: Range[]
+        rangeIndex: number
+        styleElement: HTMLStyleElement
+    }
     getInstance: () => import("../protyle").Protyle,
     observerLoad?: ResizeObserver,
     observer?: ResizeObserver,

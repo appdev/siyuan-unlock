@@ -15,6 +15,7 @@ import {openModel} from "../mobile/menu/model";
 import {closeModel} from "../mobile/util/closePanel";
 import {App} from "../index";
 import {resizeSide} from "./resizeSide";
+import {isSupportCSSHL, searchMarkRender} from "../protyle/render/searchMarkRender";
 
 let historyEditor: Protyle;
 
@@ -38,6 +39,7 @@ const renderDoc = (element: HTMLElement, currentPage: number) => {
     const assetElement = element.querySelector('.history__text[data-type="assetPanel"]');
     const mdElement = element.querySelector('.history__text[data-type="mdPanel"]') as HTMLTextAreaElement;
     const listElement = element.querySelector(".b3-list");
+    element.querySelector(".protyle-title__input").classList.add("fn__none");
     assetElement.classList.add("fn__none");
     mdElement.classList.add("fn__none");
     docElement.classList.add("fn__none");
@@ -354,7 +356,7 @@ export const openHistory = (app: App) => {
     </div>
     <div class="fn__flex-1 fn__flex" id="historyContainer">
         <div data-type="doc" class="history__repo fn__block" data-init="true">
-            <div style="overflow:auto;border-bottom: 1px solid var(--b3-border-color);">
+            <div class="history__action">
                 <div class="block__icons">
                     <span data-type="docprevious" class="block__icon block__icon--show b3-tooltips b3-tooltips__e" disabled="disabled" aria-label="${window.siyuan.languages.previousLabel}"><svg><use xlink:href='#iconLeft'></use></svg></span>
                     <button class="b3-button b3-button--text ft__selectnone" data-type="jumpHistoryPage" data-totalpage="1">1</button>
@@ -398,7 +400,7 @@ export const openHistory = (app: App) => {
                 </ul>
                 <div class="history__resize"></div>
                 <div class="fn__flex-column fn__flex-1">
-                    <div class="protyle-title__input ft__center ft__breakword"></div>
+                    <div class="protyle-title__input ft__center ft__breakword fn__none"></div>
                     <div class="fn__flex-1 history__text fn__none" data-type="assetPanel"></div>
                     <textarea class="fn__flex-1 history__text fn__none" data-type="mdPanel"></textarea>
                     <div class="fn__flex-1 history__text fn__none" style="padding: 0" data-type="docPanel"></div>
@@ -409,7 +411,7 @@ export const openHistory = (app: App) => {
             <li class="b3-list--empty">${window.siyuan.languages.emptyContent}</li>
         </ul>
         <div data-type="repo" class="fn__none history__repo">
-            <div style="overflow: auto"">
+            <div class="history__action">
                 <div class="block__icons">
                     <span data-type="previous" class="block__icon block__icon--show b3-tooltips b3-tooltips__e" disabled="disabled" aria-label="${window.siyuan.languages.previousLabel}"><svg><use xlink:href='#iconLeft'></use></svg></span>
                     <button class="b3-button b3-button--text ft__selectnone" data-type="jumpRepoPage" data-totalpage="1">1</button>
@@ -445,6 +447,7 @@ export const openHistory = (app: App) => {
             icon: "iconHistory",
             title: window.siyuan.languages.dataHistory,
             bindEvent(element) {
+                element.firstElementChild.setAttribute("style", "background-color:var(--b3-theme-background);height:100%");
                 bindEvent(app, element.firstElementChild);
             }
         });
@@ -459,6 +462,7 @@ export const openHistory = (app: App) => {
             }
         });
         dialog.element.setAttribute("data-key", Constants.DIALOG_HISTORY);
+        dialog.element.querySelector("input").focus();
         bindEvent(app, dialog.element, dialog);
         resizeSide(dialog.element.querySelector(".history__resize"), dialog.element.querySelector(".history__side"), "sideWidth");
     }
@@ -690,9 +694,11 @@ const bindEvent = (app: App, element: Element, dialog?: Dialog) => {
                     assetElement.classList.remove("fn__none");
                     assetElement.innerHTML = renderAssetsPreview(dataPath);
                 } else if (type === "doc") {
+                    const k = (firstPanelElement.querySelector(".b3-text-field") as HTMLInputElement).value;
                     fetchPost("/api/history/getDocHistoryContent", {
                         historyPath: dataPath,
-                        k: (firstPanelElement.querySelector(".b3-text-field") as HTMLInputElement).value
+                        highlight: !isSupportCSSHL(),
+                        k
                     }, (response) => {
                         if (response.data.isLargeDoc) {
                             mdElement.value = response.data.content;
@@ -707,9 +713,11 @@ const bindEvent = (app: App, element: Element, dialog?: Dialog) => {
                                 protyle: historyEditor.protyle,
                                 action: [Constants.CB_GET_HISTORY, Constants.CB_GET_HTML],
                             });
+                            searchMarkRender(historyEditor.protyle, k.split(" "));
                         }
                     });
                 }
+                titleElement.classList.remove("fn__none");
                 titleElement.textContent = target.querySelector(".b3-list-item__text").textContent;
                 let currentItem = hasClosestByClassName(target, "b3-list") as HTMLElement;
                 if (currentItem) {
@@ -838,9 +846,9 @@ const bindEvent = (app: App, element: Element, dialog?: Dialog) => {
                 if (totalPage > 1) {
                     confirmDialog(
                         window.siyuan.languages.jumpToPage.replace("${x}", totalPage),
-                        `<input style="width: 100%;" class="b3-text-field fn__flex-center" type="number" min="1" max="${totalPage}" value="${currentPage}">`,
-                        (dialog: Dialog) => {
-                            const inputElement = dialog.element.querySelector(".b3-text-field") as HTMLInputElement;
+                        `<input class="b3-text-field fn__block" type="number" min="1" max="${totalPage}" value="${currentPage}">`,
+                        (confirmD) => {
+                            const inputElement = confirmD.element.querySelector(".b3-text-field") as HTMLInputElement;
                             if (inputElement.value === "") {
                                 return;
                             }
@@ -857,9 +865,9 @@ const bindEvent = (app: App, element: Element, dialog?: Dialog) => {
                 if (totalPage > 1) {
                     confirmDialog(
                         window.siyuan.languages.jumpToPage.replace("${x}", totalPage),
-                        `<input style="width: 100%;" class="b3-text-field fn__flex-center" type="number" min="1" max="${totalPage}" value="${currentPage}">`,
-                        (dialog: Dialog) => {
-                            const inputElement = dialog.element.querySelector(".b3-text-field") as HTMLInputElement;
+                        `<input class="b3-text-field fn__block" type="number" min="1" max="${totalPage}" value="${currentPage}">`,
+                        (confirmD) => {
+                            const inputElement = confirmD.element.querySelector(".b3-text-field") as HTMLInputElement;
                             if (inputElement.value === "") {
                                 return;
                             }

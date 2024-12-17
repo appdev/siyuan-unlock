@@ -1,7 +1,7 @@
 import {fetchPost} from "../../../util/fetch";
 import {getColIconByType} from "./col";
 import {Constants} from "../../../constants";
-import {addDragFill, renderCell} from "./cell";
+import {addDragFill, cellScrollIntoView, renderCell} from "./cell";
 import {unicode2Emoji} from "../../../emoji";
 import {focusBlock} from "../../util/selection";
 import {hasClosestBlock, hasClosestByAttribute, hasClosestByClassName} from "../../util/hasClosest";
@@ -131,10 +131,9 @@ export const avRender = (element: Element, protyle: IProtyle, cb?: () => void, v
                     if (column.hidden) {
                         return;
                     }
-                    tableHTML += `<div class="av__cell av__cell--header ariaLabel" data-col-id="${column.id}"  draggable="true" 
+                    tableHTML += `<div class="av__cell av__cell--header" data-col-id="${column.id}"  draggable="true" 
 data-icon="${column.icon}" data-dtype="${column.type}" data-wrap="${column.wrap}" data-pin="${column.pin}" 
 data-desc="${escapeAttr(column.desc)}" data-position="top"
-aria-label="${escapeAriaLabel(column.name)}<div class='ft__on-surface'>${escapeAriaLabel(column.desc || "")}</div>"
 style="width: ${column.width || "200px"};">
     ${column.icon ? unicode2Emoji(column.icon, "av__cellheadericon", true) : `<svg class="av__cellheadericon"><use xlink:href="#${getColIconByType(column.type)}"></use></svg>`}
     <span class="av__celltext fn__flex-1">${escapeHtml(column.name)}</span>
@@ -202,7 +201,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex)}
                 let tabHTML = "";
                 let viewData: IAVView;
                 response.data.views.forEach((item: IAVView) => {
-                    tabHTML += `<div data-position="top" data-id="${item.id}" data-page="${item.pageSize}" aria-label="${escapeAriaLabel(item.name)}<div class='ft__on-surface'>${escapeAriaLabel(item.desc || "")}</div>" class="ariaLabel item${item.id === response.data.viewID ? " item--focus" : ""}">
+                    tabHTML += `<div data-position="top" data-id="${item.id}" data-page="${item.pageSize}" data-desc="${escapeAriaLabel(item.desc || "")}" class="ariaLabel item${item.id === response.data.viewID ? " item--focus" : ""}">
     ${item.icon ? unicode2Emoji(item.icon, "item__graphic", true) : '<svg class="item__graphic"><use xlink:href="#iconTable"></use></svg>'}
     <span class="item__text">${escapeHtml(item.name)}</span>
 </div>`;
@@ -264,14 +263,12 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex)}
                 <div class="av__colsticky">
                     <button class="b3-button" data-type="av-add-bottom">
                         <svg><use xlink:href="#iconAdd"></use></svg>
-                        ${window.siyuan.languages.newRow}
+                        <span>${window.siyuan.languages.newRow}</span>
                     </button>
                     <span class="fn__space"></span>
-                    <button class="b3-button${data.rowCount > data.rows.length ? "" : " fn__none"}">
-                        <svg data-type="av-load-more"><use xlink:href="#iconArrowDown"></use></svg>
-                        <span data-type="av-load-more">
-                            ${window.siyuan.languages.loadMore}
-                        </span>
+                    <button class="b3-button${data.rowCount > data.rows.length ? "" : " fn__none"}" data-type="av-load-more">
+                        <svg><use xlink:href="#iconArrowDown"></use></svg>
+                        <span>${window.siyuan.languages.loadMore}</span>
                         <svg data-type="set-page-size" data-size="${data.pageSize}"><use xlink:href="#iconMore"></use></svg>
                     </button>
                 </div>
@@ -312,13 +309,13 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex)}
                     } else if (!document.querySelector(".av__panel") && !isSearching) {
                         focusBlock(e);
                     }
+                    cellScrollIntoView(e, newCellElement);
                 }
                 selectRowIds.forEach((selectRowId, index) => {
                     const rowElement = e.querySelector(`.av__row[data-id="${selectRowId}"]`) as HTMLElement;
                     if (rowElement) {
                         rowElement.classList.add("av__row--select");
                         rowElement.querySelector(".av__firstcol use").setAttribute("xlink:href", "#iconCheck");
-
                     }
 
                     if (index === selectRowIds.length - 1 && rowElement) {
