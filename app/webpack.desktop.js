@@ -79,13 +79,6 @@ module.exports = (env, argv) => {
                     ],
                 },
                 {
-                    test: /\.woff2$/,
-                    type: "asset/resource",
-                    generator: {
-                        filename: "../fonts/JetBrainsMono-Regular.woff2",
-                    },
-                },
-                {
                     test: /\.(png|svg)$/,
                     use: [
                         {

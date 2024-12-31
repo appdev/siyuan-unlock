@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/88250/go-humanize"
 	"github.com/88250/gulu"
 	figure "github.com/common-nighthawk/go-figure"
 	"github.com/gofrs/flock"
@@ -44,7 +45,7 @@ import (
 var Mode = "prod"
 
 const (
-	Ver       = "103.1.15"
+	Ver       = "103.1.18"
 	IsInsider = false
 )
 
@@ -80,7 +81,7 @@ func Boot() {
 	readOnly := flag.String("readonly", "false", "read-only mode")
 	accessAuthCode := flag.String("accessAuthCode", "", "access auth code")
 	ssl := flag.Bool("ssl", false, "for https and wss")
-	lang := flag.String("lang", "", "zh_CN/zh_CHT/en_US/fr_FR/es_ES/ja_JP/it_IT/de_DE/he_IL/ru_RU/pl_PL")
+	lang := flag.String("lang", "", "zh_CN/zh_CHT/en_US/fr_FR/es_ES/ja_JP/it_IT/de_DE/he_IL/ru_RU/pl_PL/ar_SA")
 	mode := flag.String("mode", "prod", "dev/prod")
 	flag.Parse()
 
@@ -418,6 +419,7 @@ func initMime() {
 	mime.AddExtensionType(".mjs", "text/javascript")
 	mime.AddExtensionType(".html", "text/html")
 	mime.AddExtensionType(".json", "application/json")
+	mime.AddExtensionType(".woff2", "font/woff2")
 
 	// 某些系统上下载资源文件后打开是 zip https://github.com/siyuan-note/siyuan/issues/6347
 	mime.AddExtensionType(".doc", "application/msword")
@@ -499,4 +501,14 @@ func UnlockWorkspace() {
 		logging.LogErrorf("remove workspace lock failed: %s", err)
 		return
 	}
+}
+
+func LogDatabaseSize(dbPath string) {
+	dbFile, err := os.Stat(dbPath)
+	if nil != err {
+		return
+	}
+
+	dbSize := humanize.BytesCustomCeil(uint64(dbFile.Size()), 2)
+	logging.LogInfof("database [%s] size [%s]", dbPath, dbSize)
 }

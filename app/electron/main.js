@@ -43,7 +43,7 @@ const windowStatePath = path.join(confDir, "windowState.json");
 let bootWindow;
 let latestActiveWindow;
 let firstOpen = false;
-let workspaces = []; // workspaceDir, id, browserWindow, tray
+let workspaces = []; // workspaceDir, id, browserWindow, tray, hideShortcut
 let kernelPort = 6806;
 let resetWindowStateOnRestart = false;
 
@@ -853,6 +853,15 @@ app.whenReady().then(() => {
                     globalShortcut.unregister(hotKey2Electron(data.accelerator));
                 }
                 break;
+            case "setTrafficLightPosition":
+                if (!currentWindow || !currentWindow.setWindowButtonPosition) {
+                    return;
+                }
+                if (new URL(currentWindow.getURL()).pathname === "/stage/build/app/window.html") {
+                    data.position.y += 5 * data.zoom;
+                }
+                currentWindow.setWindowButtonPosition(data.position);
+                break;
             case "show":
                 if (!currentWindow) {
                     return;
@@ -990,6 +999,17 @@ app.whenReady().then(() => {
     ipcMain.on("siyuan-quit", (event, port) => {
         exitApp(port);
     });
+    ipcMain.on("siyuan-show-window", (event) => {
+        const mainWindow = getWindowByContentId(event.sender.id);
+        if (!mainWindow) {
+            return;
+        }
+
+        if (mainWindow.isMinimized()) {
+            mainWindow.restore();
+        }
+        mainWindow.show();
+    });
     ipcMain.on("siyuan-open-window", (event, data) => {
         const mainWindow = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
         const mainBounds = mainWindow.getBounds();
@@ -1090,6 +1110,12 @@ app.whenReady().then(() => {
         if (!data.hotkeys || data.hotkeys.length === 0) {
             return;
         }
+        workspaces.find(workspaceItem => {
+            if (event.sender.id === workspaceItem.browserWindow.webContents.id) {
+                workspaceItem.hotkeys = data.hotkeys;
+                return true;
+            }
+        });
         data.hotkeys.forEach((item, index) => {
             const shortcut = hotKey2Electron(item);
             if (!shortcut) {
@@ -1103,11 +1129,19 @@ app.whenReady().then(() => {
                     let currentWorkspace;
                     const currentWebContentsId = (latestActiveWindow && !latestActiveWindow.isDestroyed()) ? latestActiveWindow.webContents.id : undefined;
                     workspaces.find(workspaceItem => {
-                        if ((currentWebContentsId || event.sender.id) === workspaceItem.browserWindow.webContents.id) {
+                        if (currentWebContentsId === workspaceItem.browserWindow.webContents.id && workspaceItem.hotkeys[0] === item) {
                             currentWorkspace = workspaceItem;
                             return true;
                         }
                     });
+                    if (!currentWorkspace) {
+                        workspaces.find(workspaceItem => {
+                            if (workspaceItem.hotkeys[0] === item && event.sender.id === workspaceItem.browserWindow.webContents.id) {
+                                currentWorkspace = workspaceItem;
+                                return true;
+                            }
+                        });
+                    }
                     if (!currentWorkspace) {
                         return;
                     }

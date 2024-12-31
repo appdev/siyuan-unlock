@@ -1106,11 +1106,12 @@ export const openMenuPanel = (options: {
     <button class="fn__block b3-button b3-button--cancel">${window.siyuan.languages.cancel}</button>
 </div>`,
                         });
-                        dialog.element.addEventListener("click", (event) => {
-                            let target = event.target as HTMLElement;
-                            while (target && !target.isSameNode(dialog.element)) {
+                        dialog.element.addEventListener("click", (dialogEvent) => {
+                            let target = dialogEvent.target as HTMLElement;
+                            const isDispatch = typeof dialogEvent.detail === "string";
+                            while (target && !target.isSameNode(dialog.element) || isDispatch) {
                                 const action = target.getAttribute("data-action");
-                                if (action === "delete") {
+                                if (action === "delete" || (isDispatch && dialogEvent.detail === "Enter")) {
                                     removeCol({
                                         protyle: options.protyle,
                                         data,
@@ -1140,13 +1141,14 @@ export const openMenuPanel = (options: {
                                     });
                                     dialog.destroy();
                                     break;
-                                } else if (target.classList.contains("b3-button--cancel")) {
+                                } else if (target.classList.contains("b3-button--cancel") || (isDispatch && dialogEvent.detail === "Escape")) {
                                     dialog.destroy();
                                     break;
                                 }
                                 target = target.parentElement;
                             }
                         });
+                        dialog.element.setAttribute("data-key", Constants.DIALOG_CONFIRM);
                     } else {
                         removeCol({
                             protyle: options.protyle,
@@ -1287,7 +1289,9 @@ export const openMenuPanel = (options: {
                     event.stopPropagation();
                     break;
                 } else if (type === "av-view-switch") {
-                    if (!target.querySelector(".b3-chip--primary")) {
+                    if (!target.parentElement.classList.contains("b3-menu__item--current")) {
+                        avPanelElement.querySelector(".b3-menu__item--current")?.classList.remove("b3-menu__item--current");
+                        target.parentElement.classList.add("b3-menu__item--current");
                         options.blockElement.removeAttribute("data-render");
                         avRender(options.blockElement, options.protyle, undefined, target.parentElement.dataset.id);
                     }
@@ -1295,13 +1299,15 @@ export const openMenuPanel = (options: {
                     event.stopPropagation();
                     break;
                 } else if (type === "av-view-edit") {
-                    if (target.parentElement.querySelector(".b3-chip--primary")) {
+                    if (target.parentElement.classList.contains("b3-menu__item--current")) {
                         openViewMenu({
                             protyle: options.protyle,
                             blockElement: options.blockElement as HTMLElement,
                             element: target.parentElement
                         });
                     } else {
+                        avPanelElement.querySelector(".b3-menu__item--current")?.classList.remove("b3-menu__item--current");
+                        target.parentElement.classList.add("b3-menu__item--current");
                         options.blockElement.removeAttribute("data-render");
                         avRender(options.blockElement, options.protyle, () => {
                             openViewMenu({

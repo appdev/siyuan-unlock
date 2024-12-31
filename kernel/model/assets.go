@@ -116,6 +116,9 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 				if strings.Contains(u, ":") {
 					u = strings.TrimPrefix(u, "/")
 				}
+				if strings.Contains(u, "?") {
+					u = u[:strings.Index(u, "?")]
+				}
 
 				if !gulu.File.IsExist(u) || gulu.File.IsDir(u) {
 					continue
@@ -322,13 +325,24 @@ func GetAssetAbsPath(relativePath string) (ret string, err error) {
 	if strings.Contains(relativePath, "?") {
 		relativePath = relativePath[:strings.Index(relativePath, "?")]
 	}
+
+	// 在全局 assets 路径下搜索
+	p := filepath.Join(util.DataDir, relativePath)
+	if gulu.File.IsExist(p) {
+		ret = p
+		if !util.IsSubPath(util.WorkspaceDir, ret) {
+			err = fmt.Errorf("[%s] is not sub path of workspace", ret)
+			return
+		}
+		return
+	}
+
+	// 在笔记本下搜索
 	notebooks, err := ListNotebooks()
 	if err != nil {
 		err = errors.New(Conf.Language(0))
 		return
 	}
-
-	// 在笔记本下搜索
 	for _, notebook := range notebooks {
 		notebookAbsPath := filepath.Join(util.DataDir, notebook.ID)
 		filelock.Walk(notebookAbsPath, func(path string, d fs.DirEntry, err error) error {
@@ -356,16 +370,6 @@ func GetAssetAbsPath(relativePath string) (ret string, err error) {
 		}
 	}
 
-	// 在全局 assets 路径下搜索
-	p := filepath.Join(util.DataDir, relativePath)
-	if gulu.File.IsExist(p) {
-		ret = p
-		if !util.IsSubPath(util.WorkspaceDir, ret) {
-			err = fmt.Errorf("[%s] is not sub path of workspace", ret)
-			return
-		}
-		return
-	}
 	return "", errors.New(fmt.Sprintf(Conf.Language(12), relativePath))
 }
 
@@ -960,6 +964,12 @@ func MissingAssets() (ret []string) {
 }
 
 func emojisInTree(tree *parse.Tree) (ret []string) {
+	if icon := tree.Root.IALAttr("icon"); "" != icon {
+		if !strings.Contains(icon, "://") && !strings.HasPrefix(icon, "api/icon/") && !util.NativeEmojiChars[icon] {
+			ret = append(ret, "/emojis/"+icon)
+		}
+	}
+
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering {
 			return ast.WalkContinue

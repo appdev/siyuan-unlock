@@ -73,6 +73,7 @@ import {copyPNGByLink} from "../../menus/util";
 import {globalCommand} from "./command/global";
 import {duplicateCompletely} from "../../protyle/render/av/action";
 import {copyTextByType} from "../../protyle/toolbar/util";
+import {onlyProtyleCommand} from "./command/protyle";
 
 const switchDialogEvent = (app: App, event: MouseEvent) => {
     event.preventDefault();
@@ -377,9 +378,23 @@ const editKeydown = (app: App, event: KeyboardEvent) => {
     }
     if (matchHotKey(window.siyuan.config.keymap.editor.general.switchReadonly.custom, event)) {
         event.preventDefault();
-        updateReadonly(protyle.breadcrumb.element.parentElement.querySelector('.block__icon[data-type="readonly"]'), protyle);
+        onlyProtyleCommand({
+            protyle,
+            command: "switchReadonly",
+            previousRange: range,
+        });
         return true;
     }
+    if (matchHotKey(window.siyuan.config.keymap.editor.general.switchAdjust.custom, event)) {
+        event.preventDefault();
+        onlyProtyleCommand({
+            protyle,
+            command: "switchAdjust",
+            previousRange: range,
+        });
+        return true;
+    }
+
     if (matchHotKey(window.siyuan.config.keymap.editor.general.backlinks.custom, event)) {
         event.preventDefault();
         if (range) {
@@ -1366,14 +1381,14 @@ export const windowKeyDown = (app: App, event: KeyboardEvent) => {
         return;
     }
     // https://github.com/siyuan-note/siyuan/issues/8913#issuecomment-1679720605
-    const confirmElement = document.querySelector("#confirmDialogConfirmBtn");
-    if (confirmElement) {
+    const confirmDialogElement = document.querySelector('.b3-dialog--open[data-key="dialog-confirm"]');
+    if (confirmDialogElement) {
         if (event.key === "Enter") {
-            confirmElement.dispatchEvent(new CustomEvent("click"));
+            confirmDialogElement.dispatchEvent(new CustomEvent("click", {detail: event.key}));
             event.preventDefault();
             return;
         } else if (event.key === "Escape") {
-            confirmElement.previousElementSibling.previousElementSibling.dispatchEvent(new CustomEvent("click"));
+            confirmDialogElement.dispatchEvent(new CustomEvent("click", {detail: event.key}));
             event.preventDefault();
             return;
         }

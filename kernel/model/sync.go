@@ -389,6 +389,20 @@ func SetSyncEnable(b bool) {
 	return
 }
 
+func SetSyncInterval(interval int) {
+	if 30 > interval {
+		interval = 30
+	}
+	if 43200 < interval {
+		interval = 43200
+	}
+
+	Conf.Sync.Interval = interval
+	Conf.Save()
+	planSyncAfter(time.Duration(interval) * time.Second)
+	return
+}
+
 func SetSyncPerception(b bool) {
 	if util.ContainerDocker == util.Container {
 		b = false
@@ -600,7 +614,7 @@ func formatRepoErrorMsg(err error) string {
 			msg = Conf.Language(24)
 		} else if strings.Contains(msgLowerCase, "net/http: request canceled while waiting for connection") || strings.Contains(msgLowerCase, "exceeded while awaiting") || strings.Contains(msgLowerCase, "context deadline exceeded") || strings.Contains(msgLowerCase, "timeout") || strings.Contains(msgLowerCase, "context cancellation while reading body") {
 			msg = Conf.Language(24)
-		} else if strings.Contains(msgLowerCase, "connection was") || strings.Contains(msgLowerCase, "reset by peer") || strings.Contains(msgLowerCase, "refused") || strings.Contains(msgLowerCase, "socket") || strings.Contains(msgLowerCase, "closed idle connection") || strings.Contains(msgLowerCase, "eof") {
+		} else if strings.Contains(msgLowerCase, "connection") || strings.Contains(msgLowerCase, "refused") || strings.Contains(msgLowerCase, "socket") || strings.Contains(msgLowerCase, "eof") || strings.Contains(msgLowerCase, "closed") || strings.Contains(msgLowerCase, "network") {
 			msg = Conf.Language(28)
 		}
 	}
@@ -641,7 +655,7 @@ func getSyncIgnoreLines() (ret []string) {
 
 func IncSync() {
 	syncSameCount.Store(0)
-	planSyncAfter(30 * time.Second)
+	planSyncAfter(time.Duration(Conf.Sync.Interval) * time.Second)
 }
 
 func planSyncAfter(d time.Duration) {

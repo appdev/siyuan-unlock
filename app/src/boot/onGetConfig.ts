@@ -40,6 +40,11 @@ export const onGetConfig = (isStart: boolean, app: App) => {
         port: location.port
     });
     webFrame.setZoomFactor(window.siyuan.storage[Constants.LOCAL_ZOOM]);
+    ipcRenderer.send(Constants.SIYUAN_CMD, {
+        cmd: "setTrafficLightPosition",
+        zoom: window.siyuan.storage[Constants.LOCAL_ZOOM],
+        position: Constants.SIZE_ZOOM.find((item) => item.zoom === window.siyuan.storage[Constants.LOCAL_ZOOM]).position
+    });
     /// #endif
     if (!window.siyuan.config.uiLayout || (window.siyuan.config.uiLayout && !window.siyuan.config.uiLayout.left)) {
         window.siyuan.config.uiLayout = Constants.SIYUAN_EMPTY_LAYOUT;
@@ -317,29 +322,35 @@ ${response.data.replace("%pages", "<span class=totalPages></span>").replace("%pa
                     path: pdfFilePath,
                     removeAssets: ipcData.removeAssets,
                     watermark: ipcData.watermark
-                }, () => {
+                }, async () => {
                     afterExport(pdfFilePath, msgId);
                     if (ipcData.removeAssets) {
                         const removePromise = (dir: string) => {
                             return new Promise(function (resolve) {
-                                //先读文件夹
                                 fs.stat(dir, function (err, stat) {
-                                    if (stat) {
-                                        if (stat.isDirectory()) {
-                                            fs.readdir(dir, function (err, files) {
-                                                files = files.map(file => path.join(dir, file)); // a/b  a/m
-                                                Promise.all(files.map(file => removePromise(file))).then(function () {
-                                                    fs.rm(dir, resolve);
-                                                });
+                                    if (!stat) {
+                                        return;
+                                    }
+
+                                    if (stat.isDirectory()) {
+                                        fs.readdir(dir, function (err, files) {
+                                            files = files.map(file => path.join(dir, file)); // a/b  a/m
+                                            Promise.all(files.map(file => removePromise(file))).then(function () {
+                                                fs.rm(dir, resolve);
                                             });
-                                        } else {
-                                            fs.unlink(dir, resolve);
-                                        }
+                                        });
+                                    } else {
+                                        fs.unlink(dir, resolve);
                                     }
                                 });
                             });
                         };
-                        removePromise(path.join(savePath, "assets"));
+
+                        const assetsDir = path.join(savePath, "assets");
+                        await removePromise(assetsDir);
+                        if (1 > fs.readdirSync(assetsDir).length) {
+                            fs.rmdirSync(assetsDir);
+                        }
                     }
                 });
             });

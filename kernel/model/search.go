@@ -475,6 +475,8 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 
 	r, _ := regexp.Compile(keyword)
 	escapedKey := util.EscapeHTML(keyword)
+	escapedKey = strings.ReplaceAll(escapedKey, "&#34;", "&quot;")
+	escapedKey = strings.ReplaceAll(escapedKey, "&#39;", "'")
 	escapedR, _ := regexp.Compile(escapedKey)
 	ids = gulu.Str.RemoveDuplicatedElem(ids)
 	var renameRoots []*ast.Node
@@ -592,7 +594,7 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 						return ast.WalkContinue
 					}
 
-					replaceNodeTokens(n, method, keyword, replacement, r)
+					replaceNodeTokens(n, method, keyword, strings.TrimSpace(replacement), r)
 				case ast.NodeLinkText:
 					if !replaceTypes["imgText"] {
 						return ast.WalkContinue
@@ -673,11 +675,11 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 						if replaceTypes["aHref"] {
 							if 0 == method {
 								if strings.Contains(n.TextMarkAHref, keyword) {
-									n.TextMarkAHref = strings.ReplaceAll(n.TextMarkAHref, keyword, replacement)
+									n.TextMarkAHref = strings.ReplaceAll(n.TextMarkAHref, keyword, strings.TrimSpace(replacement))
 								}
 							} else if 3 == method {
 								if nil != r && r.MatchString(n.TextMarkAHref) {
-									n.TextMarkAHref = r.ReplaceAllString(n.TextMarkAHref, replacement)
+									n.TextMarkAHref = r.ReplaceAllString(n.TextMarkAHref, strings.TrimSpace(replacement))
 								}
 							}
 						}
@@ -1014,7 +1016,11 @@ func FullTextSearchBlock(query string, boxes, paths []string, types map[string]b
 		typeFilter := buildTypeFilter(types)
 		boxFilter := buildBoxesFilter(boxes)
 		pathFilter := buildPathsFilter(paths)
-		blocks, matchedBlockCount, matchedRootCount = fullTextSearchByQuerySyntax(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderByClause, beforeLen, page, pageSize)
+		if ast.IsNodeIDPattern(query) {
+			blocks, matchedBlockCount, matchedRootCount = searchBySQL("SELECT * FROM `blocks` WHERE `id` = '"+query+"'", beforeLen, page, pageSize)
+		} else {
+			blocks, matchedBlockCount, matchedRootCount = fullTextSearchByFTS(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderByClause, beforeLen, page, pageSize)
+		}
 	case 2: // SQL
 		blocks, matchedBlockCount, matchedRootCount = searchBySQL(query, beforeLen, page, pageSize)
 	case 3: // 正则表达式
@@ -1026,11 +1032,16 @@ func FullTextSearchBlock(query string, boxes, paths []string, types map[string]b
 		typeFilter := buildTypeFilter(types)
 		boxFilter := buildBoxesFilter(boxes)
 		pathFilter := buildPathsFilter(paths)
-		if 2 > len(strings.Split(strings.TrimSpace(query), " ")) {
-			blocks, matchedBlockCount, matchedRootCount = fullTextSearchByQuerySyntax(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderByClause, beforeLen, page, pageSize)
+		if ast.IsNodeIDPattern(query) {
+			blocks, matchedBlockCount, matchedRootCount = searchBySQL("SELECT * FROM `blocks` WHERE `id` = '"+query+"'", beforeLen, page, pageSize)
 		} else {
-			docMode = true // 文档全文搜索模式 https://github.com/siyuan-note/siyuan/issues/10584
-			blocks, matchedBlockCount, matchedRootCount = fullTextSearchByKeyword(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderByClause, beforeLen, page, pageSize)
+			if 2 > len(strings.Split(strings.TrimSpace(query), " ")) {
+				query = stringQuery(query)
+				blocks, matchedBlockCount, matchedRootCount = fullTextSearchByFTS(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderByClause, beforeLen, page, pageSize)
+			} else {
+				docMode = true // 文档全文搜索模式 https://github.com/siyuan-note/siyuan/issues/10584
+				blocks, matchedBlockCount, matchedRootCount = fullTextSearchByLikeWithRoot(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderByClause, beforeLen, page, pageSize)
+			}
 		}
 	}
 	pageCount = (matchedBlockCount + pageSize - 1) / pageSize
@@ -1124,7 +1135,9 @@ func FullTextSearchBlock(query string, boxes, paths []string, types map[string]b
 		ret = []*Block{}
 	}
 
-	filterSelfHPath(ret)
+	if 0 == groupBy {
+		filterSelfHPath(ret)
+	}
 	return
 }
 
@@ -1362,22 +1375,6 @@ func extractID(content string) (ret string) {
 	return
 }
 
-func fullTextSearchByQuerySyntax(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderBy string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
-	if ast.IsNodeIDPattern(query) {
-		ret, matchedBlockCount, matchedRootCount = searchBySQL("SELECT * FROM `blocks` WHERE `id` = '"+query+"'", beforeLen, page, pageSize)
-		return
-	}
-	return fullTextSearchByFTS(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderBy, beforeLen, page, pageSize)
-}
-
-func fullTextSearchByKeyword(query, boxFilter, pathFilter, typeFilter, ignoreFilter string, orderBy string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
-	if ast.IsNodeIDPattern(query) {
-		ret, matchedBlockCount, matchedRootCount = searchBySQL("SELECT * FROM `blocks` WHERE `id` = '"+query+"'", beforeLen, page, pageSize)
-		return
-	}
-	return fullTextSearchByLikeWithRoot(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderBy, beforeLen, page, pageSize)
-}
-
 func fullTextSearchByRegexp(exp, boxFilter, pathFilter, typeFilter, ignoreFilter, orderBy string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
 	fieldFilter := fieldRegexp(exp)
 	stmt := "SELECT * FROM `blocks` WHERE " + fieldFilter + " AND type IN " + typeFilter
@@ -1412,7 +1409,6 @@ func fullTextSearchCountByRegexp(exp, boxFilter, pathFilter, typeFilter, ignoreF
 }
 
 func fullTextSearchByFTS(query, boxFilter, pathFilter, typeFilter, ignoreFilter, orderBy string, beforeLen, page, pageSize int) (ret []*Block, matchedBlockCount, matchedRootCount int) {
-	query = stringQuery(query)
 	table := "blocks_fts" // 大小写敏感
 	if !Conf.Search.CaseSensitive {
 		table = "blocks_fts_case_insensitive"
@@ -1506,6 +1502,7 @@ func fullTextSearchByLikeWithRoot(query, boxFilter, pathFilter, typeFilter, igno
 
 	keywords = gulu.Str.RemoveDuplicatedElem(keywords)
 	terms := strings.Join(keywords, search.TermSep)
+	terms = strings.ReplaceAll(terms, "''", "'")
 	ret = fromSQLBlocks(&resultBlocks, terms, beforeLen)
 	if 1 > len(ret) {
 		ret = []*Block{}

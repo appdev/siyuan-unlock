@@ -29,12 +29,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/88250/go-humanize"
 	"github.com/88250/gulu"
 	"github.com/88250/lute"
 	"github.com/88250/lute/ast"
 	"github.com/Xuanwo/go-locale"
-	"github.com/getsentry/sentry-go"
 	"github.com/sashabaranov/go-openai"
 	"github.com/siyuan-note/eventbus"
 	"github.com/siyuan-note/filelock"
@@ -344,6 +342,12 @@ func InitConf() {
 	if 0 == Conf.Sync.Mode {
 		Conf.Sync.Mode = 1
 	}
+	if 30 > Conf.Sync.Interval {
+		Conf.Sync.Interval = 30
+	}
+	if 60*60*12 < Conf.Sync.Interval {
+		Conf.Sync.Interval = 60 * 60 * 12
+	}
 	if nil == Conf.Sync.S3 {
 		Conf.Sync.S3 = &conf.S3{PathStyle: true, SkipTlsVerify: true}
 	}
@@ -503,15 +507,6 @@ func InitConf() {
 	Conf.Save()
 	logging.SetLogLevel(Conf.LogLevel)
 
-	if Conf.System.UploadErrLog {
-		logging.LogInfof("user has enabled [Automatically upload error messages and diagnostic data]")
-		sentry.Init(sentry.ClientOptions{
-			Dsn:         "https://bdff135f14654ae58a054adeceb2c308@o1173696.ingest.sentry.io/6269178",
-			Release:     util.Ver,
-			Environment: util.Mode,
-		})
-	}
-
 	if Conf.System.DisableGoogleAnalytics {
 		logging.LogInfof("user has disabled [Google Analytics]")
 	}
@@ -633,19 +628,17 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int) {
 
 	util.IsExiting.Store(true)
 	waitSecondForExecInstallPkg := false
-	if !skipNewVerInstallPkg() {
-		if newVerInstallPkgPath := getNewVerInstallPkgPath(); "" != newVerInstallPkgPath {
-			if 2 == execInstallPkg || (force && 0 == execInstallPkg) { // 执行新版本安装
-				waitSecondForExecInstallPkg = true
-				if gulu.OS.IsWindows() {
-					util.PushMsg(Conf.Language(130), 1000*30)
-				}
-				go execNewVerInstallPkg(newVerInstallPkgPath)
-			} else if 0 == execInstallPkg { // 新版本安装包已经准备就绪
-				exitCode = 2
-				logging.LogInfof("the new version install pkg is ready [%s], waiting for the user's next instruction", newVerInstallPkgPath)
-				return
+	if !skipNewVerInstallPkg() && "" != newVerInstallPkgPath {
+		if 2 == execInstallPkg || (force && 0 == execInstallPkg) { // 执行新版本安装
+			waitSecondForExecInstallPkg = true
+			if gulu.OS.IsWindows() {
+				util.PushMsg(Conf.Language(130), 1000*30)
 			}
+			go execNewVerInstallPkg(newVerInstallPkgPath)
+		} else if 0 == execInstallPkg { // 新版本安装包已经准备就绪
+			exitCode = 2
+			logging.LogInfof("the new version install pkg is ready [%s], waiting for the user's next instruction", newVerInstallPkgPath)
+			return
 		}
 	}
 
@@ -840,7 +833,8 @@ func (conf *AppConf) language(num int) (ret string) {
 }
 
 func InitBoxes() {
-	initialized := 0 < treenode.CountBlocks()
+	blockCount := treenode.CountBlocks()
+	initialized := 0 < blockCount
 	for _, box := range Conf.GetOpenedBoxes() {
 		box.UpdateHistoryGenerated() // 初始化历史生成时间为当前时间
 
@@ -849,11 +843,7 @@ func InitBoxes() {
 		}
 	}
 
-	var dbSize string
-	if dbFile, err := os.Stat(util.DBPath); err == nil {
-		dbSize = humanize.BytesCustomCeil(uint64(dbFile.Size()), 2)
-	}
-	logging.LogInfof("database size [%s], tree/block count [%d/%d]", dbSize, treenode.CountTrees(), treenode.CountBlocks())
+	logging.LogInfof("tree/block count [%d/%d]", treenode.CountTrees(), blockCount)
 }
 
 func IsSubscriber() bool {

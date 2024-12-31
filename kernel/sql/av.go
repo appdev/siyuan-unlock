@@ -27,6 +27,7 @@ import (
 	"github.com/88250/lute/ast"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/av"
+	"github.com/siyuan-note/siyuan/kernel/filesys"
 	"github.com/siyuan-note/siyuan/kernel/treenode"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
@@ -194,6 +195,15 @@ func RenderAttributeViewTable(attrView *av.AttributeView, view *av.View, query s
 	for _, row := range ret.Rows {
 		for _, cell := range row.Cells {
 			switch cell.ValueType {
+			case av.KeyTypeBlock: // 对于主键可能需要填充静态锚文本 Database-bound block primary key supports setting static anchor text https://github.com/siyuan-note/siyuan/issues/10049
+				if nil != cell.Value.Block {
+					for k, v := range ials[row.ID] {
+						if k == av.NodeAttrViewStaticText+"-"+attrView.ID {
+							cell.Value.Block.Content = v
+							break
+						}
+					}
+				}
 			case av.KeyTypeRollup: // 渲染汇总列
 				rollupKey, _ := attrView.GetKey(cell.Value.KeyID)
 				if nil == rollupKey || nil == rollupKey.Rollup {
@@ -420,7 +430,7 @@ func RenderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplCont
 	}
 
 	goTpl := template.New("").Delims(".action{", "}")
-	tplFuncMap := treenode.BuiltInTemplateFuncs()
+	tplFuncMap := filesys.BuiltInTemplateFuncs()
 	SQLTemplateFuncs(&tplFuncMap)
 	goTpl = goTpl.Funcs(tplFuncMap)
 	tpl, err := goTpl.Parse(tplContent)

@@ -1,4 +1,7 @@
 {
+  "second": "seconde",
+  "syncInterval": "intervalle de synchronisation",
+  "syncIntervalTip": "Synchronisation automatique des données après l'arrêt des modifications",
   "removeAV": "Supprimer de la base de données",
   "empty": "Vide",
   "newRowInRelation": "Créer une nouvelle entrée dans ${x} <b class='ft__on-surface'>${y}</b>",
@@ -565,6 +568,7 @@
   "newDocBelow": "Créer un document ci-dessous",
   "newDocAbove": "Créer un document ci-dessus",
   "fullWidth": "Largeur adaptative",
+  "switchAdjust": "Commutation de la largeur adaptative",
   "fullWidthTip": "Lorsqu'il est activé, la zone d'édition sera affichée aussi large que possible",
   "tabLimit": "Nombre maximum d'onglets ouverts",
   "tabLimit1": "Trier par heure d'ouverture, fermer le premier onglet ouvert",
@@ -768,7 +772,7 @@
   "openSyncTip2": "Lorsque vous passez de la désactivation à l'activation, il est recommandé de cliquer manuellement sur le bouton de synchronisation pour déclencher une synchronisation",
   "syncMode": "Mode de synchronisation cloud",
   "syncModeTip": "Le mode de synchronisation peut être sélectionné davantage après l'activation de la synchronisation dans le cloud",
-  "syncMode1": "Automatique (synchronisation toutes les 30 secondes après que les données ne changent plus)",
+  "syncMode1": "Automatique",
   "syncMode2": "Manuelle (synchronisation automatique une seule fois lorsque le logiciel est démarré et fermé, les autres fois, il faut déclencher manuellement la synchronisation)",
   "syncMode3": "Manuelle Complète (pas de synchronisation au démarrage et à l'arrêt, contrôle manuel complet de la synchronisation et du sens de synchronisation)",
   "cloudSync": "Cloud Sync",
@@ -911,7 +915,7 @@
   "insertBefore": "Insérer un bloc vide devant le bloc où se trouve le curseur",
   "insertAfter": "Insérer un bloc vide après le bloc où se trouve le curseur",
   "list1": "Liste",
-  "insert": "Insérer l'élément",
+  "element": "élément",
   "closeTab": "Fermer l'onglet actuel",
   "keymap": "Raccourci",
   "clearFontStyle": "Effacer Styles",
@@ -1176,8 +1180,6 @@
   "about6": "Configuré comme mot de passe d'authentification d'accès, laisser vide pour désactiver l'authentification.",
   "about7": "Suivez l'écran de verrouillage du système",
   "about8": "Après activation, l'application sera automatiquement verrouillée lors du verrouillage de l'écran système",
-  "about9": "Télécharger automatiquement les messages d'erreur et les données de diagnostic",
-  "about10": "Après l'activation, il télécharge automatiquement les informations d'erreur et les données de diagnostic via le SDK <a href=\"https://sentry.io\" target=\"_blank\">Sentry</a>, qui n'implique pas de données de confidentialité personnelles afin que les développeurs peut corriger des bogues.  L'application sera fermée automatiquement après modification, veuillez la redémarrer manuellement.",
   "about11": "Service de réseau",
   "about12": "Après l'activation, les autres appareils du même réseau local seront autorisés à accéder. L'application sera fermée automatiquement après modification, veuillez la redémarrer manuellement.",
   "about13": "API token",
@@ -1452,8 +1454,8 @@
     "124": "Veuillez activer la synchronisation cloud dans [Paramètres - Activer la synchronisation cloud]",
     "125": "Il y a trop d'échecs de téléchargement dans la synchronisation automatique. Veuillez essayer de déclencher manuellement la synchronisation. Si le problème persiste, veuillez le signaler via <a href=\"https://liuyun.io/article/1686530886208\" target=\"_blank\">GitHub Issues</a>",
     "126": "Les signets ne peuvent pas être vides",
-    "127": "Il reste [%d] jours avant l'expiration de l'abonnement, après quoi les données cloud seront complètement supprimées. Veuillez visiter <a target='_blank' href='${url}'>ici</a> pour le renouvellement",
-    "128": "L'abonnement a expiré. Après l'expiration, les données cloud seront complètement supprimées. Le rappel ne s'affichera plus deux jours après l'expiration de l'abonnement. Pour renouveler, veuillez visiter <a target='_blank' href='${url}'>ici</a>",
+    "127": "Il reste [%d] jours avant l'expiration de l'abonnement, après quoi les données de stockage cloud officielles seront complètement supprimées. Pour renouveler, visitez <a target='_blank' href='${url}'>ici</a>",
+    "128": "L'abonnement a expiré, les données de stockage cloud officielles seront complètement supprimées (les données S3/WebDAV ne sont pas affectées), deux jours après l'expiration de l'abonnement, ce rappel ne s'affichera plus. Pour renouveler, visitez <a target='_blank' href='${url}'>ici</a>",
     "129": "Les données cloud ont été corrompues, veuillez réinitialiser le dépôt de données local et le répertoire de synchronisation cloud pour résoudre le problème",
     "130": "Le programme d'installation de la nouvelle version démarre. Étant donné que le système d'exploitation va effectuer une analyse de sécurité, le démarrage peut prendre un certain temps. Veuillez patienter...",
     "131": "Cette opération n'est pas prise en charge, veuillez vous rendre sur la console de gestion du fournisseur de stockage cloud pour opérer",
@@ -1576,6 +1578,7 @@
     "248": "Le cap cible est situé dans le bloc conteneur et ne peut pas être utilisé comme point de dépôt",
     "249": "Impossible d'accéder aux données en raison d'une erreur de configuration. Veuillez vérifier les paramètres et les autorisations de stockage cloud",
     "250": "La demande a été limitée par le stockage cloud. Veuillez vérifier les paramètres et les autorisations de stockage cloud",
-    "251": "Total des actifs inutilisés [%d], seulement [%d] listés ici"
+    "251": "Total des actifs inutilisés [%d], seulement [%d] listés ici",
+    "252": "\uD83D\uDEA8 Microsoft Defender peut supprimer par erreur le noyau, supprimer des données et réduire considérablement les performances. Il est recommandé d'ajouter le chemin d'installation et l'espace de travail de SiYuan à la liste des exclusions<span class=\"fn__space\"></span><button id=\"addMicrosoftDefenderExclusion\" class=\"b3-button b3-button--white\">Ajouter</button><span class=\"fn__space\"></span>"
   }
 }

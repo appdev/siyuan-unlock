@@ -35,6 +35,7 @@
 @import "business/resize";
 @import "business/av";
 @import "business/emojis";
+@import "component/svg";
 
 /*
 .status: 2
@@ -93,25 +94,6 @@ html {
   }
 }
 
-.svg {
-  fill: currentColor;
-  display: inline-block;
-  stroke-width: 0;
-  stroke: currentColor;
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-
-  &--mid {
-    width: 16px;
-    height: 16px;
-  }
-
-  &--small {
-    width: 12px;
-    height: 12px;
-  }
-}
 
 .toolbar {
   background-color: var(--b3-toolbar-background);
@@ -329,21 +311,29 @@ html {
     opacity: .38;
   }
 
+  .dragover__top,
+  .dragover__bottom {
+    box-shadow: none !important;
+  }
+
   .dragover__top::after,
   .dragover__bottom::after {
     content: "";
-    width: var(--file-toggle-width);
-    height: 4px;
-    background-color: var(--b3-theme-surface);
     position: absolute;
-    left: 0;
-    bottom: -2px;
+    height: 4px;
+    width: calc(100% - var(--file-toggle-width));
+    left: var(--file-toggle-width);
+    background-color: var(--b3-theme-primary-lighter);
     z-index: 1;
+    pointer-events: none;
   }
 
   .dragover__top::after {
     top: -3px;
-    bottom: auto;
+  }
+
+  .dragover__bottom::after {
+    bottom: -2px;
   }
 
   &__close {

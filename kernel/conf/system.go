@@ -39,13 +39,14 @@ type System struct {
 	NetworkServe bool          `json:"networkServe"` // 是否开启网络伺服
 	NetworkProxy *NetworkProxy `json:"networkProxy"`
 
-	UploadErrLog           bool `json:"uploadErrLog"`
 	DisableGoogleAnalytics bool `json:"disableGoogleAnalytics"`
 	DownloadInstallPkg     bool `json:"downloadInstallPkg"`
 	AutoLaunch2            int  `json:"autoLaunch2"`    // 0：不自动启动，1：自动启动，2：自动启动+隐藏主窗口
 	LockScreenMode         int  `json:"lockScreenMode"` // 0：手动，1：手动+跟随系统 https://github.com/siyuan-note/siyuan/issues/9087
 
 	DisabledFeatures []string `json:"disabledFeatures"`
+
+	MicrosoftDefenderExcluded bool `json:"microsoftDefenderExcluded"` // 是否已加入 Microsoft Defender 排除项 https://github.com/siyuan-note/siyuan/issues/13650
 }
 
 func NewSystem() *System {

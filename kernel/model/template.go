@@ -34,6 +34,7 @@ import (
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/av"
+	"github.com/siyuan-note/siyuan/kernel/filesys"
 	"github.com/siyuan-note/siyuan/kernel/search"
 	"github.com/siyuan-note/siyuan/kernel/sql"
 	"github.com/siyuan-note/siyuan/kernel/treenode"
@@ -43,7 +44,7 @@ import (
 
 func RenderGoTemplate(templateContent string) (ret string, err error) {
 	tmpl := template.New("")
-	tplFuncMap := treenode.BuiltInTemplateFuncs()
+	tplFuncMap := filesys.BuiltInTemplateFuncs()
 	sql.SQLTemplateFuncs(&tplFuncMap)
 	tmpl = tmpl.Funcs(tplFuncMap)
 	tpl, err := tmpl.Parse(templateContent)
@@ -254,7 +255,7 @@ func RenderDynamicIconContentTemplate(content, id string) (ret string) {
 	dataModel["alias"] = block.Alias
 
 	goTpl := template.New("").Delims(".action{", "}")
-	tplFuncMap := treenode.BuiltInTemplateFuncs()
+	tplFuncMap := filesys.BuiltInTemplateFuncs()
 	sql.SQLTemplateFuncs(&tplFuncMap)
 	goTpl = goTpl.Funcs(tplFuncMap)
 	tpl, err := goTpl.Funcs(tplFuncMap).Parse(content)
@@ -304,7 +305,7 @@ func RenderTemplate(p, id string, preview bool) (tree *parse.Tree, dom string, e
 	}
 
 	goTpl := template.New("").Delims(".action{", "}")
-	tplFuncMap := treenode.BuiltInTemplateFuncs()
+	tplFuncMap := filesys.BuiltInTemplateFuncs()
 	sql.SQLTemplateFuncs(&tplFuncMap)
 	goTpl = goTpl.Funcs(tplFuncMap)
 	tpl, err := goTpl.Funcs(tplFuncMap).Parse(gulu.Str.FromBytes(md))
@@ -353,7 +354,7 @@ func RenderTemplate(p, id string, preview bool) (tree *parse.Tree, dom string, e
 		// 块引缺失锚文本情况下自动补全 https://github.com/siyuan-note/siyuan/issues/6087
 		if n.IsTextMarkType("block-ref") {
 			if refText := n.Text(); "" == refText {
-				refText = sql.GetRefText(n.TextMarkBlockRefID)
+				refText = strings.TrimSpace(sql.GetRefText(n.TextMarkBlockRefID))
 				if "" != refText {
 					treenode.SetDynamicBlockRefText(n, refText)
 				} else {

@@ -42,7 +42,6 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/system/setAccessAuthCode", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setAccessAuthCode)
 	ginServer.Handle("POST", "/api/system/setFollowSystemLockScreen", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setFollowSystemLockScreen)
 	ginServer.Handle("POST", "/api/system/setNetworkServe", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setNetworkServe)
-	ginServer.Handle("POST", "/api/system/setUploadErrLog", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setUploadErrLog)
 	ginServer.Handle("POST", "/api/system/setAutoLaunch", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setAutoLaunch)
 	ginServer.Handle("POST", "/api/system/setGoogleAnalytics", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setGoogleAnalytics)
 	ginServer.Handle("POST", "/api/system/setDownloadInstallPkg", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setDownloadInstallPkg)
@@ -67,6 +66,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/system/importConf", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, importConf)
 	ginServer.Handle("POST", "/api/system/getWorkspaceInfo", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, getWorkspaceInfo)
 	ginServer.Handle("POST", "/api/system/reloadUI", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, reloadUI)
+	ginServer.Handle("POST", "/api/system/addMicrosoftDefenderExclusion", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, addMicrosoftDefenderExclusion)
 
 	ginServer.Handle("POST", "/api/storage/setLocalStorage", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setLocalStorage)
 	ginServer.Handle("POST", "/api/storage/getLocalStorage", model.CheckAuth, getLocalStorage)
@@ -190,6 +190,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/block/getDocInfo", model.CheckAuth, getDocInfo)
 	ginServer.Handle("POST", "/api/block/getDocsInfo", model.CheckAuth, getDocsInfo)
 	ginServer.Handle("POST", "/api/block/checkBlockExist", model.CheckAuth, checkBlockExist)
+	ginServer.Handle("POST", "/api/block/getUnfoldedParentID", model.CheckAuth, getUnfoldedParentID)
 	ginServer.Handle("POST", "/api/block/checkBlockFold", model.CheckAuth, checkBlockFold)
 	ginServer.Handle("POST", "/api/block/insertBlock", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, insertBlock)
 	ginServer.Handle("POST", "/api/block/prependBlock", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, prependBlock)
@@ -237,6 +238,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/cloud/getCloudSpace", model.CheckAuth, model.CheckAdminRole, getCloudSpace)
 
 	ginServer.Handle("POST", "/api/sync/setSyncEnable", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setSyncEnable)
+	ginServer.Handle("POST", "/api/sync/setSyncInterval", model.CheckAuth, setSyncInterval)
 	ginServer.Handle("POST", "/api/sync/setSyncPerception", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setSyncPerception)
 	ginServer.Handle("POST", "/api/sync/setSyncGenerateConflictDoc", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setSyncGenerateConflictDoc)
 	ginServer.Handle("POST", "/api/sync/setSyncMode", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, setSyncMode)
