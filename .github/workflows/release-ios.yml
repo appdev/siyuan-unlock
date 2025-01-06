@@ -6,9 +6,6 @@ on:
       version:
         description: "release version/tag"
         required: true
-      packageManager:
-        description: "pnpm@x.x.x"
-        required: true
 
 jobs:
   build:
@@ -63,7 +60,7 @@ jobs:
           node-version: 20
 
       - name: Install Node pnpm
-        run: npm install -g ${{ github.event.inputs.packageManager }}
+        run: npm install -g pnpm@9.12.1
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
 
       - name: Install Node Dependencies
