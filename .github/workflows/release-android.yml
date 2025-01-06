@@ -29,7 +29,7 @@ jobs:
           mkdir -p ${{ github.workspace }}/go
           cd ${{ github.workspace }}/siyuan-note/
 
-          git clone --branch ${{ github.event.inputs.version }} --depth=1 https://github.com/siyuan-note/siyuan.git
+          git clone --branch --depth=1 https://github.com/siyuan-note/siyuan.git
           cd siyuan
 
           git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/disable-update.patch
