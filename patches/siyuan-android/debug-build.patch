@@ -1,0 +1,48 @@
+diff --git forkSrcPrefix/app/build.gradle forkDstPrefix/app/build.gradle
+index 3a62b3e68cab5e05e3e5a3c393e751a3f9e78f5f..2a73de9a05914d1a04f381398ab5fd748535c082 100644
+--- forkSrcPrefix/app/build.gradle
++++ forkDstPrefix/app/build.gradle
+@@ -4,7 +4,7 @@ plugins {
+ 
+ // 多渠道打包配置已引用的方式传递
+ apply from: rootProject.file('flavors.gradle')
+-apply from: rootProject.file('signings.gradle')
++// apply from: rootProject.file('signings.gradle')
+ apply from: rootProject.file('buildRelease.gradle')
+ 
+ // By appending the version name, build type, and a timestamp to the APK filename,
+@@ -41,6 +41,22 @@ android {
+         versionName siyuanVersionName
+     }
+ 
++    signingConfigs {
++        siyuanConfig {
++            storeFile file("../keystore/debug.jks")
++            storePassword "android"
++            keyAlias "androiddebugkey"
++            keyPassword "android"
++        }
++
++        debug {
++            storeFile = file("../keystore/debug.jks")
++            storePassword System.getenv("KEYSTORE_PASSWORD")
++            keyAlias "debug"
++            keyPassword System.getenv("KEYSTORE_PASSWORD")
++        }
++    }
++
+     buildTypes {
+         release {
+             // 正式版打包时指定签名证书
+@@ -54,9 +70,10 @@ android {
+             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+         }
+         debug {
++            signingConfig signingConfigs.debug
+             applicationIdSuffix ".debug"
+             minifyEnabled false
+-            resValue "string", "app_name", "SiYuan-Debug"
++            resValue "string", "app_name", "SiYuan"
+             resValue "string", "app_package_name", "org.b3log.siyuan.debug"
+             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+         }

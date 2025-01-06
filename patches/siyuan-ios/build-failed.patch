@@ -1,0 +1,36 @@
+diff --git forkSrcPrefix/siyuan-ios.xcodeproj/project.pbxproj forkDstPrefix/siyuan-ios.xcodeproj/project.pbxproj
+index 4dfeb67d9eb915c13aaf1c65debe121b7544d9a2..f6d78356ed005167316afb7e43e309dc337ec555 100644
+--- forkSrcPrefix/siyuan-ios.xcodeproj/project.pbxproj
++++ forkDstPrefix/siyuan-ios.xcodeproj/project.pbxproj
+@@ -16,6 +16,7 @@
+ 		268CE5AE275A68B700DFCFF8 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 268CE5AC275A68B700DFCFF8 /* LaunchScreen.storyboard */; };
+ 		268CE5B6275A68F300DFCFF8 /* app in Resources */ = {isa = PBXBuildFile; fileRef = 268CE5B5275A68F300DFCFF8 /* app */; };
+ 		26D64CCE28430F4000295E70 /* iosk.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 26D64CCD28430F4000295E70 /* iosk.xcframework */; };
++		B269F6D62D27C0BD00F1BC25 /* libresolv.9.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = B269F6D52D27C0BD00F1BC25 /* libresolv.9.tbd */; };
+ /* End PBXBuildFile section */
+ 
+ /* Begin PBXFileReference section */
+@@ -33,6 +34,7 @@
+ 		268CE5AF275A68B700DFCFF8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+ 		268CE5B5275A68F300DFCFF8 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; path = app; sourceTree = "<group>"; };
+ 		26D64CCD28430F4000295E70 /* iosk.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = iosk.xcframework; path = ../siyuan/kernel/ios/iosk.xcframework; sourceTree = "<group>"; };
++		B269F6D52D27C0BD00F1BC25 /* libresolv.9.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.9.tbd; path = usr/lib/libresolv.9.tbd; sourceTree = SDKROOT; };
+ /* End PBXFileReference section */
+ 
+ /* Begin PBXFrameworksBuildPhase section */
+@@ -40,6 +42,7 @@
+ 			isa = PBXFrameworksBuildPhase;
+ 			buildActionMask = 2147483647;
+ 			files = (
++				B269F6D62D27C0BD00F1BC25 /* libresolv.9.tbd in Frameworks */,
+ 				26D64CCE28430F4000295E70 /* iosk.xcframework in Frameworks */,
+ 			);
+ 			runOnlyForDeploymentPostprocessing = 0;
+@@ -83,6 +86,7 @@
+ 		268CE5B7275A69E800DFCFF8 /* Frameworks */ = {
+ 			isa = PBXGroup;
+ 			children = (
++				B269F6D52D27C0BD00F1BC25 /* libresolv.9.tbd */,
+ 				26D64CCD28430F4000295E70 /* iosk.xcframework */,
+ 			);
+ 			name = Frameworks;
