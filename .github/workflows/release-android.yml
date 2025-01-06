@@ -100,7 +100,7 @@ jobs:
         id: decode_keystore
         uses: timheuer/base64-to-file@v1.2
         with:
-          fileName: "debug.jks"
+          fileName: "siyuan.jks"
           fileDir: ${{ github.workspace }}/siyuan-note/siyuan-android/keystore
           encodedString: ${{ secrets.KEYSTORE }}
 
@@ -108,7 +108,7 @@ jobs:
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan-android
         run: |
           chmod 777 ./gradlew
-          ./gradlew :app:assembleDebug
+          ./gradlew :app:assembleRelease
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
@@ -126,5 +126,5 @@ jobs:
         with:
           upload_url: ${{ steps.get_current_release.outputs.upload_url }}
           asset_name: siyuan-${{ github.event.inputs.version }}-android-arm64.apk
-          asset_path: ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/googleplay/debug/siyuan-*.apk
+          asset_path: ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/googleplay/release/siyuan-*.apk
           asset_content_type: application/octet-stream
