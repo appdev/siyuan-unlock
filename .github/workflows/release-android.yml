@@ -61,7 +61,7 @@ jobs:
           node-version: 20
 
       - name: Install Node pnpm
-        run: npm install -g ${{ github.event.inputs.packageManager }}
+        run: npm install -g pnpm@9.12.1
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
 
       - name: Install Node Dependencies
