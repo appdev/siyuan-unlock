@@ -1,0 +1,122 @@
+name: release-ios
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "release version/tag"
+        required: true
+      packageManager:
+        description: "pnpm@x.x.x"
+        required: true
+
+jobs:
+  build:
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      matrix:
+        config:
+          - os: macos-latest
+            kernel_path: "../ios/iosk.xcframework"
+            target: "ios"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: siyuan-note
+
+      - name: clone origin and apply patches
+        run: |
+          mkdir -p ${{ github.workspace }}/go
+          cd ${{ github.workspace }}/siyuan-note/
+
+          git clone --branch ${{ github.event.inputs.version }} --depth=1 https://github.com/siyuan-note/siyuan.git
+          cd siyuan
+
+          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/disable-update.patch
+          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/default-config.patch
+          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/mock-vip-user.patch
+
+          cd ..
+
+          git clone --depth=1 https://github.com/siyuan-note/siyuan-ios.git
+          cd siyuan-ios
+
+          # https://github.com/golang/go/issues/58416
+          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan-ios/build-failed.patch
+
+          sed -i '' 's/MARKETING_VERSION =\(.*\)/MARKETING_VERSION = ${{ github.event.inputs.version }};/g' siyuan-ios.xcodeproj/project.pbxproj
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER =\(.*\)/PRODUCT_BUNDLE_IDENTIFIER = com.ld246.siyuan.debug;/g' siyuan-ios.xcodeproj/project.pbxproj
+          git status
+          git diff
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ github.workspace }}/siyuan-note/siyuan/kernel/go.mod
+          cache-dependency-path: "**/*.sum"
+      - run: go version
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Node pnpm
+        run: npm install -g ${{ github.event.inputs.packageManager }}
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
+
+      - name: Install Node Dependencies
+        run: pnpm install --no-frozen-lockfile
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
+
+      - name: Building UI
+        run: pnpm run build
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
+
+      - name: gomobile
+        working-directory: ${{ github.workspace }}/go
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+
+      - name: Building ios Kernel
+        run: |
+          gomobile bind --tags fts5 -ldflags '-s -w' -v -target=ios -o "${{ matrix.config.kernel_path }}" ./
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel/mobile
+        env:
+          GO111MODULE: on
+          CGO_ENABLED: 1
+
+      - name: ios assets
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app/
+        run: |
+          mkdir -p ${{ github.workspace }}/siyuan-note/siyuan-ios/app/
+          cp -r ./appearance ./guide ./stage ./changelogs ${{ github.workspace }}/siyuan-note/siyuan-ios/app/
+
+      - name: Building iOS
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan-ios
+        run: |
+          mkdir -p ../siyuan-ios-out/Payload
+          xcodebuild -workspace ./siyuan-ios.xcodeproj/project.xcworkspace -scheme siyuan-ios -sdk iphoneos -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath ../siyuan-ios-out
+          mv ../siyuan-ios-out/Build/Products/Release-iphoneos/siyuan-ios.app ../siyuan-ios-out/Payload
+          cd ../siyuan-ios-out
+          zip -r Payload.zip Payload
+          mv Payload.zip siyuan.ipa
+
+      - uses: joutvhu/get-release@v1
+        id: get_current_release
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Android
+        uses: shogo82148/actions-upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.get_current_release.outputs.upload_url }}
+          asset_name: siyuan-${{ github.event.inputs.version }}-ios.ipa
+          asset_path: ${{ github.workspace }}/siyuan-note/siyuan-ios-out/siyuan.ipa
+          asset_content_type: application/octet-stream
