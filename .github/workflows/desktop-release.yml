@@ -1,5 +1,4 @@
-name: release-pc
-
+name: CD For SiYuan Unlock
 on:
   workflow_dispatch:
     inputs:
