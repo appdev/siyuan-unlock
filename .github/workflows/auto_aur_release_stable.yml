@@ -22,11 +22,11 @@ jobs:
 
       - name: Extract tag name
         id: get_version
-        run: echo ::set-output name=TAG_VERSION::${{ github.event.release.tag_name }}
+        run: echo ::set-output name=TAG_VERSION::${{ github.event.inputs.version }}
 
       - name: Extra tag name without v
         id: get_version_without_v
-        run: echo ::set-output name=TAG_VERSION_WITHOUT_V::$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')
+        run: echo ::set-output name=TAG_VERSION_WITHOUT_V::$(echo "${{ github.event.inputs.version }}" | sed 's/^v//')
 
       - name: Create PKGBUILD
         run: |
@@ -38,7 +38,7 @@ jobs:
           # had agreement with the author to use the PKGBUILD
           # for change request, PLEASE MAKE A PR ON GITHUB REPO, keep commenting here would be ignored
 
-          pkgname=siyuan-bin
+          pkgname=siyuan-unlock-bin
           pkgver=${{ steps.get_version_without_v.outputs.TAG_VERSION_WITHOUT_V }}
           pkgrel=1
           pkgdesc="auto upload to AUR when SiYuan stable release"
@@ -48,7 +48,7 @@ jobs:
           options=("!strip" "!debug")
           depends=("fuse2")
           optdepends=('pandoc: docx export')
-          source=("https://github.com/siyuan-note/siyuan/releases/download/v\${pkgver}/siyuan-\${pkgver}-linux.AppImage")
+          source=("https://github.com/appdev/siyuan-unlock/releases/download/v\${pkgver}/siyuan-\${pkgver}-linux.AppImage")
           sha256sums=('SKIP')
 
           _pkgname=siyuan-\${pkgver}-linux.AppImage

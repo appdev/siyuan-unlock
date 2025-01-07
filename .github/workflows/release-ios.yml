@@ -114,6 +114,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.get_current_release.outputs.upload_url }}
-          asset_name: siyuan-${{ github.event.inputs.version }}-ios.ipa
+          asset_name: siyuan-unlock-${{ github.event.inputs.version }}-ios.ipa
           asset_path: ${{ github.workspace }}/siyuan-note/siyuan-ios-out/siyuan.ipa
           asset_content_type: application/octet-stream
