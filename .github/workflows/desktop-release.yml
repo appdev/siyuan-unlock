@@ -21,6 +21,7 @@ jobs:
             electron_args: "dist-linux"
             goos: "linux"
             goarch: "amd64"
+            cc_path: "x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc"
             suffix: "linux.tar.gz"
           - os: ubuntu-20.04
             name: ubuntu build linux.AppImage
@@ -29,7 +30,16 @@ jobs:
             electron_args: "dist-linux"
             goos: "linux"
             goarch: "amd64"
+            cc_path: "x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc"
             suffix: "linux.AppImage"
+          - os: ubuntu-20.04
+            kernel_path: "../app/kernel-linux-arm64/SiYuan-Kernel"
+            build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
+            electron_args: "dist-linux-arm64"
+            goos: "linux"
+            goarch: "arm64"
+            cc_path: "aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
+            suffix: "linux-arm64.tar.gz"
           - os: macos-latest
             kernel_path: "../app/kernel-darwin/SiYuan-Kernel"
             build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
@@ -72,6 +82,19 @@ jobs:
           git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/mock-vip-user.patch
 
           git status
+
+      - name: Set up Cross Compilation Toolchains for Linux
+        if: contains( matrix.config.goos, 'linux')
+        run: |
+          sudo mkdir -p /usr/local/musl
+          
+          if [ "${{ matrix.config.goarch }}" = "amd64" ]; then
+            wget https://musl.cc/x86_64-linux-musl-cross.tgz
+            sudo tar -xzf x86_64-linux-musl-cross.tgz -C /usr/local/musl
+          elif [ "${{ matrix.config.goarch }}" = "arm64" ]; then
+            wget https://musl.cc/aarch64-linux-musl-cross.tgz
+            sudo tar -xzf aarch64-linux-musl-cross.tgz -C /usr/local/musl
+          fi
 
       - name: Set up MingGW
         uses: msys2/setup-msys2@v2
@@ -124,8 +147,17 @@ jobs:
         if: contains( matrix.config.goos, 'windows')
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
 
+      - name: Clean Build Directories
+        if: contains( matrix.config.goos, 'linux')
+        run: |
+          rm -rf app/build
+          rm -rf app/kernel-linux
+          rm -rf app/kernel-linux-arm64
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan
+
       - name: Building Kernel
-        run: go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
+        run: |
+          go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
         env:
           GO111MODULE: on
@@ -133,6 +165,8 @@ jobs:
           GOOS: ${{ matrix.config.goos }}
           GOPATH: ${{ github.workspace }}/go
           GOARCH: ${{ matrix.config.goarch }}
+          CC: /usr/local/musl/${{ matrix.config.cc_path }}
+          GOPROXY: https://mirrors.aliyun.com/goproxy/
 
       - name: Building Electron
         run: pnpm run ${{ matrix.config.electron_args }}
