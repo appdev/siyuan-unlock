@@ -157,8 +157,11 @@ jobs:
 
       - name: Building Kernel
         run: |
-          if [ "${{ matrix.config.goos }}" = "linux" ]; then
+          if [[ "${{ matrix.config.goos }}" == "linux" ]]; then
             export CC=/usr/local/musl/${{ matrix.config.cc_path }}
+            go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
+            else
+            go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
           fi
           go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
