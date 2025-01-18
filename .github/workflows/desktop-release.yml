@@ -156,14 +156,7 @@ jobs:
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan
 
       - name: Building Kernel
-        run: |
-          if [[ "${{ matrix.config.goos }}" == "linux" ]]; then
-            export CC=/usr/local/musl/${{ matrix.config.cc_path }}
-            go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
-            else
-            go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
-          fi
-          go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
+        run: go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
         env:
           GO111MODULE: on
@@ -172,6 +165,7 @@ jobs:
           GOPATH: ${{ github.workspace }}/go
           GOARCH: ${{ matrix.config.goarch }}
           GOPROXY: https://mirrors.aliyun.com/goproxy/
+          CC: ${{ runner.os == 'Linux' && format('/usr/local/musl/{0}', matrix.config.cc_path) || '' }}
 
       - name: Building Electron
         run: pnpm run ${{ matrix.config.electron_args }}
