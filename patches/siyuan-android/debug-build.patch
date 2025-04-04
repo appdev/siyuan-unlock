@@ -1,50 +1,56 @@
-diff --git forkSrcPrefix/app/build.gradle forkDstPrefix/app/build.gradle
-index 6922a27f97cc37fa3490c9b0ab5b8dd2002044a0..7a3e6bbdb0d40871ef51128f2b6b8ce756d506ae 100644
---- forkSrcPrefix/app/build.gradle
-+++ forkDstPrefix/app/build.gradle
-@@ -4,7 +4,7 @@ plugins {
+}
 
- // 多渠道打包配置已引用的方式传递
- apply from: rootProject.file('flavors.gradle')
--apply from: rootProject.file('signings.gradle')
-+// apply from: rootProject.file('signings.gradle')
- apply from: rootProject.file('buildRelease.gradle')
+// 多渠道打包配置已引用的方式传递
+apply from: rootProject.file('flavors.gradle')
+apply from: rootProject.file('signings.gradle')
+//apply from: rootProject.file('flavors.gradle')
+//apply from: rootProject.file('signings.gradle')
+apply from: rootProject.file('buildRelease.gradle')
 
- // By appending the version name, build type, and a timestamp to the APK filename,
-@@ -41,22 +41,31 @@ android {
-         versionName siyuanVersionName
-     }
+// By appending the version name, build type, and a timestamp to the APK filename,
 
-+    signingConfigs {
-+        release {
-+            storeFile = file("../keystore/siyuan.jks")
-+            storePassword System.getenv("KEYSTORE_PASSWORD")
-+            keyAlias "siyuan"
-+            keyPassword System.getenv("KEYSTORE_PASSWORD")
-+        }
-+    }
-+
-     buildTypes {
-         release {
-             // 正式版打包时指定签名证书
--            signingConfig signingConfigs.siyuanConfig
-+            signingConfig signingConfigs.release
+    defaultConfig {
+        applicationId "org.b3log.siyuan"
+        minSdk 26
+        targetSdk 34 // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
+        targetSdk 34
+        // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
+        versionCode siyuanVersionCode
+        versionName siyuanVersionName
+    }
 
-             minifyEnabled true
-             shrinkResources true
--            // 此处优先级太高，渠道处配置 resValue 不会生效，故放到了 productFlavors 多渠道打包处处理
--            // resValue "string", "app_name", "SiYuan"
--            resValue "string", "app_package_name", "org.b3log.siyuan"
-+            resValue "string", "app_name", "SiYuan"
-+            resValue "string", "app_package_name", "org.b3log.siyuan.unlock"
-             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-         }
-         debug {
-+            signingConfig signingConfigs.debug
-             applicationIdSuffix ".debug"
-             minifyEnabled false
--            resValue "string", "app_name", "SiYuan-Debug"
-+            resValue "string", "app_name", "SiYuan"
-             resValue "string", "app_package_name", "org.b3log.siyuan.debug"
-             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-         }
+    signingConfigs {
+        release {
+            storeFile = file("../keystore/siyuan.jks")
+            storePassword System.getenv("KEYSTORE_PASSWORD")
+            keyAlias "siyuan"
+            keyPassword System.getenv("KEYSTORE_PASSWORD")
+        }
+    }
+
+    buildTypes {
+        release {
+            // 正式版打包时指定签名证书
+            signingConfig signingConfigs.siyuanConfig
+            signingConfig signingConfigs.release
+
+            minifyEnabled true
+            shrinkResources true
+
+            // 此处优先级太高，渠道处配置 resValue 不会生效，故放到了 productFlavors 多渠道打包处处理
+            // resValue "string", "app_name", "SiYuan"
+            resValue "string", "app_package_name", "org.b3log.siyuan"
+            resValue "string", "app_name", "SiYuan"
+            resValue "string", "app_package_name", "org.b3log.siyuan.unlock"
+
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+
+
+            minifyEnabled false
+
+            resValue "string", "app_name", "SiYuan-Debug"
+            resValue "string", "app_name", "SiYuan"
+            resValue "string", "app_package_name", "org.b3log.siyuan.debug"
+
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
