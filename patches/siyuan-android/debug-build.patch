@@ -1,7 +1,7 @@
-diff --git a/app/build.gradle b/app/build.gradle
-index 3a62b3e..0dde632 100644
---- a/app/build.gradle
-+++ b/app/build.gradle
+diff --git forkSrcPrefix/app/build.gradle forkDstPrefix/app/build.gradle
+index 6922a27f97cc37fa3490c9b0ab5b8dd2002044a0..7a3e6bbdb0d40871ef51128f2b6b8ce756d506ae 100644
+--- forkSrcPrefix/app/build.gradle
++++ forkDstPrefix/app/build.gradle
 @@ -4,7 +4,7 @@ plugins {
 
  // 多渠道打包配置已引用的方式传递
