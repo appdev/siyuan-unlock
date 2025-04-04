@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle b/app/build.gradle
-index 6922a27..4a28bc9 100644
+index 6922a27..d33b4a3 100644
 --- a/app/build.gradle
 +++ b/app/build.gradle
 @@ -3,8 +3,8 @@ plugins {
@@ -13,7 +13,7 @@ index 6922a27..4a28bc9 100644
  apply from: rootProject.file('buildRelease.gradle')
  
  // By appending the version name, build type, and a timestamp to the APK filename,
-@@ -36,22 +36,30 @@ android {
+@@ -36,22 +36,35 @@ android {
      defaultConfig {
          applicationId "org.b3log.siyuan"
          minSdk 26
@@ -22,8 +22,12 @@ index 6922a27..4a28bc9 100644
 +        // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
          versionCode siyuanVersionCode
          versionName siyuanVersionName
-     }
- 
++        ndk {
++            //noinspection ChromeOsAbiSupport
++            abiFilters = abiList == null ? ['arm64-v8a'] : abiList
++        }
++    }
++
 +    signingConfigs {
 +        release {
 +            storeFile = file("../keystore/siyuan.jks")
@@ -31,8 +35,8 @@ index 6922a27..4a28bc9 100644
 +            keyAlias "siyuan"
 +            keyPassword System.getenv("KEYSTORE_PASSWORD")
 +        }
-+    }
-+
+     }
+ 
      buildTypes {
          release {
              // 正式版打包时指定签名证书
@@ -45,12 +49,13 @@ index 6922a27..4a28bc9 100644
 -            // 此处优先级太高，渠道处配置 resValue 不会生效，故放到了 productFlavors 多渠道打包处处理
 -            // resValue "string", "app_name", "SiYuan"
 -            resValue "string", "app_package_name", "org.b3log.siyuan"
++            buildConfigField "String", "CHANNEL", '"googleplay"'
 +            resValue "string", "app_name", "SiYuan"
 +            resValue "string", "app_package_name", "org.b3log.siyuan.unlock"
  
              proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
          }
-@@ -60,7 +68,7 @@ android {
+@@ -60,7 +73,7 @@ android {
  
              minifyEnabled false
  
