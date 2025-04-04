@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         config:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             kernel_path: "../../../siyuan-android/app/libs/kernel.aar"
 
     steps:
