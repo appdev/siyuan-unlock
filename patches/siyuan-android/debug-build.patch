@@ -1,56 +1,61 @@
-}
-
-// 多渠道打包配置已引用的方式传递
-apply from: rootProject.file('flavors.gradle')
-apply from: rootProject.file('signings.gradle')
-//apply from: rootProject.file('flavors.gradle')
-//apply from: rootProject.file('signings.gradle')
-apply from: rootProject.file('buildRelease.gradle')
-
-// By appending the version name, build type, and a timestamp to the APK filename,
-
-    defaultConfig {
-        applicationId "org.b3log.siyuan"
-        minSdk 26
-        targetSdk 34 // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
-        targetSdk 34
-        // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
-        versionCode siyuanVersionCode
-        versionName siyuanVersionName
-    }
-
-    signingConfigs {
-        release {
-            storeFile = file("../keystore/siyuan.jks")
-            storePassword System.getenv("KEYSTORE_PASSWORD")
-            keyAlias "siyuan"
-            keyPassword System.getenv("KEYSTORE_PASSWORD")
-        }
-    }
-
-    buildTypes {
-        release {
-            // 正式版打包时指定签名证书
-            signingConfig signingConfigs.siyuanConfig
-            signingConfig signingConfigs.release
-
-            minifyEnabled true
-            shrinkResources true
-
-            // 此处优先级太高，渠道处配置 resValue 不会生效，故放到了 productFlavors 多渠道打包处处理
-            // resValue "string", "app_name", "SiYuan"
-            resValue "string", "app_package_name", "org.b3log.siyuan"
-            resValue "string", "app_name", "SiYuan"
-            resValue "string", "app_package_name", "org.b3log.siyuan.unlock"
-
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-
-
-            minifyEnabled false
-
-            resValue "string", "app_name", "SiYuan-Debug"
-            resValue "string", "app_name", "SiYuan"
-            resValue "string", "app_package_name", "org.b3log.siyuan.debug"
-
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+diff --git a/app/build.gradle b/app/build.gradle
+index 6922a27..4a28bc9 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -3,8 +3,8 @@ plugins {
+ }
+ 
+ // 多渠道打包配置已引用的方式传递
+-apply from: rootProject.file('flavors.gradle')
+-apply from: rootProject.file('signings.gradle')
++//apply from: rootProject.file('flavors.gradle')
++//apply from: rootProject.file('signings.gradle')
+ apply from: rootProject.file('buildRelease.gradle')
+ 
+ // By appending the version name, build type, and a timestamp to the APK filename,
+@@ -36,22 +36,30 @@ android {
+     defaultConfig {
+         applicationId "org.b3log.siyuan"
+         minSdk 26
+-        targetSdk 34 // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
++        targetSdk 34
++        // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
+         versionCode siyuanVersionCode
+         versionName siyuanVersionName
+     }
+ 
++    signingConfigs {
++        release {
++            storeFile = file("../keystore/siyuan.jks")
++            storePassword System.getenv("KEYSTORE_PASSWORD")
++            keyAlias "siyuan"
++            keyPassword System.getenv("KEYSTORE_PASSWORD")
++        }
++    }
++
+     buildTypes {
+         release {
+             // 正式版打包时指定签名证书
+-            signingConfig signingConfigs.siyuanConfig
++            signingConfig signingConfigs.release
+ 
+             minifyEnabled true
+             shrinkResources true
+-
+-            // 此处优先级太高，渠道处配置 resValue 不会生效，故放到了 productFlavors 多渠道打包处处理
+-            // resValue "string", "app_name", "SiYuan"
+-            resValue "string", "app_package_name", "org.b3log.siyuan"
++            resValue "string", "app_name", "SiYuan"
++            resValue "string", "app_package_name", "org.b3log.siyuan.unlock"
+ 
+             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+         }
+@@ -60,7 +68,7 @@ android {
+ 
+             minifyEnabled false
+ 
+-            resValue "string", "app_name", "SiYuan-Debug"
++            resValue "string", "app_name", "SiYuan"
+             resValue "string", "app_package_name", "org.b3log.siyuan.debug"
+ 
+             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
