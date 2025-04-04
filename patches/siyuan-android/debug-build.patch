@@ -22,10 +22,6 @@ index 6922a27..d33b4a3 100644
 +        // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
          versionCode siyuanVersionCode
          versionName siyuanVersionName
-+        ndk {
-+            //noinspection ChromeOsAbiSupport
-+            abiFilters = abiList == null ? ['arm64-v8a'] : abiList
-+        }
 +    }
 +
 +    signingConfigs {
