@@ -45,7 +45,7 @@ index 6922a27..d33b4a3 100644
 -            // 此处优先级太高，渠道处配置 resValue 不会生效，故放到了 productFlavors 多渠道打包处处理
 -            // resValue "string", "app_name", "SiYuan"
 -            resValue "string", "app_package_name", "org.b3log.siyuan"
-+            buildConfigField "String", "CHANNEL", '"googleplay"'
++            buildConfigField "String", "CHANNEL", "googleplay"
 +            resValue "string", "app_name", "SiYuan"
 +            resValue "string", "app_package_name", "org.b3log.siyuan.unlock"
  
