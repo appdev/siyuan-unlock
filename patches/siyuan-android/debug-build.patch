@@ -42,7 +42,7 @@ index 6922a27..ddddda9 100644
 -            resValue "string", "app_package_name", "org.b3log.siyuan"
 +            resValue "string", "app_name", "SiYuan"
 +            resValue "string", "app_package_name", "org.b3log.siyuan-unlock"
-+            buildConfigField "String", "CHANNEL", '"googleplay"'
++            buildConfigField "String", "CHANNEL", "googleplay"
  
              proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
          }
