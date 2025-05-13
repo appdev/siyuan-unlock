@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle b/app/build.gradle
-index 6922a27..3bcc77f 100644
+index 6922a27..ddddda9 100644
 --- a/app/build.gradle
 +++ b/app/build.gradle
 @@ -3,9 +3,9 @@ plugins {
@@ -15,20 +15,7 @@ index 6922a27..3bcc77f 100644
  
  // By appending the version name, build type, and a timestamp to the APK filename,
  // it becomes very easy for testers and developers to identify exactly which version of the application they are testing.
-@@ -30,28 +30,38 @@ android.applicationVariants.configureEach { variant ->
- }
- 
- android {
--    namespace 'org.b3log.siyuan'
-+    namespace 'org.b3log.siyuan-unlock'
-     compileSdk 34
- 
-     defaultConfig {
--        applicationId "org.b3log.siyuan"
-+        applicationId "org.b3log.siyuan-unlock"
-         minSdk 26
-         targetSdk 34 // 这里升级后会导致部分机型的工具栏被软键盘遮挡，升级的话需要回测 https://github.com/siyuan-note/siyuan/issues/14440
-         versionCode siyuanVersionCode
+@@ -41,17 +41,27 @@ android {
          versionName siyuanVersionName
      }
  
