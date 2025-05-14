@@ -121,7 +121,8 @@ jobs:
           tag_name: ${{ github.event.inputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: List generated APK files
+        run: ls -la ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/googleplay/release/
       - name: Upload Android
         uses: shogo82148/actions-upload-release-asset@v1
         env:
