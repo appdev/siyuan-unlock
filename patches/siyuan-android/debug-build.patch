@@ -1,15 +1,13 @@
 diff --git a/app/build.gradle b/app/build.gradle
-index 6922a27..06e4067 100644
+index 6922a27..a7da1fc 100644
 --- a/app/build.gradle
 +++ b/app/build.gradle
-@@ -3,9 +3,9 @@ plugins {
- }
+@@ -4,8 +4,8 @@ plugins {
  
  // 多渠道打包配置已引用的方式传递
--apply from: rootProject.file('flavors.gradle')
+ apply from: rootProject.file('flavors.gradle')
 -apply from: rootProject.file('signings.gradle')
 -apply from: rootProject.file('buildRelease.gradle')
-+//apply from: rootProject.file('flavors.gradle')
 +//apply from: rootProject.file('signings.gradle')
 +//apply from: rootProject.file('buildRelease.gradle')
  
@@ -58,3 +56,39 @@ index 66b9b9e..946a60b 100644
  
      </application>
  
+diff --git a/flavors.gradle b/flavors.gradle
+index eeaed73..9338e4a 100644
+--- a/flavors.gradle
++++ b/flavors.gradle
+@@ -19,31 +19,11 @@ android {
+ 
+   // 多渠道打包配置
+   productFlavors {
+-
+-    // 小米/Vivo/OPPO/荣耀
+-    cn profileLqr() >> {
+-      buildConfigField "String", "CHANNEL", '"cn"'
+-      resValue "string", "app_name", "思源笔记"
+-    }
+-
+     // Google Play
+     googleplay profileLqr() >> {
+       buildConfigField "String", "CHANNEL", '"googleplay"'
+       resValue "string", "app_name", "SiYuan"
+     }
+-
+-    // 华为
+-    huawei profileLqr() >> {
+-      buildConfigField "String", "CHANNEL", '"huawei"'
+-      resValue "string", "app_name", "思源笔记"
+-    }
+-
+-    // 官方
+-    official profileLqr() >> {
+-      buildConfigField "String", "CHANNEL", '"official"'
+-      resValue "string", "app_name", "SiYuan"
+-    }
+-
+     // 遍历 productFlavors 多渠道，设置渠道号
+     productFlavors.all {
+       flavor -> flavor.manifestPlaceholders.put("CHANNEL", name)
