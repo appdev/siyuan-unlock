@@ -42,9 +42,6 @@ jobs:
           git clone --depth=1 https://github.com/siyuan-note/siyuan-ios.git
           cd siyuan-ios
 
-          # https://github.com/golang/go/issues/58416
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan-ios/build-failed.patch
-
           sed -i '' 's/MARKETING_VERSION =\(.*\)/MARKETING_VERSION = ${{ github.event.inputs.version }};/g' siyuan-ios.xcodeproj/project.pbxproj
           sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER =\(.*\)/PRODUCT_BUNDLE_IDENTIFIER = com.ld246.siyuan.debug;/g' siyuan-ios.xcodeproj/project.pbxproj
           git status
@@ -111,7 +108,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Android
+      - name: Upload ios.ipa
         uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
