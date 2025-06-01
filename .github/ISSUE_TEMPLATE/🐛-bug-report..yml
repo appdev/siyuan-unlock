@@ -7,8 +7,8 @@ body:
    attributes:
      label: 同样的问题在上游是否也存在
      description: |
-        在提问之前请先确定，同样的问题在  siyuan-note https://github.com/siyuan-note/siyuan 中是否也存在
+        在提问之前请先确定，同样的问题在  siyuan-note https://github.com/siyuan-note/siyuan 中是否也存在，理论上我们只能解决由于去除登录而产生的问题
      options:
        - label: | 
-            上游项目同样存在这个问题
+            上游项目同样**不存在**这个问题
          required: true
