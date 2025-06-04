@@ -36,11 +36,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: siyuan-note
-          
-      - name: Check musl site
-        run: |
-          curl -I https://musl.libc.org/
-          git ls-remote https://git.musl-libc.org/cgit/musl/
 
       - name: clone origin and apply patches
         run: |
