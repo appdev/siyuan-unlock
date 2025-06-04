@@ -87,12 +87,12 @@ jobs:
         if: contains( matrix.config.goos, 'linux')
         run: |
           sudo mkdir -p /usr/local/musl
-          
+      
           if [ "${{ matrix.config.goarch }}" = "amd64" ]; then
-            wget https://musl.cc/x86_64-linux-musl-cross.tgz
+            wget https://github.com/appdev/musl-archive/releases/download/latest/x86_64-linux-musl-cross.tgz
             sudo tar -xzf x86_64-linux-musl-cross.tgz -C /usr/local/musl
           elif [ "${{ matrix.config.goarch }}" = "arm64" ]; then
-            wget https://musl.cc/aarch64-linux-musl-cross.tgz
+            wget https://github.com/appdev/musl-archive/releases/download/latest/aarch64-linux-musl-cross.tgz
             sudo tar -xzf aarch64-linux-musl-cross.tgz -C /usr/local/musl
           fi
 
