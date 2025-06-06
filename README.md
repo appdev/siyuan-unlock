@@ -4,7 +4,7 @@
 - 这不是针对 [siyuan-note](https://github.com/siyuan-note/siyuan) 的破解版，而是基于 [GPL](https://github.com/siyuan-note/siyuan/blob/master/LICENSE) 协议，针对 [siyuan-note](https://github.com/siyuan-note/siyuan) 的修改版。去除了需要思源账号才能使用 S3同步 的限制。
 
 
-运行容器 **部署 Docker 版本并不是必须的 （这很难理解吗？怎么总有人问）**
+运行容器 **部署 Docker 版本并不是必须的**
 ```shell
 docker run \
 -v /opt/siyuan:/siyuan/workspace \ # 上方创建的容器卷:映射容器内思源笔记的数据存放路径，与workspace保持一致
