@@ -1,5 +1,5 @@
 ## 求职
-我目前正在找一份 Android、Flutter 开发的工作，我拥有10年的开发经验，如你所见，除了 Android 、flutter 外，我还会使用 c++、rust、go 等等。  
+我目前正在找一份 Android、Flutter 开发的工作，我拥有10年的开发经验，如你所见，除了 Android 、Flutter 外，我还会使用 C++、Rust、Go 等等。  
 
 你可以通过 mail@apkdv.com 联系我详谈  
 
