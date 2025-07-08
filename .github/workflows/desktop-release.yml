@@ -54,7 +54,7 @@ jobs:
             goos: "darwin"
             goarch: "arm64"
             suffix: "mac-arm64.dmg"
-          - os: windows-2019
+          - os: windows-latest
             kernel_path: "../app/kernel/SiYuan-Kernel.exe"
             build_args: "-s -w -H=windowsgui -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
             electron_args: "dist"
