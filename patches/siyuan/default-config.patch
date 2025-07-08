@@ -1,15 +1,3 @@
-diff --git forkSrcPrefix/kernel/conf/system.go forkDstPrefix/kernel/conf/system.go
-index e3acc95435abc18c6334be12637bdc48a7ea9762..7ffafaa1f254994248532bb555941cac087689e3 100644
---- forkSrcPrefix/kernel/conf/system.go
-+++ forkDstPrefix/kernel/conf/system.go
-@@ -53,6 +53,7 @@ func NewSystem() *System {
- 		Name:               util.GetDeviceName(),
- 		KernelVersion:      util.Ver,
- 		NetworkProxy:       &NetworkProxy{},
-+		DisableGoogleAnalytics: true,
- 		DownloadInstallPkg: false,
- 	}
- }
 diff --git forkSrcPrefix/kernel/conf/sync.go forkDstPrefix/kernel/conf/sync.go
 index 488cb9e5701adc964635376373202516656b1f9a..4e2a457fe7ff2dec817c2e0ae9de610d1412cbd3 100644
 --- forkSrcPrefix/kernel/conf/sync.go
