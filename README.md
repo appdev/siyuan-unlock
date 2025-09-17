@@ -233,7 +233,7 @@ chown -R 1001:1002 /siyuan/workspace
 
 ## 🚀 下载安装
 
-[GitHub](https://github.com/siyuan-unlock/appdev/releases)
+[GitHub](https://github.com/appdev/siyuan-unlock/releases)
 
 ## Docker 部署
 
