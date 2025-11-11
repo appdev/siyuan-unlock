@@ -1,9 +1,3 @@
-## 声明
-
-- 如果你是订阅、付费用户，你应该使用思源官方版本 [siyuan-note](https://github.com/siyuan-note/siyuan)，以获得更好的体验。
-- 这是基于 [GPL](https://github.com/siyuan-note/siyuan/blob/master/LICENSE) 协议，针对 [siyuan-note](https://github.com/siyuan-note/siyuan) 的修改版。去除了需要思源账号才能使用 S3 、WevDAV 同步的限制。
-
-
 
 ### Docker 部署
 
