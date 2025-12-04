@@ -11,10 +11,10 @@ index 9010350078560bb298de72bc73d54e51db60f21b..dfe9ab286f50431bdb30c633b8e63886
  	ret := gulu.Ret.NewResult()
  	defer c.JSON(http.StatusOK, ret)
  
-@@ -608,6 +608,60 @@ func getCloudUser(c *gin.Context) {
+@@ -608,6 +608,48 @@ func getCloudUser(c *gin.Context) {
  	ret.Data = model.Conf.GetUser()
  }
-
+ 
 +func getCloudUser(c *gin.Context) {
 +	ret := gulu.Ret.NewResult()
 +	defer c.JSON(http.StatusOK, ret)
@@ -23,29 +23,17 @@ index 9010350078560bb298de72bc73d54e51db60f21b..dfe9ab286f50431bdb30c633b8e63886
 +		return
 +	}
 +
-+	arg, ok := util.JsonArg(c, ret)
-+	if !ok {
-+		return
-+	}
-+
-+	t := arg["token"]
-+	var token string
-+	if nil != t {
-+		token = t.(string)
-+	}
-+	model.RefreshUser(token)
-+   originUser := model.Conf.GetUser()
 +	user := &conf.User{
-+			UserId: originUser.UserId,
-+			UserName: originUser.UserName,
-+			UserAvatarURL: originUser.UserAvatarURL,
-+			UserHomeBImgURL: originUser.UserHomeBImgURL,
-+			UserTitles: originUser.UserTitles,
-+			UserIntro: originUser.UserIntro,
-+			UserNickname: originUser.UserNickname,
++			UserId: "0",
++			UserName: "_",
++			UserAvatarURL: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
++			UserHomeBImgURL: "",
++			UserTitles: []*conf.UserTitle{},
++			UserIntro: "",
++			UserNickname: "",
 +			UserCreateTime: "29991231 00:00:00",
 +			UserSiYuanProExpireTime: -1,
-+			UserToken: originUser.UserToken,
++			UserToken: "token",
 +			UserTokenExpireTime: "32503593600",
 +			UserSiYuanRepoSize: 0,
 +			UserSiYuanPointExchangeRepoSize: 0,
