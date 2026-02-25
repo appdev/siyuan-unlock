@@ -42,6 +42,11 @@ jobs:
           git clone --depth=1 https://github.com/siyuan-note/siyuan-ios.git
           cd siyuan-ios
 
+          # https://github.com/siyuan-note/siyuan-ios/commit/d72cd11a6d78df88b56a2850f0f46c2b905a5433 
+          # ASSETCATALOG_COMPILER_APPICON_NAME = logo;
+          # 但代码里只有 AppIcon.appiconset，先复制一份看看后续会不会修复
+          cp -r siyuan-ios/Assets.xcassets/AppIcon.appiconset siyuan-ios/Assets.xcassets/logo.appiconset
+
           sed -i '' 's/MARKETING_VERSION =\(.*\)/MARKETING_VERSION = ${{ github.event.inputs.version }};/g' siyuan-ios.xcodeproj/project.pbxproj
           sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER =\(.*\)/PRODUCT_BUNDLE_IDENTIFIER = com.ld246.siyuan.debug;/g' siyuan-ios.xcodeproj/project.pbxproj
           git status
@@ -114,6 +119,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.get_current_release.outputs.upload_url }}
-          asset_name: siyuan-unlock-${{ github.event.inputs.version }}-ios.ipa
+          asset_name: siyuan-${{ github.event.inputs.version }}-ios.ipa
           asset_path: ${{ github.workspace }}/siyuan-note/siyuan-ios-out/siyuan.ipa
           asset_content_type: application/octet-stream
