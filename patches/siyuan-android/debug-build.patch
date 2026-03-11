@@ -1,33 +1,38 @@
-
-// 多渠道打包配置
-apply from: rootProject.file('flavors.gradle')
-apply from: rootProject.file('signings.gradle')
-//apply from: rootProject.file('signings.gradle')
-apply from: rootProject.file('buildRelease.gradle')
-
-// 1. 配置 App Bundle (.aab) 的基础文件名
-
-        versionCode siyuanVersionCode
-        versionName siyuanVersionName
-    }
-
-    signingConfigs {
-        release {
-            storeFile = file("../keystore/siyuan.jks")
-            storePassword System.getenv("KEYSTORE_PASSWORD")
-            keyAlias "siyuan"
-            keyPassword System.getenv("KEYSTORE_PASSWORD")
-        }
-    }
-    buildFeatures {
-        buildConfig true
-    }
-
-    buildTypes {
-        release {
-            // 正式版打包时指定签名证书
-            signingConfig signingConfigs.siyuanConfig
-            signingConfig signingConfigs.release
-
-            minifyEnabled true
-            shrinkResources true
+diff --git a/app/build.gradle b/app/build.gradle
+index e0ec580..93c1c43 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -5,7 +5,7 @@ plugins {
+ 
+ // 多渠道打包配置
+ apply from: rootProject.file('flavors.gradle')
+-apply from: rootProject.file('signings.gradle')
++//apply from: rootProject.file('signings.gradle')
+ apply from: rootProject.file('buildRelease.gradle')
+ 
+ // 1. 配置 App Bundle (.aab) 的基础文件名
+@@ -45,7 +45,14 @@ android {
+         versionCode siyuanVersionCode
+         versionName siyuanVersionName
+     }
+-
++    signingConfigs {
++        release {
++            storeFile = file("../keystore/siyuan.jks")
++            storePassword System.getenv("KEYSTORE_PASSWORD")
++            keyAlias "siyuan"
++            keyPassword System.getenv("KEYSTORE_PASSWORD")
++        }
++    }
+     buildFeatures {
+         buildConfig true
+     }
+@@ -53,7 +60,7 @@ android {
+     buildTypes {
+         release {
+             // 正式版打包时指定签名证书
+-            signingConfig signingConfigs.siyuanConfig
++            signingConfig signingConfigs.release
+ 
+             minifyEnabled true
+             shrinkResources true
