@@ -179,11 +179,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Electron App
-        uses: shogo82148/actions-upload-release-asset@v1
+        uses: ncipollo/release-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.get_current_release.outputs.upload_url }}
-          asset_name: siyuan-unlock-${{ github.event.inputs.version }}-${{ matrix.config.suffix }}
-          asset_path: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-${{ matrix.config.suffix }}
-          asset_content_type: application/octet-stream
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-${{ matrix.config.suffix }}
+          allowUpdates: true
+          omitBody: true
+          omitName: true
+          tag: ${{ github.event.inputs.version }}
+          replacesArtifacts: false
