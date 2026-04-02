@@ -185,7 +185,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-${{ matrix.config.suffix }}
-          asset_name: siyuan-unlock-${{ github.event.inputs.version }}-${{ matrix.config.suffix }}
+          name: siyuan-unlock-${{ github.event.inputs.version }}-${{ matrix.config.suffix }}
           allowUpdates: true
           omitBody: true
           omitName: true
