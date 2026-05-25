@@ -4,7 +4,7 @@ export const query = {
     element: undefined as Element,
     genHTML: () => {
         return `<div class="b3-label">
- ${window.siyuan.languages.searchBlockType}
+    <div>${window.siyuan.languages.searchBlockType}</div>
     <div class="fn__flex config-query">
         <label class="fn__flex">
             <svg class="svg"><use xlink:href="#iconMath"></use></svg>
@@ -124,6 +124,15 @@ export const query = {
             <input class="b3-switch" id="blockquote" type="checkbox"${window.siyuan.config.search.blockquote ? " checked" : ""}/>
         </label>
         <label class="fn__flex">
+            <svg class="svg"><use xlink:href="#iconCallout"></use></svg>
+            <span class="fn__space"></span>
+            <div class="fn__flex-1">
+                ${window.siyuan.languages.callout} <sup>[1]</sup>
+            </div>
+            <span class="fn__space"></span>
+            <input class="b3-switch" id="callout" type="checkbox"${window.siyuan.config.search.callout ? " checked" : ""}/>
+        </label>
+        <label class="fn__flex">
             <svg class="svg"><use xlink:href="#iconSuper"></use></svg>
             <span class="fn__space"></span>
             <div class="fn__flex-1">
@@ -166,7 +175,7 @@ export const query = {
     </div>
 </div>
 <div class="b3-label">
- ${window.siyuan.languages.searchBlockAttr}
+    <div>${window.siyuan.languages.searchBlockAttr}</div>
     <div class="config-query">
         <label class="fn__flex">
             <svg class="svg"><use xlink:href="#iconN"></use></svg>
@@ -205,7 +214,7 @@ export const query = {
     </div>
 </div>
 <div class="b3-label">
- ${window.siyuan.languages.searchBackmention}
+    <div>${window.siyuan.languages.searchBackmention}</div>
     <div class="config-query">
         <label class="fn__flex">
             <div class="fn__flex-1">
@@ -235,7 +244,7 @@ export const query = {
             <span class="fn__space"></span>
             <input class="b3-switch" id="backlinkMentionDoc" type="checkbox"${window.siyuan.config.search.backlinkMentionDoc ? " checked" : ""}/>
         </label>
-        <div class="fn__flex label" style="flex: 2">
+        <div class="fn__flex label fn__flex-1" style="flex: 2">
             <div>
                 ${window.siyuan.languages.keywordsLimit}
             </div>
@@ -245,7 +254,7 @@ export const query = {
     </div>
 </div>
 <div class="b3-label">
- ${window.siyuan.languages.searchVirtualRef}
+    <div>${window.siyuan.languages.searchVirtualRef}</div>
     <div class="config-query">
         <label class="fn__flex">
             <div class="fn__flex-1">
@@ -278,7 +287,7 @@ export const query = {
     </div>
 </div>
 <div class="b3-label">
- ${window.siyuan.languages.searchIndex}
+    <div>${window.siyuan.languages.searchIndex}</div>
     <div class="config-query">
         <label class="fn__flex">
             <div class="fn__flex-1">
@@ -326,6 +335,7 @@ export const query = {
                     mathBlock: (query.element.querySelector("#mathBlock") as HTMLInputElement).checked,
                     table: (query.element.querySelector("#table") as HTMLInputElement).checked,
                     blockquote: (query.element.querySelector("#blockquote") as HTMLInputElement).checked,
+                    callout: (query.element.querySelector("#callout") as HTMLInputElement).checked,
                     superBlock: (query.element.querySelector("#superBlock") as HTMLInputElement).checked,
                     paragraph: (query.element.querySelector("#paragraph") as HTMLInputElement).checked,
                     name: (query.element.querySelector("#name") as HTMLInputElement).checked,

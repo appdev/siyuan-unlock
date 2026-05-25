@@ -2,11 +2,9 @@ import {Wnd} from "./Wnd";
 import {genUUID} from "../util/genID";
 import {addResize, fixWndFlex1} from "./util";
 import {resizeTabs} from "./tabUtil";
-import {recordBeforeResizeTop} from "../protyle/util/resize";
 /// #if MOBILE
 // 检测移动端是否引入了桌面端的代码
 console.error("Need remove unused code");
-
 /// #endif
 
 export class Layout {
@@ -42,12 +40,9 @@ export class Layout {
         } else {
             this.element.classList.add("fn__flex");
         }
-        if (mergedOptions.type === "left") {
-            this.element.classList.add("fn__flex-shrink");
-        }
     }
 
-    addLayout(child: Layout, id?: string) {
+    addLayout(child: Layout, id?: string, after = true) {
         if (!id) {
             this.children.splice(this.children.length, 0, child);
             if (this) {
@@ -56,8 +51,12 @@ export class Layout {
         } else {
             this.children.find((item, index) => {
                 if (item.id === id) {
-                    this.children.splice(index + 1, 0, child);
-                    item.element.after(child.element);
+                    this.children.splice(after ? index + 1 : index, 0, child);
+                    if (after) {
+                        item.element.after(child.element);
+                    } else {
+                        item.element.before(child.element);
+                    }
                     return true;
                 }
             });
@@ -67,19 +66,22 @@ export class Layout {
         } else {
             child.element.style[(this && this.direction === "lr") ? "width" : "height"] = child.size;
         }
-        addResize(child);
+        addResize(child, after);
         child.parent = this;
     }
 
-    addWnd(child: Wnd, id?: string) {
-        recordBeforeResizeTop();
+    addWnd(child: Wnd, id?: string, after = true) {
         if (!id) {
             this.children.splice(this.children.length, 0, child);
             this.element.append(child.element);
         } else {
             this.children.find((item, index) => {
                 if (item.id === id) {
-                    this.children.splice(index + 1, 0, child);
+                    if (after) {
+                        this.children.splice(index + 1, 0, child);
+                    } else {
+                        this.children.splice(index, 0, child);
+                    }
                     if (this.direction === "lr") {
                         // 向右分屏，左侧文档抖动，移除动画和边距
                         item.element.querySelectorAll(".protyle-content").forEach((element: HTMLElement) => {
@@ -90,7 +92,11 @@ export class Layout {
                             }
                         });
                     }
-                    item.element.after(child.element);
+                    if (after) {
+                        item.element.after(child.element);
+                    } else {
+                        item.element.before(child.element);
+                    }
                     return true;
                 }
             });
@@ -98,7 +104,7 @@ export class Layout {
         if (id) {
             fixWndFlex1(this);
         }
-        addResize(child);
+        addResize(child, after);
         resizeTabs(false);
         child.parent = this;
     }

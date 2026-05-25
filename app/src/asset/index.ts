@@ -15,6 +15,7 @@ import {fetchPost} from "../util/fetch";
 import {setStorageVal, updateHotkeyTip} from "../protyle/util/compatibility";
 import {App} from "../index";
 import {clearOBG} from "../layout/dock/util";
+import {getDisplayName} from "../util/pathName";
 
 export class Asset extends Model {
     public path: string;
@@ -47,6 +48,12 @@ export class Asset extends Model {
             this.pdfPage = this.pdfId;
         }
         this.render();
+    }
+
+    public update(path: string) {
+        this.path = path;
+        this.parent.updateTitle(getDisplayName(path));
+        this.render(false);
     }
 
     private getPdfId(cb: () => void) {
@@ -85,8 +92,8 @@ export class Asset extends Model {
         /// #endif
     }
 
-    private render() {
-        const type = this.path.substr(this.path.lastIndexOf(".")).toLowerCase();
+    private render(isInit = true) {
+        const type = this.path.substr(this.path.lastIndexOf(".")).toLowerCase().split("?")[0];
         if (Constants.SIYUAN_ASSETS_IMAGE.includes(type)) {
             this.element.innerHTML = `<div class="asset"><img src="${this.path.startsWith("file") ? this.path : document.getElementById("baseURL").getAttribute("href") + "/" + this.path}"></div>`;
         } else if (Constants.SIYUAN_ASSETS_AUDIO.includes(type)) {
@@ -95,6 +102,9 @@ export class Asset extends Model {
             this.element.innerHTML = `<div class="asset"><video controls="controls" src="${this.path.startsWith("file") ? this.path : document.getElementById("baseURL").getAttribute("href") + "/" + this.path}"></video></div>`;
         } else if (type === ".pdf") {
             /// #if !MOBILE
+            if (!isInit) {
+                this.pdfObject.close();
+            }
             this.element.innerHTML = `<div class="pdf__outer" id="outerContainer">
       <div id="sidebarContainer">
         <div id="toolbarSidebar">
@@ -180,43 +190,43 @@ export class Asset extends Model {
             <button id="previous" class="secondaryToolbarButton b3-menu__item pageUp">
               <svg class="b3-menu__icon"><use xlink:href="#iconUp"></use></svg> 
               <span class="b3-menu__label">${window.siyuan.languages.previousLabel}</span>
-              <span class="b3-menu__accelerator">${updateHotkeyTip("P")}/${updateHotkeyTip("K")}</span>
+              <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">${updateHotkeyTip("P")}/${updateHotkeyTip("K")}</span>
             </button>
             <button id="next" class="secondaryToolbarButton b3-menu__item pageDown">
               <svg class="b3-menu__icon"><use xlink:href="#iconDown"></use></svg> 
               <span class="b3-menu__label">${window.siyuan.languages.nextLabel}</span>
-              <span class="b3-menu__accelerator">${updateHotkeyTip("J")}/${updateHotkeyTip("N")}</span>
+              <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">${updateHotkeyTip("J")}/${updateHotkeyTip("N")}</span>
             </button>
             <button id="firstPage" class="secondaryToolbarButton b3-menu__item firstPage">
               <svg class="b3-menu__icon"><use xlink:href="#iconBack"></use></svg> 
               <span class="b3-menu__label">${window.siyuan.languages.firstPage}</span>
-              <span class="b3-menu__accelerator">Home</span>
+              <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">Home</span>
             </button>
             <button id="lastPage" class="secondaryToolbarButton b3-menu__item lastPage">
               <svg class="b3-menu__icon"><use xlink:href="#iconForward"></use></svg> 
               <span class="b3-menu__label">${window.siyuan.languages.lastPage}</span>
-              <span class="b3-menu__accelerator">End</span>
+              <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">End</span>
             </button>
             <div class="horizontalToolbarSeparator b3-menu__separator"></div>
             <button id="zoomOutButton" class="secondaryToolbarButton b3-menu__item zoomOut">
                <svg class="b3-menu__icon"><use xlink:href="#iconLine"></use></svg> 
                <span class="b3-menu__label">${window.siyuan.languages.zoomOut}</span>
-               <span class="b3-menu__accelerator">${updateHotkeyTip("⌘-")}</span>
+               <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">${updateHotkeyTip("⌘-")}</span>
             </button>
             <button id="zoomInButton" class="secondaryToolbarButton b3-menu__item zoomIn">
                <svg class="b3-menu__icon"><use xlink:href="#iconAdd"></use></svg> 
                <span class="b3-menu__label">${window.siyuan.languages.zoomIn}</span>
-               <span class="b3-menu__accelerator">${updateHotkeyTip("⌘=")}</span>
+               <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">${updateHotkeyTip("⌘=")}</span>
             </button>
             <button id="pageRotateCw" class="secondaryToolbarButton b3-menu__item rotateCw">
                <svg class="b3-menu__icon"><use xlink:href="#iconRedo"></use></svg> 
                <span class="b3-menu__label">${window.siyuan.languages.rotateCw}</span>
-               <span class="b3-menu__accelerator">R</span>
+               <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">R</span>
             </button>
             <button id="pageRotateCcw" class="secondaryToolbarButton b3-menu__item rotateCcw">
                <svg class="b3-menu__icon"><use xlink:href="#iconUndo"></use></svg> 
                <span class="b3-menu__label">${window.siyuan.languages.rotateCcw}</span>
-               <span class="b3-menu__accelerator">⇧R</span>
+               <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">${updateHotkeyTip("⇧R")}</span>
             </button>
 
             <div class="horizontalToolbarSeparator b3-menu__separator"></div>
@@ -224,12 +234,12 @@ export class Asset extends Model {
             <button id="cursorSelectTool" class="secondaryToolbarButton b3-menu__item selectTool toggled">
                <svg class="b3-menu__icon"><use xlink:href="#iconSelectText"></use></svg> 
                <span class="b3-menu__label">${window.siyuan.languages.cursorText}</span>
-               <span class="b3-menu__accelerator">S</span>
+               <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">S</span>
             </button>
             <button id="cursorHandTool" class="secondaryToolbarButton b3-menu__item handTool">
               <svg class="b3-menu__icon"><use xlink:href="#iconHand"></use></svg> 
               <span class="b3-menu__label">${window.siyuan.languages.cursorHand}</span>
-              <span class="b3-menu__accelerator">H</span>
+              <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">H</span>
             </button>
             <div class="horizontalToolbarSeparator b3-menu__separator"></div>
             <button id="scrollVertical" class="secondaryToolbarButton b3-menu__item scrollModeButtons scrollVertical toggled">
@@ -262,7 +272,7 @@ export class Asset extends Model {
             <button id="presentationMode" class="secondaryToolbarButton b3-menu__item presentationMode">
               <svg class="b3-menu__icon"><use xlink:href="#iconPlay"></use></svg>
               <span class="b3-menu__label">${window.siyuan.languages.presentationMode}</span>
-              <span class="b3-menu__accelerator">${updateHotkeyTip("⌥⌘P")}</span>
+              <span class="b3-menu__accelerator b3-menu__accelerator--hotkey">${updateHotkeyTip("⌥⌘P")}</span>
             </button>
             <div class="horizontalToolbarSeparator b3-menu__separator spreadModeButtons"></div>
             <button id="documentProperties" class="secondaryToolbarButton b3-menu__item documentProperties">

@@ -20,11 +20,18 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"unicode"
 
 	"github.com/88250/gulu"
 	"github.com/siyuan-note/logging"
 )
+
+var newlinesRegex = regexp.MustCompile(`[\r\n]+`)
+
+func ReplaceNewline(text, replaceWith string) string {
+	return newlinesRegex.ReplaceAllString(text, replaceWith)
+}
 
 func ContainsCJK(text string) bool {
 	for _, r := range text {
@@ -69,6 +76,15 @@ func RemoveInvalid(text string) (ret string) {
 	return
 }
 
+func RemoveInvalidRetainCtrl(text string) (ret string) {
+	ret = strings.ReplaceAll(text, "\u00A0", " ") // NBSP 转换为普通空格
+	ret = gulu.Str.RemoveZeroWidthNoBreakSpace(ret)
+	ret = gulu.Str.RemoveZeroWidthSpace(ret)
+	// 不要移除零宽连字符，因为 emoji 需要 https://github.com/siyuan-note/siyuan/issues/14272
+	ret = gulu.Str.RemovePUA(ret)
+	return
+}
+
 var NativeEmojiChars = map[string]bool{}
 
 func InitEmojiChars() {
@@ -79,16 +95,16 @@ func InitEmojiChars() {
 		return
 	}
 
-	var conf []map[string]interface{}
+	var conf []map[string]any
 	if err = gulu.JSON.UnmarshalJSON(data, &conf); err != nil {
 		logging.LogErrorf("unmarshal emojis conf.json failed: %s", err)
 		return
 	}
 
 	for _, emoji := range conf {
-		items := emoji["items"].([]interface{})
+		items := emoji["items"].([]any)
 		for _, item := range items {
-			e := item.(map[string]interface{})
+			e := item.(map[string]any)
 			NativeEmojiChars[e["unicode"].(string)] = true
 		}
 	}

@@ -17,6 +17,7 @@
 package sql
 
 import (
+	"strings"
 	"time"
 
 	"github.com/88250/lute/ast"
@@ -25,6 +26,7 @@ import (
 	"github.com/jinzhu/copier"
 	gcache "github.com/patrickmn/go-cache"
 	"github.com/siyuan-note/logging"
+	"github.com/siyuan-note/siyuan/kernel/search"
 )
 
 var cacheDisabled = true
@@ -37,8 +39,8 @@ func disableCache() {
 	cacheDisabled = true
 }
 
-var blockCache, _ = ristretto.NewCache[string, *Block](&ristretto.Config[string, *Block]{
-	NumCounters: 102400,
+var blockCache, _ = ristretto.NewCache(&ristretto.Config{
+	NumCounters: 100000,
 	MaxCost:     10240,
 	BufferItems: 64,
 })
@@ -57,6 +59,8 @@ func putBlockCache(block *Block) {
 		logging.LogErrorf("clone block failed: %v", err)
 		return
 	}
+	cloned.Content = strings.ReplaceAll(cloned.Content, search.SearchMarkLeft, "")
+	cloned.Content = strings.ReplaceAll(cloned.Content, search.SearchMarkRight, "")
 	blockCache.Set(cloned.ID, cloned, 1)
 }
 
@@ -67,7 +71,7 @@ func getBlockCache(id string) (ret *Block) {
 
 	b, _ := blockCache.Get(id)
 	if nil != b {
-		ret = b
+		ret = b.(*Block)
 	}
 	return
 }

@@ -1,12 +1,12 @@
-@import "content";
-@import "toolbar";
-@import "wysiwyg";
-@import "attr";
+@use "content" as *;
+@use "toolbar" as *;
+@use "wysiwyg" as *;
+@use "attr" as *;
 
 .protyle-scroll {
   --b3-dynamicscroll-width: 200px;
   position: absolute;
-  right: 10px;
+  right: 12px;
   top: 30px;
   width: 16px;
   bottom: 9px; // 下图标 hover 时，需要留出一定的空间
@@ -61,6 +61,12 @@
         background-color: var(--b3-border-color);
         box-shadow: none;
       }
+
+      &::-moz-range-track,
+      &::-moz-range-thumb {
+        background-color: var(--b3-border-color);
+        box-shadow: none;
+      }
     }
   }
 }
@@ -99,8 +105,8 @@
   }
 
   svg {
-    height: 14px;
     color: var(--b3-theme-on-surface-light);
+    height: calc(var(--b3-font-size-editor) * 1.625);
     width: 14px;
     float: left;
     transition: var(--b3-color-transition);
@@ -268,6 +274,18 @@
 .protyle-background {
   position: relative;
 
+  &:not(.protyle-background--enable) {
+    .protyle-background__img .protyle-icons,
+    .b3-chips__doctag .b3-chip__close,
+    .protyle-background__action {
+      display: none;
+    }
+
+    .protyle-background__icon {
+      cursor: default;
+    }
+  }
+
   &--enable {
     .protyle-background__img:hover .protyle-icons,
     .protyle-background__icon:hover {
@@ -290,7 +308,7 @@
   &__icon {
     height: 80px;
     width: 80px;
-    transition: var(--b3-transition);
+    transition: opacity 150ms linear;
     cursor: pointer;
     font-size: 68px; // 🔪显示不完整
     line-height: 80px;
@@ -344,7 +362,7 @@
 .protyle-title {
   margin: 34px 16px 0 24px;
   position: relative;
-  font-size: 16px;
+  font-size: var(--b3-font-size-editor);
   font-family: var(--b3-font-family-protyle);
   padding-left: 2px;
   border-radius: var(--b3-border-radius);
@@ -393,7 +411,7 @@
 
     &:empty::after {
       content: attr(data-tip);
-      color: var(--b3-theme-on-surface-light);
+      color: var(--b3-empty-color);
       cursor: text;
     }
 
@@ -403,11 +421,29 @@
   }
 }
 
-table[contenteditable="false"] + .protyle-action__table {
-  display: none;
+.protyle-password {
+  text-align: center !important;
+
+  &__content {
+    display: flex;
+    width: 260px;
+    margin: 0 auto;
+  }
+
+  &__logo {
+    font-size: 80px;
+  }
+
+  &__tip {
+    font-size: 2rem;
+  }
 }
 
-table[contenteditable="true"] + .protyle-action__table {
+table[contenteditable="false"] + .protyle-action__table > .table__resize {
+  display: none !important;
+}
+
+table + .protyle-action__table {
   position: absolute;
   top: 4px;
   height: 0;

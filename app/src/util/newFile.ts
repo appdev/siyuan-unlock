@@ -13,7 +13,6 @@ import {replaceFileName, validateName} from "../editor/rename";
 import {hideElements} from "../protyle/ui/hideElements";
 import {openMobileFileById} from "../mobile/editor";
 import {App} from "../index";
-import {escapeHtml} from "./escape";
 
 export const getNewFilePath = (useSavePath: boolean) => {
     let notebookId = "";
@@ -81,6 +80,7 @@ export const newFile = (optios: {
     useSavePath: boolean,
     name?: string,
     afterCB?: (id: string, title: string) => void
+    listDocTree?: boolean
 }) => {
     if (getOpenNotebookCount() === 0) {
         showMessage(window.siyuan.languages.newFileTip);
@@ -102,7 +102,8 @@ export const newFile = (optios: {
                     notebook: data.data.box,
                     path: createPath,
                     // 根目录时无法确定 parentID
-                    markdown: ""
+                    markdown: "",
+                    listDocTree: optios.listDocTree
                 }, response => {
                     if (optios.afterCB) {
                         optios.afterCB(response.data, pathPosix().basename(createPath));
@@ -127,7 +128,8 @@ export const newFile = (optios: {
                         notebook: data.data.box,
                         path: createPath,
                         parentID: getDisplayName(optios.currentPath, true, true),
-                        markdown: ""
+                        markdown: "",
+                        listDocTree: optios.listDocTree
                     }, response => {
                         if (optios.afterCB) {
                             optios.afterCB(response.data, pathPosix().basename(createPath));
@@ -154,7 +156,8 @@ export const newFile = (optios: {
                 fetchPost("/api/filetree/createDocWithMd", {
                     notebook: data.data.box,
                     path: createPath,
-                    markdown: ""
+                    markdown: "",
+                    listDocTree: optios.listDocTree
                 }, response => {
                     if (optios.afterCB) {
                         optios.afterCB(response.data, pathPosix().basename(createPath));
@@ -182,7 +185,8 @@ export const newFile = (optios: {
                 path: newPath,
                 title,
                 md: "",
-                sorts: optios.paths
+                sorts: optios.paths,
+                listDocTree: optios.listDocTree
             }, () => {
                 if (optios.afterCB) {
                     optios.afterCB(id, title);
@@ -237,18 +241,21 @@ export const newFileByName = (app: App, value: string) => {
 };
 
 export const newFileBySelect = (protyle: IProtyle, selectText: string, nodeElement: HTMLElement, pathDir: string, targetNotebookId: string) => {
-    const newFileName = replaceFileName(selectText.trim() ? selectText.trim() : protyle.lute.BlockDOM2Content(nodeElement.outerHTML).replace(/\n/g, "")) || window.siyuan.languages.untitled;
+    const newFileName = replaceFileName(selectText.trim() ? selectText.trim() : protyle.lute.BlockDOM2Content(nodeElement.outerHTML).replace(/\n/g, "").trim()) || window.siyuan.languages.untitled;
     const hPath = pathPosix().join(pathDir, newFileName);
     fetchPost("/api/filetree/getIDsByHPath", {
         path: hPath,
         notebook: targetNotebookId
     }, (idResponse) => {
-        const refText = escapeHtml(newFileName.substring(0, window.siyuan.config.editor.blockRefDynamicAnchorTextMaxLen));
+        const refText = newFileName.substring(0, window.siyuan.config.editor.blockRefDynamicAnchorTextMaxLen);
         if (idResponse.data && idResponse.data.length > 0) {
-            protyle.toolbar.setInlineMark(protyle, "block-ref", "range", {
+            const refElement = protyle.toolbar.setInlineMark(protyle, "block-ref", "range", {
                 type: "id",
                 color: `${idResponse.data[0]}${Constants.ZWSP}d${Constants.ZWSP}${refText}`
             });
+            if (refElement[0]) {
+                protyle.toolbar.range.selectNodeContents(refElement[0]);
+            }
         } else {
             fetchPost("/api/filetree/createDocWithMd", {
                 notebook: targetNotebookId,
@@ -256,10 +263,13 @@ export const newFileBySelect = (protyle: IProtyle, selectText: string, nodeEleme
                 parentID: protyle.notebookId === targetNotebookId ? protyle.block.rootID : "",
                 markdown: ""
             }, response => {
-                protyle.toolbar.setInlineMark(protyle, "block-ref", "range", {
+                const refElement = protyle.toolbar.setInlineMark(protyle, "block-ref", "range", {
                     type: "id",
                     color: `${response.data}${Constants.ZWSP}d${Constants.ZWSP}${refText}`
                 });
+                if (refElement[0]) {
+                    protyle.toolbar.range.selectNodeContents(refElement[0]);
+                }
             });
         }
         hideElements(["toolbar"], protyle);

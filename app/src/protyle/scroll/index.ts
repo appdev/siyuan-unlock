@@ -16,13 +16,13 @@ export class Scroll {
     constructor(protyle: IProtyle) {
         this.parentElement = document.createElement("div");
         this.parentElement.classList.add("protyle-scroll");
-        this.parentElement.innerHTML = `<div class="protyle-scroll__up ariaLabel" data-position="right4top" aria-label="${updateHotkeyTip("⌘Home")}">
+        this.parentElement.innerHTML = `<div class="protyle-scroll__up ariaLabel" data-position="north" aria-label="${updateHotkeyTip("⌘Home")}">
     <svg><use xlink:href="#iconUp"></use></svg>
 </div>
-<div class="fn__none protyle-scroll__bar ariaLabel" data-position="right18bottom" aria-label="Blocks 1/1">
+<div class="fn__none protyle-scroll__bar ariaLabel" data-position="2west" aria-label="Blocks 1/1">
     <input class="b3-slider" type="range" max="1" min="1" step="1" value="1" />
 </div>
-<div class="protyle-scroll__down ariaLabel" data-position="right4bottom" aria-label="${updateHotkeyTip("⌘End")}">
+<div class="protyle-scroll__down ariaLabel" aria-label="${updateHotkeyTip("⌘End")}">
     <svg><use xlink:href="#iconDown"></use></svg>
 </div>`;
 
@@ -55,6 +55,11 @@ export class Scroll {
                 this.setIndex(protyle);
             }
         });
+        this.parentElement.addEventListener("mousewheel", (event: WheelEvent) => {
+            if (event.deltaY !== 0 && protyle.scroll.lastScrollTop !== -1) {
+                protyle.contentElement.scrollTop += event.deltaY;
+            }
+        }, {passive: true});
     }
 
     private setIndex(protyle: IProtyle) {
@@ -62,6 +67,7 @@ export class Scroll {
             return;
         }
         protyle.wysiwyg.element.setAttribute("data-top", protyle.wysiwyg.element.scrollTop.toString());
+        protyle.contentElement.style.overflow = "hidden";
         fetchPost("/api/filetree/getDoc", {
             index: parseInt(this.inputElement.value),
             id: protyle.block.parentID,
@@ -73,6 +79,9 @@ export class Scroll {
                 protyle,
                 action: [Constants.CB_GET_FOCUSFIRST, Constants.CB_GET_UNCHANGEID],
                 afterCB: () => {
+                    setTimeout(() => {
+                        protyle.contentElement.style.overflow = "";
+                    }, Constants.TIMEOUT_INPUT);    // 需和 onGet 中的 preventScroll 保持一致
                     showTooltip(this.element.getAttribute("aria-label"), this.element);
                 }
             });

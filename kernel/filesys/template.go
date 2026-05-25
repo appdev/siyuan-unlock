@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/88250/go-humanize"
+	"github.com/88250/lute/parse"
 	util2 "github.com/88250/lute/util"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/araddon/dateparse"
@@ -43,6 +44,9 @@ func BuiltInTemplateFuncs() (ret template.FuncMap) {
 	ret["WeekdayCN"] = util.WeekdayCN
 	ret["WeekdayCN2"] = util.WeekdayCN2
 	ret["ISOWeek"] = util.ISOWeek
+	ret["ISOYear"] = util.ISOYear
+	ret["ISOMonth"] = util.ISOMonth
+	ret["ISOWeekDate"] = util.ISOWeekDate
 	ret["pow"] = pow
 	ret["powf"] = powf
 	ret["log"] = log
@@ -53,7 +57,29 @@ func BuiltInTemplateFuncs() (ret template.FuncMap) {
 	ret["statBlock"] = StatBlock
 	ret["runeCount"] = runeCount
 	ret["wordCount"] = wordCount
+	ret["markdown2text"] = markdown2text
+	ret["markdown2content"] = markdown2content
 	return
+}
+
+func markdown2content(md string) (ret string) {
+	luteEngine := util.NewLute()
+	tree := parse.Parse("", []byte(md), luteEngine.ParseOptions)
+	if nil == tree || nil == tree.Root {
+		logging.LogWarnf("parse markdown [%s] failed", md)
+		return
+	}
+	return tree.Root.Content()
+}
+
+func markdown2text(md string) (ret string) {
+	luteEngine := util.NewLute()
+	tree := parse.Parse("", []byte(md), luteEngine.ParseOptions)
+	if nil == tree || nil == tree.Root {
+		logging.LogWarnf("parse markdown [%s] failed", md)
+		return
+	}
+	return tree.Root.Text()
 }
 
 func runeCount(s string) (ret int) {
@@ -66,12 +92,12 @@ func wordCount(s string) (ret int) {
 	return
 }
 
-func pow(a, b interface{}) int64    { return int64(math.Pow(cast.ToFloat64(a), cast.ToFloat64(b))) }
-func powf(a, b interface{}) float64 { return math.Pow(cast.ToFloat64(a), cast.ToFloat64(b)) }
-func log(a, b interface{}) int64 {
+func pow(a, b any) int64    { return int64(math.Pow(cast.ToFloat64(a), cast.ToFloat64(b))) }
+func powf(a, b any) float64 { return math.Pow(cast.ToFloat64(a), cast.ToFloat64(b)) }
+func log(a, b any) int64 {
 	return int64(math.Log(cast.ToFloat64(a)) / math.Log(cast.ToFloat64(b)))
 }
-func logf(a, b interface{}) float64 { return math.Log(cast.ToFloat64(a)) / math.Log(cast.ToFloat64(b)) }
+func logf(a, b any) float64 { return math.Log(cast.ToFloat64(a)) / math.Log(cast.ToFloat64(b)) }
 
 func parseTime(dateStr string) time.Time {
 	now := time.Now()

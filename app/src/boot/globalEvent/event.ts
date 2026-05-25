@@ -19,6 +19,9 @@ import {Tab} from "../../layout/Tab";
 import {hideTooltip} from "../../dialog/tooltip";
 import {openFileById} from "../../editor/util";
 import {checkFold} from "../../util/noRelyPCFunction";
+import {hideAllElements} from "../../protyle/ui/hideElements";
+import {dragOverScroll, stopScrollAnimation} from "./dragover";
+import {setWebViewFocusable} from "../../mobile/util/mobileAppUtil";
 
 export const initWindowEvent = (app: App) => {
     document.body.addEventListener("mouseleave", () => {
@@ -47,6 +50,53 @@ export const initWindowEvent = (app: App) => {
         windowMouseMove(event, mouseIsEnter);
     });
 
+    let scrollTarget: HTMLElement | false;
+    window.addEventListener("dragover", (event: DragEvent & { target: HTMLElement }) => {
+        if (event.dataTransfer.types.includes("text/plain")) {
+            return;
+        }
+        const fileElement = hasClosestByClassName(event.target, "sy__file");
+        const protyleElement = hasClosestByClassName(event.target, "protyle", true);
+        if (!scrollTarget) {
+            scrollTarget = fileElement || protyleElement;
+        }
+        if (scrollTarget && protyleElement && (
+            scrollTarget.classList.contains("sy__file") || protyleElement !== scrollTarget
+        )) {
+            scrollTarget = protyleElement;
+        } else if (scrollTarget && scrollTarget.classList.contains("protyle") && fileElement) {
+            scrollTarget = fileElement;
+        }
+        if (hasClosestByClassName(event.target, "layout-tab-container__drag") ||
+            event.dataTransfer.types.includes(Constants.SIYUAN_DROP_TAB)) {
+            stopScrollAnimation();
+            return;
+        }
+        let scrollElement;
+        if (scrollTarget && scrollTarget.classList.contains("sy__file")) {
+            scrollElement = scrollTarget.firstElementChild.nextElementSibling;
+        } else if (scrollTarget && scrollTarget.classList.contains("protyle")) {
+            scrollElement = scrollTarget.querySelector(".protyle-content");
+        }
+        if (scrollTarget && scrollElement) {
+            if ((event.dataTransfer.types.includes(Constants.SIYUAN_DROP_FILE) && hasClosestByClassName(event.target, "layout-tab-bar")) ||
+                (event.dataTransfer.types.includes("Files") && scrollTarget.classList.contains("sy__file")) ||
+                (scrollTarget.classList.contains("protyle") && hasClosestByClassName(event.target, "dockPanel"))) {
+                stopScrollAnimation();
+            } else {
+                dragOverScroll(event, scrollElement.getBoundingClientRect(), scrollElement);
+            }
+        } else {
+            stopScrollAnimation();
+        }
+    });
+    window.addEventListener("dragend", () => {
+        stopScrollAnimation();
+    });
+    window.addEventListener("dragleave", () => {
+        stopScrollAnimation();
+    });
+
     window.addEventListener("mouseup", (event) => {
         if (event.button === 3) {
             event.preventDefault();
@@ -54,6 +104,13 @@ export const initWindowEvent = (app: App) => {
         } else if (event.button === 4) {
             event.preventDefault();
             goForward(app);
+        }
+    });
+
+    window.addEventListener("mousedown", (event) => {
+        // protyle.toolbar 点击空白处时进行隐藏
+        if (!hasClosestByClassName(event.target as Element, "protyle-toolbar")) {
+            hideAllElements(["toolbar"]);
         }
     });
 
@@ -69,6 +126,9 @@ export const initWindowEvent = (app: App) => {
         window.siyuan.ctrlIsPressed = false;
         window.siyuan.shiftIsPressed = false;
         window.siyuan.altIsPressed = false;
+        /// #if BROWSER
+        setWebViewFocusable();
+        /// #endif
     });
 
     window.addEventListener("click", (event: MouseEvent & { target: HTMLElement }) => {

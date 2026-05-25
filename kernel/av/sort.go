@@ -18,18 +18,16 @@ package av
 
 import (
 	"bytes"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-type Sortable interface {
-	SortRows(attrView *AttributeView)
-}
-
+// ViewSort 描述了视图排序规则的结构。
 type ViewSort struct {
-	Column string    `json:"column"` // 列 ID
+	Column string    `json:"column"` // 字段（列）ID
 	Order  SortOrder `json:"order"`  // 排序顺序
 }
 
@@ -39,6 +37,126 @@ const (
 	SortOrderAsc  SortOrder = "ASC"
 	SortOrderDesc SortOrder = "DESC"
 )
+
+func Sort(viewable Viewable, attrView *AttributeView) {
+	collection := viewable.(Collection)
+	sorts := collection.GetSorts()
+	if 1 > len(sorts) {
+		return
+	}
+
+	type FieldIndexSort struct {
+		Index int
+		Order SortOrder
+	}
+
+	var fieldIndexSorts []*FieldIndexSort
+	for _, s := range sorts {
+		for i, c := range collection.GetFields() {
+			if c.GetID() == s.Column {
+				fieldIndexSorts = append(fieldIndexSorts, &FieldIndexSort{Index: i, Order: s.Order})
+				break
+			}
+		}
+	}
+
+	items := collection.GetItems()
+	editedValItems := map[string]bool{}
+	for i, item := range items {
+		for _, fieldIndexSort := range fieldIndexSorts {
+			val := items[i].GetValues()[fieldIndexSort.Index]
+			if KeyTypeCheckbox == val.Type {
+				if block := item.GetBlockValue(); nil != block && block.IsEdited() {
+					// 如果主键编辑过，则复选框也算作编辑过，参与排序 https://github.com/siyuan-note/siyuan/issues/11016
+					editedValItems[item.GetID()] = true
+					break
+				}
+			}
+
+			if val.IsEdited() {
+				// 如果该项目某字段的值已经编辑过，则该项目可参与排序
+				editedValItems[item.GetID()] = true
+				break
+			}
+		}
+	}
+
+	// 将未编辑的项目和已编辑的项目分开排序
+	var uneditedItems, editedItems []Item
+	for _, item := range items {
+		if _, ok := editedValItems[item.GetID()]; ok {
+			editedItems = append(editedItems, item)
+		} else {
+			uneditedItems = append(uneditedItems, item)
+		}
+	}
+
+	sort.Slice(uneditedItems, func(i, j int) bool {
+		val1 := uneditedItems[i].GetBlockValue()
+		if nil == val1 {
+			return true
+		}
+		val2 := uneditedItems[j].GetBlockValue()
+		if nil == val2 {
+			return false
+		}
+		return val1.CreatedAt < val2.CreatedAt
+	})
+
+	sort.Slice(editedItems, func(i, j int) bool {
+		sorted := true
+		for _, fieldIndexSort := range fieldIndexSorts {
+			val1 := editedItems[i].GetValues()[fieldIndexSort.Index]
+			val2 := editedItems[j].GetValues()[fieldIndexSort.Index]
+			if nil == val1 || val1.IsEmpty() {
+				if nil != val2 && !val2.IsEmpty() {
+					return false
+				}
+				sorted = false
+				continue
+			} else {
+				if nil == val2 || val2.IsEmpty() {
+					return true
+				}
+			}
+
+			result := val1.Compare(val2, attrView)
+			if 0 == result {
+				sorted = false
+				continue
+			}
+			sorted = true
+
+			switch fieldIndexSort.Order {
+			case SortOrderAsc:
+				return 0 > result
+			case SortOrderDesc:
+				return 0 < result
+			default:
+				return 0 < result
+			}
+		}
+
+		if !sorted {
+			key1 := editedItems[i].GetBlockValue()
+			if nil == key1 {
+				return false
+			}
+			key2 := editedItems[j].GetBlockValue()
+			if nil == key2 {
+				return false
+			}
+			return key1.CreatedAt < key2.CreatedAt
+		}
+		return false
+	})
+
+	// 将包含未编辑的项目放在最后
+	collection.SetItems(append(editedItems, uneditedItems...))
+	if 1 > len(collection.GetItems()) {
+		collection.SetItems([]Item{})
+	}
+}
 
 func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 	switch value.Type {
@@ -68,7 +186,7 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 				return 0
 			}
 
-			if util.PinYinCompare(value.Text.Content, other.Text.Content) {
+			if util.EmojiPinYinCompare(value.Text.Content, other.Text.Content) {
 				return -1
 			}
 			return 1
@@ -87,12 +205,12 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 					return -1
 				}
 				return 0
-			} else {
-				if !other.Number.IsNotEmpty {
-					return 1
-				}
-				return 0
 			}
+
+			if !other.Number.IsNotEmpty {
+				return 1
+			}
+			return 0
 		}
 	case KeyTypeDate:
 		if nil != value.Date && nil != other.Date {
@@ -120,12 +238,12 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 					return -1
 				}
 				return 0
-			} else {
-				if !other.Date.IsNotEmpty {
-					return 1
-				}
-				return 0
 			}
+
+			if !other.Date.IsNotEmpty {
+				return 1
+			}
+			return 0
 		}
 	case KeyTypeCreated:
 		if nil != value.Created && nil != other.Created {
@@ -174,7 +292,6 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 						return s
 					}
 				}
-				return 0
 			} else {
 				for i := 0; i < oLen; i++ {
 					v := value.MSelect[i].Content
@@ -189,8 +306,8 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 						return s
 					}
 				}
-				return 0
 			}
+			return 0
 		}
 	case KeyTypeURL:
 		if nil != value.URL && nil != other.URL {
@@ -243,7 +360,7 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 				return 0
 			}
 
-			if util.PinYinCompare(v1, v2) {
+			if util.EmojiPinYinCompare(v1, v2) {
 				return -1
 			}
 			return 1
@@ -266,7 +383,7 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 				return 0
 			}
 
-			if util.PinYinCompare(value.Template.Content, other.Template.Content) {
+			if util.EmojiPinYinCompare(value.Template.Content, other.Template.Content) {
 				return -1
 			}
 			return 1
@@ -283,7 +400,7 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 		}
 	case KeyTypeRelation:
 		if nil != value.Relation && nil != other.Relation {
-			if 1 < len(value.Relation.Contents) && 1 < len(other.Relation.Contents) && KeyTypeNumber == value.Relation.Contents[0].Type && KeyTypeNumber == other.Relation.Contents[0].Type {
+			if 0 < len(value.Relation.Contents) && 0 < len(other.Relation.Contents) && KeyTypeNumber == value.Relation.Contents[0].Type && KeyTypeNumber == other.Relation.Contents[0].Type {
 				v1, ok1 := util.Convert2Float(value.Relation.Contents[0].String(false))
 				v2, ok2 := util.Convert2Float(other.Relation.Contents[0].String(false))
 				if ok1 && ok2 {
@@ -314,14 +431,14 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 				return 0
 			}
 
-			if util.PinYinCompare(vContent, oContent) {
+			if util.EmojiPinYinCompare(vContent, oContent) {
 				return -1
 			}
 			return 1
 		}
 	case KeyTypeRollup:
 		if nil != value.Rollup && nil != other.Rollup {
-			if 1 < len(value.Rollup.Contents) && 1 < len(other.Rollup.Contents) && KeyTypeNumber == value.Rollup.Contents[0].Type && KeyTypeNumber == other.Rollup.Contents[0].Type {
+			if 0 < len(value.Rollup.Contents) && 0 < len(other.Rollup.Contents) && KeyTypeNumber == value.Rollup.Contents[0].Type && KeyTypeNumber == other.Rollup.Contents[0].Type {
 				v1, ok1 := util.Convert2Float(value.Rollup.Contents[0].String(false))
 				v2, ok2 := util.Convert2Float(other.Rollup.Contents[0].String(false))
 				if ok1 && ok2 {
@@ -352,7 +469,7 @@ func (value *Value) Compare(other *Value, attrView *AttributeView) int {
 				return 0
 			}
 
-			if util.PinYinCompare(vContent, oContent) {
+			if util.EmojiPinYinCompare(vContent, oContent) {
 				return -1
 			}
 			return 1

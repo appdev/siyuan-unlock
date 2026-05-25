@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -38,8 +37,8 @@ import (
 	"github.com/88250/lute/editor"
 	"github.com/88250/lute/html"
 	"github.com/88250/lute/parse"
+	"github.com/disintegration/imaging"
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/imroc/req/v3"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/httpclient"
 	"github.com/siyuan-note/logging"
@@ -51,6 +50,148 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/treenode"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
+
+func GetAssetImgSize(assetPath string) (width, height int) {
+	absPath, err := GetAssetAbsPath(assetPath)
+	if err != nil {
+		logging.LogErrorf("get asset [%s] abs path failed: %s", assetPath, err)
+		return
+	}
+
+	img, err := imaging.Open(absPath)
+	if err != nil {
+		logging.LogErrorf("open asset image [%s] failed: %s", absPath, err)
+		return
+	}
+
+	width = img.Bounds().Dx()
+	height = img.Bounds().Dy()
+	return
+}
+
+func GetAssetPathByHash(hash string) string {
+	assetHash := cache.GetAssetHash(hash)
+	if nil == assetHash {
+		sqlAsset := sql.QueryAssetByHash(hash)
+		if nil == sqlAsset {
+			return ""
+		}
+		cache.SetAssetHash(sqlAsset.Hash, sqlAsset.Path)
+		return sqlAsset.Path
+	}
+	return assetHash.Path
+}
+
+func HandleAssetsRemoveEvent(assetAbsPath string) {
+	if !filelock.IsExist(assetAbsPath) {
+		return
+	}
+	if gulu.File.IsDir(assetAbsPath) {
+		return
+	}
+	// 跳过隐藏文件，如 WPS 的临时文件、Mac 的 .DS_Store
+	if filelock.IsHidden(assetAbsPath) {
+		return
+	}
+	if strings.HasSuffix(assetAbsPath, ".tmp") {
+		return
+	}
+
+	removeIndexAssetContent(assetAbsPath)
+	removeAssetThumbnail(assetAbsPath)
+
+	hash, err := util.GetEtag(assetAbsPath)
+	if nil != err {
+		logging.LogErrorf("calc asset [%s] hash failed: %s", assetAbsPath, err)
+	} else {
+		cache.RemoveAssetHash(hash)
+	}
+}
+
+func HandleAssetsChangeEvent(assetAbsPath string) {
+	if !filelock.IsExist(assetAbsPath) {
+		return
+	}
+	if gulu.File.IsDir(assetAbsPath) {
+		return
+	}
+	if filelock.IsHidden(assetAbsPath) {
+		return
+	}
+	if strings.HasSuffix(assetAbsPath, ".tmp") {
+		return
+	}
+
+	indexAssetContent(assetAbsPath)
+	removeAssetThumbnail(assetAbsPath)
+
+	hash, err := util.GetEtag(assetAbsPath)
+	if nil != err {
+		logging.LogErrorf("calc asset [%s] hash failed: %s", assetAbsPath, err)
+	} else {
+		p := strings.TrimPrefix(assetAbsPath, util.DataDir)
+		p = strings.TrimPrefix(filepath.ToSlash(p), "/")
+		cache.SetAssetHash(hash, p)
+	}
+}
+
+func removeAssetThumbnail(assetAbsPath string) {
+	if util.IsCompressibleAssetImage(assetAbsPath) {
+		p := filepath.ToSlash(assetAbsPath)
+		_, after, found := strings.Cut(p, "assets/")
+		if !found {
+			return
+		}
+		thumbnailPath := filepath.Join(util.TempDir, "thumbnails", "assets", after)
+		os.RemoveAll(thumbnailPath)
+	}
+}
+
+func NeedGenerateAssetsThumbnail(sourceImgPath string) bool {
+	info, err := os.Stat(sourceImgPath)
+	if err != nil {
+		return false
+	}
+	if info.IsDir() {
+		return false
+	}
+	return info.Size() > 1024*1024
+}
+
+func GenerateAssetsThumbnail(sourceImgPath, resizedImgPath string) (err error) {
+	start := time.Now()
+	img, err := imaging.Open(sourceImgPath)
+	if err != nil {
+		return
+	}
+
+	// 获取原图宽高
+	originalWidth := img.Bounds().Dx()
+	originalHeight := img.Bounds().Dy()
+
+	// 固定最大宽度为 520，计算缩放比例
+	maxWidth := 520
+	scale := float64(maxWidth) / float64(originalWidth)
+
+	// 按比例计算新的宽高
+	newWidth := maxWidth
+	newHeight := int(float64(originalHeight) * scale)
+
+	// 缩放图片
+	resizedImg := imaging.Resize(img, newWidth, newHeight, imaging.Lanczos)
+
+	// 保存缩放后的图片
+	err = os.MkdirAll(filepath.Dir(resizedImgPath), 0755)
+	if err != nil {
+		return
+	}
+	err = imaging.Save(resizedImg, resizedImgPath)
+	if err != nil {
+		return
+	}
+	logging.LogDebugf("generated thumbnail image [%s] to [%s], cost [%d]ms", sourceImgPath, resizedImgPath, time.Since(start).Milliseconds())
+	return
+}
 
 func DocImageAssets(rootID string) (ret []string, err error) {
 	tree, err := LoadTreeByBlockID(rootID)
@@ -75,14 +216,24 @@ func DocImageAssets(rootID string) (ret []string, err error) {
 	return
 }
 
-func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err error) {
+func DocAssets(rootID string) (ret []string, err error) {
 	tree, err := LoadTreeByBlockID(rootID)
 	if err != nil {
 		return
 	}
 
-	var files int
-	msgId := gulu.Rand.String(7)
+	ret = getAssetsLinkDests(tree.Root, false)
+	return
+}
+
+func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err error) {
+	syncingFiles.Store(rootID, true)
+	defer syncingFiles.Delete(rootID)
+
+	tree, err := LoadTreeByBlockID(rootID)
+	if err != nil {
+		return
+	}
 
 	docDirLocalPath := filepath.Join(util.DataDir, tree.Box, path.Dir(tree.Path))
 	assetsDirPath := getAssetsDir(filepath.Join(util.DataDir, tree.Box), docDirLocalPath)
@@ -92,13 +243,24 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 		}
 	}
 
-	browserClient := req.C().
-		SetUserAgent(util.UserAgent).
-		SetTimeout(30 * time.Second).
-		EnableInsecureSkipVerify().
-		SetProxy(httpclient.ProxyFromEnvironment)
+	err = netAssets2LocalAssets0(tree, onlyImg, originalURL, assetsDirPath, true)
+	go func() {
+		time.Sleep(128 * time.Microsecond)
+		util.PushReloadProtyle(rootID)
+	}()
+	return
+}
 
+func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, assetsDirPath string, needWriteTree bool) (err error) {
+	var files int
+	var size int64
+	msgId := gulu.Rand.String(7)
+
+	browserClient := util.NewCustomReqClient() // 自定义了 TLS 指纹，增加下载成功率
+
+	forbiddenCount := 0
 	destNodes := getRemoteAssetsLinkDestsInTree(tree, onlyImg)
+	assetsMap := map[string]string{}
 	for _, destNode := range destNodes {
 		dests := getRemoteAssetsLinkDests(destNode, onlyImg)
 		if 1 > len(dests) {
@@ -106,28 +268,32 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 		}
 
 		for _, dest := range dests {
-			if strings.HasPrefix(strings.ToLower(dest), "file://") { // 处理本地文件链接
-				u := dest[7:]
-				unescaped, _ := url.PathUnescape(u)
-				if unescaped != u {
-					// `Convert network images/assets to local` supports URL-encoded local file names https://github.com/siyuan-note/siyuan/issues/9929
-					u = unescaped
-				}
-				if strings.Contains(u, ":") {
-					u = strings.TrimPrefix(u, "/")
-				}
-				if strings.Contains(u, "?") {
-					u = u[:strings.Index(u, "?")]
-				}
-
-				if !gulu.File.IsExist(u) || gulu.File.IsDir(u) {
+			if u := util.FileURLToLocalPath(dest); u != "" { // 处理本地文件链接
+				if !gulu.File.IsExist(u) {
+					logging.LogErrorf("local file asset [%s] not exist", u)
 					continue
 				}
 
-				name := filepath.Base(u)
+				if gulu.File.IsDir(u) {
+					logging.LogWarnf("ignore converting directory path [%s] to local asset", u)
+					continue
+				}
+
+				if util.IsSensitivePath(u) {
+					logging.LogWarnf("ignore converting sensitive path [%s] to local asset", u)
+					continue
+				}
+
+				name := assetsMap[u]
+				if "" != name {
+					setAssetsLinkDest(destNode, dest, "assets/"+name)
+					continue
+				}
+
+				name = filepath.Base(u)
 				name = util.FilterUploadFileName(name)
 				name = "network-asset-" + name
-				name = util.AssetName(name)
+				name = util.AssetName(name, ast.NewNodeID())
 				writePath := filepath.Join(assetsDirPath, name)
 				if err = filelock.Copy(u, writePath); err != nil {
 					logging.LogErrorf("copy [%s] to [%s] failed: %s", u, writePath, err)
@@ -135,7 +301,9 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 				}
 
 				setAssetsLinkDest(destNode, dest, "assets/"+name)
+				assetsMap[u] = name
 				files++
+				size += gulu.File.GetFileSize(writePath)
 				continue
 			}
 
@@ -161,10 +329,17 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 					//}
 				}
 
+				name := assetsMap[u]
+				if "" != name {
+					setAssetsLinkDest(destNode, dest, "assets/"+name)
+					continue
+				}
+
 				displayU := u
 				if 64 < len(displayU) {
 					displayU = displayU[:64] + "..."
 				}
+
 				util.PushUpdateMsg(msgId, fmt.Sprintf(Conf.Language(119), displayU), 15000)
 				request := browserClient.R()
 				request.SetRetryCount(1).SetRetryFixedInterval(3 * time.Second)
@@ -172,13 +347,15 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 					request.SetHeader("Referer", originalURL) // 改进浏览器剪藏扩展转换本地图片成功率 https://github.com/siyuan-note/siyuan/issues/7464
 				}
 				resp, reqErr := request.Get(u)
-				if strings.Contains(strings.ToLower(resp.GetContentType()), "text/html") {
-					// 忽略超链接网页 `Convert network assets to local` no longer process webpage https://github.com/siyuan-note/siyuan/issues/9965
-					continue
-				}
-
 				if nil != reqErr {
 					logging.LogErrorf("download network asset [%s] failed: %s", u, reqErr)
+					continue
+				}
+				if http.StatusForbidden == resp.StatusCode || http.StatusUnauthorized == resp.StatusCode {
+					forbiddenCount++
+				}
+				if strings.Contains(strings.ToLower(resp.GetContentType()), "text/html") {
+					// 忽略超链接网页 `Convert network assets to local` no longer process webpage https://github.com/siyuan-note/siyuan/issues/9965
 					continue
 				}
 				if 200 != resp.StatusCode {
@@ -196,7 +373,6 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 					logging.LogErrorf("download network asset [%s] failed: %s", u, repErr)
 					continue
 				}
-				var name string
 				if strings.Contains(u, "?") {
 					name = u[:strings.Index(u, "?")]
 					name = path.Base(name)
@@ -209,7 +385,7 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 				name, _ = url.PathUnescape(name)
 				name = util.FilterUploadFileName(name)
 				ext := util.Ext(name)
-				if "" == ext {
+				if !util.IsCommonExt(ext) {
 					if mtype := mimetype.Detect(data); nil != mtype {
 						ext = mtype.Extension()
 						name += ext
@@ -227,7 +403,7 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 						name += ext
 					}
 				}
-				name = util.AssetName(name)
+				name = util.AssetName(name, ast.NewNodeID())
 				name = "network-asset-" + name
 				writePath := filepath.Join(assetsDirPath, name)
 				if err = filelock.WriteFile(writePath, data); err != nil {
@@ -236,32 +412,50 @@ func NetAssets2LocalAssets(rootID string, onlyImg bool, originalURL string) (err
 				}
 
 				setAssetsLinkDest(destNode, dest, "assets/"+name)
+				assetsMap[u] = name
 				files++
+				size += int64(len(data))
 				continue
 			}
 		}
 	}
 
-	if 0 < files {
-		util.PushUpdateMsg(msgId, Conf.Language(113), 7000)
-		if err = writeTreeUpsertQueue(tree); err != nil {
-			return
+	util.PushClearMsg(msgId)
+
+	if needWriteTree {
+		if 0 < files {
+			msgId = util.PushMsg(Conf.Language(113), 7000)
+			if err = writeTreeUpsertQueue(tree); err != nil {
+				return
+			}
+			util.PushUpdateMsg(msgId, fmt.Sprintf(Conf.Language(120), files, humanize.BytesCustomCeil(uint64(size), 2)), 5000)
+
+			if 0 < forbiddenCount {
+				util.PushErrMsg(fmt.Sprintf(Conf.Language(255), forbiddenCount), 5000)
+			}
+		} else {
+			if 0 < forbiddenCount {
+				util.PushErrMsg(fmt.Sprintf(Conf.Language(255), forbiddenCount), 5000)
+			} else {
+				util.PushMsg(Conf.Language(121), 3000)
+			}
 		}
-		util.PushUpdateMsg(msgId, fmt.Sprintf(Conf.Language(120), files), 5000)
-	} else {
-		util.PushUpdateMsg(msgId, Conf.Language(121), 3000)
 	}
 	return
 }
 
 func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 	ret = []*cache.Asset{}
-	keywords := strings.Split(keyword, " ")
-
+	var keywords []string
+	keywords = append(keywords, keyword)
+	if "" != keyword {
+		keywords = append(keywords, strings.Split(keyword, " ")...)
+	}
 	pathHitCount := map[string]int{}
-	count := 0
 	filterByExt := 0 < len(exts)
-	for _, asset := range cache.GetAssets() {
+	matchedAssets := cache.FilterAssets(func(path string, asset *cache.Asset) bool {
+
+		// 扩展名过滤
 		if filterByExt {
 			ext := filepath.Ext(asset.HName)
 			includeExt := false
@@ -272,15 +466,26 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 				}
 			}
 			if !includeExt {
-				continue
+				return false
 			}
 		}
 
+		// 关键字匹配
 		lowerHName := strings.ToLower(asset.HName)
 		lowerPath := strings.ToLower(asset.Path)
 		var hitNameCount, hitPathCount int
-		for _, k := range keywords {
+		for i, k := range keywords {
 			lowerKeyword := strings.ToLower(k)
+			if 0 == i {
+				// 第一个是完全匹配，权重最高
+				if strings.Contains(lowerHName, lowerKeyword) {
+					hitNameCount += 64
+				}
+				if strings.Contains(lowerPath, lowerKeyword) {
+					hitPathCount += 64
+				}
+			}
+
 			hitNameCount += strings.Count(lowerHName, lowerKeyword)
 			hitPathCount += strings.Count(lowerPath, lowerKeyword)
 			if 1 > hitNameCount && 1 > hitPathCount {
@@ -288,13 +493,21 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 			}
 		}
 
+		// 只返回有匹配的资源
 		if 1 > hitNameCount+hitPathCount {
-			continue
+			return false
 		}
-		pathHitCount[asset.Path] += hitNameCount + hitPathCount
 
+		// 记录命中次数用于排序
+		pathHitCount[asset.Path] = hitNameCount + hitPathCount
+		return true
+	})
+
+	// 添加高亮
+	for _, asset := range matchedAssets {
+		hitCount := pathHitCount[asset.Path]
 		hName := asset.HName
-		if 0 < hitNameCount {
+		if hitCount > 0 {
 			_, hName = search.MarkText(asset.HName, strings.Join(keywords, search.TermSep), 64, Conf.Search.CaseSensitive)
 		}
 		ret = append(ret, &cache.Asset{
@@ -302,10 +515,6 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 			Path:    asset.Path,
 			Updated: asset.Updated,
 		})
-		count++
-		if Conf.Search.Limit <= count {
-			return
-		}
 	}
 
 	if 0 < len(pathHitCount) {
@@ -317,31 +526,61 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 			return ret[i].Updated > ret[j].Updated
 		})
 	}
+
+	if Conf.Search.Limit <= len(ret) {
+		ret = ret[:Conf.Search.Limit]
+	}
 	return
 }
 
-func GetAssetAbsPath(relativePath string) (ret string, err error) {
+func GetAssetAbsPath(relativePath string) (string, error) {
 	relativePath = strings.TrimSpace(relativePath)
-	if strings.Contains(relativePath, "?") {
-		relativePath = relativePath[:strings.Index(relativePath, "?")]
+	if idx := strings.Index(relativePath, "?"); idx >= 0 {
+		relativePath = relativePath[:idx]
 	}
 
-	// 在全局 assets 路径下搜索
+	absPath, err := getAssetAbsPath(relativePath)
+	if err == nil && absPath != "" {
+		return absPath, nil
+	}
+
+	// supports URL-encoded local file names
+	unescaped, secondErr := url.PathUnescape(relativePath)
+	if secondErr == nil && unescaped != relativePath {
+		absPathUnescaped, secondErr := getAssetAbsPath(unescaped)
+		if secondErr == nil && absPathUnescaped != "" {
+			return absPathUnescaped, nil
+		}
+	}
+
+	// 优先返回原始路径错误，其次返回反转义路径错误
+	if err != nil {
+		return "", err
+	}
+	if secondErr != nil {
+		return "", secondErr
+	}
+	return "", fmt.Errorf(Conf.Language(12), relativePath)
+}
+
+func getAssetAbsPath(relativePath string) (absPath string, err error) {
+	relativePath = filepath.ToSlash(relativePath)
+	// 在 data 文件夹下搜索，主要是 data/assets 文件夹
 	p := filepath.Join(util.DataDir, relativePath)
 	if gulu.File.IsExist(p) {
-		ret = p
-		if !util.IsSubPath(util.WorkspaceDir, ret) {
-			err = fmt.Errorf("[%s] is not sub path of workspace", ret)
-			return
+		if !gulu.File.IsSubPath(util.WorkspaceDir, p) {
+			return "", fmt.Errorf("[%s] is not sub path of workspace", p)
 		}
-		return
+		return p, nil
 	}
 
-	// 在笔记本下搜索
+	// 在文档同级 assets 文件夹下搜索
+	if !strings.HasPrefix(relativePath, "assets/") {
+		return "", nil
+	}
 	notebooks, err := ListNotebooks()
 	if err != nil {
-		err = errors.New(Conf.Language(0))
-		return
+		return "", errors.New(Conf.Language(0))
 	}
 	for _, notebook := range notebooks {
 		notebookAbsPath := filepath.Join(util.DataDir, notebook.ID)
@@ -354,43 +593,63 @@ func GetAssetAbsPath(relativePath string) (ret string, err error) {
 			}
 			if p := filepath.ToSlash(path); strings.HasSuffix(p, relativePath) {
 				if gulu.File.IsExist(path) {
-					ret = path
-					return io.EOF
+					absPath = path
+					return fs.SkipAll
 				}
 			}
 			return nil
 		})
 
-		if "" != ret {
-			if !util.IsSubPath(util.WorkspaceDir, ret) {
-				err = fmt.Errorf("[%s] is not sub path of workspace", ret)
-				return
+		if "" != absPath {
+			if !gulu.File.IsSubPath(util.WorkspaceDir, absPath) {
+				return "", fmt.Errorf("[%s] is not sub path of workspace", absPath)
 			}
-			return
+			return absPath, nil
 		}
 	}
-
-	return "", errors.New(fmt.Sprintf(Conf.Language(12), relativePath))
+	return "", nil
 }
 
-func UploadAssets2Cloud(rootID string) (count int, err error) {
+func UploadAssets2Cloud(id string, ignorePushMsg bool) (count int, err error) {
 	if !IsSubscriber() {
 		return
 	}
 
-	tree, err := LoadTreeByBlockID(rootID)
+	tree, err := LoadTreeByBlockID(id)
 	if err != nil {
 		return
 	}
 
-	assets := assetsLinkDestsInTree(tree)
-	embedAssets := assetsLinkDestsInQueryEmbedNodes(tree)
-	assets = append(assets, embedAssets...)
+	node := treenode.GetNodeInTree(tree, id)
+	if nil == node {
+		err = ErrBlockNotFound
+		return
+	}
+
+	nodes := []*ast.Node{node}
+	if ast.NodeHeading == node.Type {
+		nodes = append(nodes, treenode.HeadingChildren(node)...)
+	}
+
+	var assets []string
+	for _, n := range nodes {
+		assets = append(assets, getAssetsLinkDests(n, false)...)
+		assets = append(assets, getQueryEmbedNodesAssetsLinkDests(n)...)
+	}
 	assets = gulu.Str.RemoveDuplicatedElem(assets)
-	count, err = uploadAssets2Cloud(assets, bizTypeUploadAssets)
+	count, err = uploadAssets2Cloud(assets, bizTypeUploadAssets, ignorePushMsg)
 	if err != nil {
 		return
 	}
+	return
+}
+
+func UploadAssets2CloudByAssetsPaths(assetPaths []string, ignorePushMsg bool) (count int, err error) {
+	if !IsSubscriber() {
+		return
+	}
+
+	count, err = uploadAssets2Cloud(assetPaths, bizTypeUploadAssets, ignorePushMsg)
 	return
 }
 
@@ -400,7 +659,7 @@ const (
 )
 
 // uploadAssets2Cloud 将资源文件上传到云端图床。
-func uploadAssets2Cloud(assetPaths []string, bizType string) (count int, err error) {
+func uploadAssets2Cloud(assetPaths []string, bizType string, ignorePushMsg bool) (count int, err error) {
 	var uploadAbsAssets []string
 	for _, assetPath := range assetPaths {
 		var absPath string
@@ -423,7 +682,11 @@ func uploadAssets2Cloud(assetPaths []string, bizType string) (count int, err err
 	}
 
 	logging.LogInfof("uploading [%d] assets", len(uploadAbsAssets))
-	msgId := util.PushMsg(fmt.Sprintf(Conf.Language(27), len(uploadAbsAssets)), 3000)
+
+	var msgId string
+	if !ignorePushMsg {
+		msgId = util.PushMsg(fmt.Sprintf(Conf.Language(27), len(uploadAbsAssets)), 3000)
+	}
 	if loadErr := LoadUploadToken(); nil != loadErr {
 		util.PushMsg(loadErr.Error(), 5000)
 		return
@@ -464,9 +727,11 @@ func uploadAssets2Cloud(assetPaths []string, bizType string) (count int, err err
 			continue
 		}
 
-		msg := fmt.Sprintf(Conf.Language(27), html.EscapeString(absAsset))
-		util.PushStatusBar(msg)
-		util.PushUpdateMsg(msgId, msg, 3000)
+		if !ignorePushMsg {
+			msg := fmt.Sprintf(Conf.Language(27), html.EscapeString(absAsset))
+			util.PushStatusBar(msg)
+			util.PushUpdateMsg(msgId, msg, 3000)
+		}
 
 		requestResult := gulu.Ret.NewResult()
 		request := httpclient.NewCloudFileRequest2m()
@@ -489,7 +754,7 @@ func uploadAssets2Cloud(assetPaths []string, bizType string) (count int, err err
 
 		if 0 != requestResult.Code {
 			logging.LogErrorf("upload assets failed: %s", requestResult.Msg)
-			err = errors.New(fmt.Sprintf(Conf.Language(94), requestResult.Msg))
+			err = fmt.Errorf(Conf.Language(94), requestResult.Msg)
 			return
 		}
 
@@ -499,7 +764,10 @@ func uploadAssets2Cloud(assetPaths []string, bizType string) (count int, err err
 		logging.LogInfof("uploaded asset [%s]", relAsset)
 		count++
 	}
-	util.PushClearMsg(msgId)
+
+	if !ignorePushMsg {
+		util.PushClearMsg(msgId)
+	}
 
 	if 0 < len(completedUploadAssets) {
 		logging.LogInfof("uploaded [%d] assets", len(completedUploadAssets))
@@ -517,16 +785,17 @@ func RemoveUnusedAssets() (ret []string) {
 		util.PushUpdateMsg(msgId, msg, 7000)
 	}()
 
-	unusedAssets := UnusedAssets()
+	unusedAssets := UnusedAssets(false)
 
-	historyDir, err := GetHistoryDir(HistoryOpClean)
+	historyDir, err := getHistoryDir(HistoryOpClean)
 	if err != nil {
 		logging.LogErrorf("get history dir failed: %s", err)
 		return
 	}
 
 	var hashes []string
-	for _, p := range unusedAssets {
+	for _, unusedAsset := range unusedAssets {
+		p := unusedAsset.Item
 		historyPath := filepath.Join(historyDir, p)
 		if p = filepath.Join(util.DataDir, p); filelock.IsExist(p) {
 			if filelock.IsHidden(p) {
@@ -539,13 +808,15 @@ func RemoveUnusedAssets() (ret []string) {
 
 			hash, _ := util.GetEtag(p)
 			hashes = append(hashes, hash)
+			cache.RemoveAssetHash(hash)
 		}
 	}
 
 	sql.BatchRemoveAssetsQueue(hashes)
 
 	for _, unusedAsset := range unusedAssets {
-		absPath := filepath.Join(util.DataDir, unusedAsset)
+		p := unusedAsset.Item
+		absPath := filepath.Join(util.DataDir, p)
 		if filelock.IsExist(absPath) {
 			info, statErr := os.Stat(absPath)
 			if statErr == nil {
@@ -557,10 +828,17 @@ func RemoveUnusedAssets() (ret []string) {
 				}
 			}
 
-			if err := filelock.Remove(absPath); err != nil {
-				logging.LogErrorf("remove unused asset [%s] failed: %s", absPath, err)
+			if !isFileWatcherAvailable() {
+				HandleAssetsRemoveEvent(absPath)
 			}
-			util.RemoveAssetText(unusedAsset)
+
+			if removeErr := filelock.RemoveWithoutFatal(absPath); removeErr != nil {
+				logging.LogErrorf("remove unused asset [%s] failed: %s", absPath, removeErr)
+				util.PushErrMsg(fmt.Sprintf("%s", removeErr), 7000)
+				return
+			}
+
+			util.RemoveAssetText(p)
 		}
 		ret = append(ret, absPath)
 	}
@@ -579,7 +857,7 @@ func RemoveUnusedAsset(p string) (ret string) {
 		return absPath
 	}
 
-	historyDir, err := GetHistoryDir(HistoryOpClean)
+	historyDir, err := getHistoryDir(HistoryOpClean)
 	if err != nil {
 		logging.LogErrorf("get history dir failed: %s", err)
 		return
@@ -594,10 +872,17 @@ func RemoveUnusedAsset(p string) (ret string) {
 
 		hash, _ := util.GetEtag(absPath)
 		sql.BatchRemoveAssetsQueue([]string{hash})
+		cache.RemoveAssetHash(hash)
 	}
 
-	if err = filelock.Remove(absPath); err != nil {
+	if !isFileWatcherAvailable() {
+		HandleAssetsRemoveEvent(absPath)
+	}
+
+	if err = filelock.RemoveWithoutFatal(absPath); err != nil {
 		logging.LogErrorf("remove unused asset [%s] failed: %s", absPath, err)
+		util.PushErrMsg(fmt.Sprintf("%s", err), 7000)
+		return
 	}
 	ret = absPath
 
@@ -615,7 +900,7 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 	defer util.PushClearProgress()
 
 	newName = strings.TrimSpace(newName)
-	newName = util.FilterFileName(newName)
+	newName = util.FilterUploadFileName(newName)
 	if path.Base(oldPath) == newName {
 		return
 	}
@@ -628,10 +913,17 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 		return
 	}
 
-	newName = util.AssetName(newName + filepath.Ext(oldPath))
-	newPath = "assets/" + newName
-	if err = filelock.Copy(filepath.Join(util.DataDir, oldPath), filepath.Join(util.DataDir, newPath)); err != nil {
-		logging.LogErrorf("copy asset [%s] failed: %s", oldPath, err)
+	newName = util.AssetName(newName+filepath.Ext(oldPath), ast.NewNodeID())
+	parentDir := path.Dir(oldPath)
+	newPath = path.Join(parentDir, newName)
+	oldAbsPath, getErr := GetAssetAbsPath(oldPath)
+	if getErr != nil {
+		logging.LogErrorf("get asset [%s] abs path failed: %s", oldPath, getErr)
+		return
+	}
+	newAbsPath := filepath.Join(filepath.Dir(oldAbsPath), newName)
+	if err = filelock.Copy(oldAbsPath, newAbsPath); err != nil {
+		logging.LogErrorf("copy asset [%s] failed: %s", oldAbsPath, err)
 		return
 	}
 
@@ -647,6 +939,11 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 
 	notebooks, err := ListNotebooks()
 	if err != nil {
+		return
+	}
+
+	historyDir, err := getHistoryDir(HistoryOpReplace)
+	if nil != err {
 		return
 	}
 
@@ -674,6 +971,7 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 					return
 				}
 
+				cache.RemoveTreeData(util.GetTreeID(treeAbsPath))
 				p := filepath.ToSlash(strings.TrimPrefix(treeAbsPath, filepath.Join(util.DataDir, notebook.ID)))
 				tree, parseErr := filesys.LoadTreeByData(data, notebook.ID, p, luteEngine)
 				if nil != parseErr {
@@ -681,6 +979,7 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 					continue
 				}
 
+				generateTreeHistory(tree, historyDir)
 				treenode.UpsertBlockTree(tree)
 				sql.UpsertTreeQueue(tree)
 
@@ -688,6 +987,7 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 			}
 		}
 	}
+	indexHistoryDir(filepath.Base(historyDir), util.NewLute())
 
 	storageAvDir := filepath.Join(util.DataDir, "storage", "av")
 	if gulu.File.IsDir(storageAvDir) {
@@ -732,9 +1032,15 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 	return
 }
 
-func UnusedAssets() (ret []string) {
+type UnusedItem struct {
+	Item    string    `json:"item"`
+	Name    string    `json:"name"`
+	ModTime time.Time `json:"-"`
+}
+
+func UnusedAssets(sorted bool) (ret []*UnusedItem) {
 	defer logging.Recover()
-	ret = []string{}
+	ret = []*UnusedItem{}
 
 	assetsPathMap, err := allAssetAbsPaths()
 	if err != nil {
@@ -761,13 +1067,13 @@ func UnusedAssets() (ret []string) {
 				trees = append(trees, tree)
 			}
 			for _, tree := range trees {
-				for _, d := range assetsLinkDestsInTree(tree) {
+				for _, d := range getAssetsLinkDests(tree.Root, false) {
 					dests[d] = true
 				}
 
 				if titleImgPath := treenode.GetDocTitleImgPath(tree.Root); "" != titleImgPath {
 					// 题头图计入
-					if !util.IsAssetLinkDest([]byte(titleImgPath)) {
+					if !util.IsAssetLinkDest([]byte(titleImgPath), false) {
 						continue
 					}
 					dests[titleImgPath] = true
@@ -830,6 +1136,12 @@ func UnusedAssets() (ret []string) {
 			toRemoves = append(toRemoves, asset)
 			continue
 		}
+
+		if strings.HasSuffix(asset, "android-notification-texts.txt") {
+			// 排除 Android 通知文本
+			toRemoves = append(toRemoves, asset)
+			continue
+		}
 	}
 
 	// 排除数据库中引用的资源文件
@@ -878,19 +1190,33 @@ func UnusedAssets() (ret []string) {
 		} else {
 			p = strings.TrimPrefix(assetAbsPath, filepath.Dir(dataAssetsAbsPath))
 		}
-		p = filepath.ToSlash(p)
-		if strings.HasPrefix(p, "/") {
-			p = p[1:]
+		p = strings.TrimPrefix(filepath.ToSlash(p), "/")
+		name := path.Base(p)
+
+		var modTime time.Time
+		if sorted {
+			if info, statErr := os.Stat(assetAbsPath); nil == statErr {
+				modTime = info.ModTime()
+			}
 		}
-		ret = append(ret, p)
+
+		ret = append(ret, &UnusedItem{Item: p, Name: name, ModTime: modTime})
 	}
-	sort.Strings(ret)
+
+	if sorted {
+		sort.Slice(ret, func(i, j int) bool {
+			if !ret[i].ModTime.Equal(ret[j].ModTime) {
+				return ret[i].ModTime.After(ret[j].ModTime)
+			}
+			return ret[i].Item > ret[j].Item
+		})
+	}
 	return
 }
 
-func MissingAssets() (ret []string) {
+func MissingAssets() (ret []*UnusedItem) {
 	defer logging.Recover()
-	ret = []string{}
+	ret = []*UnusedItem{}
 
 	assetsPathMap, err := allAssetAbsPaths()
 	if err != nil {
@@ -918,13 +1244,13 @@ func MissingAssets() (ret []string) {
 				trees = append(trees, tree)
 			}
 			for _, tree := range trees {
-				for _, d := range assetsLinkDestsInTree(tree) {
+				for _, d := range getAssetsLinkDests(tree.Root, false) {
 					dests[d] = true
 				}
 
 				if titleImgPath := treenode.GetDocTitleImgPath(tree.Root); "" != titleImgPath {
 					// 题头图计入
-					if !util.IsAssetLinkDest([]byte(titleImgPath)) {
+					if !util.IsAssetLinkDest([]byte(titleImgPath), false) {
 						continue
 					}
 					dests[titleImgPath] = true
@@ -945,21 +1271,30 @@ func MissingAssets() (ret []string) {
 				continue
 			}
 
+			if strings.Contains(strings.ToLower(dest), ".pdf/") {
+				if idx := strings.LastIndex(dest, "/"); -1 < idx {
+					if ast.IsNodeIDPattern(dest[idx+1:]) {
+						// PDF 标注不计入 https://github.com/siyuan-note/siyuan/issues/13891
+						continue
+					}
+				}
+			}
+
 			if "" == assetsPathMap[dest] {
 				if strings.HasPrefix(dest, "assets/.") {
 					// Assets starting with `.` should not be considered missing assets https://github.com/siyuan-note/siyuan/issues/8821
 					if !filelock.IsExist(filepath.Join(util.DataDir, dest)) {
-						ret = append(ret, dest)
+						name := path.Base(dest)
+						ret = append(ret, &UnusedItem{Item: dest, Name: name})
 					}
 				} else {
-					ret = append(ret, dest)
+					name := path.Base(dest)
+					ret = append(ret, &UnusedItem{Item: dest, Name: name})
 				}
 				continue
 			}
 		}
 	}
-
-	sort.Strings(ret)
 	return
 }
 
@@ -976,12 +1311,15 @@ func emojisInTree(tree *parse.Tree) (ret []string) {
 		}
 		if ast.NodeEmojiImg == n.Type {
 			tokens := n.Tokens
-			idx := bytes.Index(tokens, []byte("src=\""))
-			if -1 == idx {
+			_, src, found := bytes.Cut(tokens, []byte("src=\""))
+			if !found {
 				return ast.WalkContinue
 			}
-			src := tokens[idx+len("src=\""):]
-			src = src[:bytes.Index(src, []byte("\""))]
+			idx := bytes.Index(src, []byte("\""))
+			if idx == -1 {
+				return ast.WalkContinue
+			}
+			src = src[:idx]
 			ret = append(ret, string(src))
 		}
 		return ast.WalkContinue
@@ -990,11 +1328,11 @@ func emojisInTree(tree *parse.Tree) (ret []string) {
 	return
 }
 
-func assetsLinkDestsInQueryEmbedNodes(tree *parse.Tree) (ret []string) {
+func getQueryEmbedNodesAssetsLinkDests(node *ast.Node) (ret []string) {
 	// The images in the embed blocks are not uploaded to the community hosting https://github.com/siyuan-note/siyuan/issues/10042
 
 	ret = []string{}
-	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering || ast.NodeBlockQueryEmbedScript != n.Type {
 			return ast.WalkContinue
 		}
@@ -1013,7 +1351,7 @@ func assetsLinkDestsInQueryEmbedNodes(tree *parse.Tree) (ret []string) {
 				continue
 			}
 
-			ret = append(ret, assetsLinkDestsInNode(embedNode)...)
+			ret = append(ret, getAssetsLinkDests(embedNode, false)...)
 		}
 		return ast.WalkContinue
 	})
@@ -1021,12 +1359,7 @@ func assetsLinkDestsInQueryEmbedNodes(tree *parse.Tree) (ret []string) {
 	return
 }
 
-func assetsLinkDestsInTree(tree *parse.Tree) (ret []string) {
-	ret = assetsLinkDestsInNode(tree.Root)
-	return
-}
-
-func assetsLinkDestsInNode(node *ast.Node) (ret []string) {
+func getAssetsLinkDests(node *ast.Node, includeServePath bool) (ret []string) {
 	ret = []string{}
 	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if n.IsBlock() {
@@ -1036,7 +1369,7 @@ func assetsLinkDestsInNode(node *ast.Node) (ret []string) {
 				k := kv[0]
 				if strings.HasPrefix(k, "custom-data-assets") {
 					dest := kv[1]
-					if "" == dest || !util.IsAssetLinkDest([]byte(dest)) {
+					if "" == dest || !util.IsAssetLinkDest([]byte(dest), includeServePath) {
 						continue
 					}
 					ret = append(ret, dest)
@@ -1052,21 +1385,21 @@ func assetsLinkDestsInNode(node *ast.Node) (ret []string) {
 		}
 
 		if ast.NodeLinkDest == n.Type {
-			if !util.IsAssetLinkDest(n.Tokens) {
+			if !util.IsAssetLinkDest(n.Tokens, includeServePath) {
 				return ast.WalkContinue
 			}
 
 			dest := strings.TrimSpace(string(n.Tokens))
 			ret = append(ret, dest)
 		} else if n.IsTextMarkType("a") {
-			if !util.IsAssetLinkDest(gulu.Str.ToBytes(n.TextMarkAHref)) {
+			if !util.IsAssetLinkDest(gulu.Str.ToBytes(n.TextMarkAHref), includeServePath) {
 				return ast.WalkContinue
 			}
 
 			dest := strings.TrimSpace(n.TextMarkAHref)
 			ret = append(ret, dest)
 		} else if n.IsTextMarkType("file-annotation-ref") {
-			if !util.IsAssetLinkDest(gulu.Str.ToBytes(n.TextMarkFileAnnotationRefID)) {
+			if !util.IsAssetLinkDest(gulu.Str.ToBytes(n.TextMarkFileAnnotationRefID), includeServePath) {
 				return ast.WalkContinue
 			}
 
@@ -1092,10 +1425,9 @@ func assetsLinkDestsInNode(node *ast.Node) (ret []string) {
 
 						for _, asset := range value.MAsset {
 							dest := asset.Content
-							if !util.IsAssetLinkDest([]byte(dest)) {
+							if !util.IsAssetLinkDest([]byte(dest), includeServePath) {
 								continue
 							}
-
 							ret = append(ret, strings.TrimSpace(dest))
 						}
 					}
@@ -1103,15 +1435,13 @@ func assetsLinkDestsInNode(node *ast.Node) (ret []string) {
 					for _, value := range keyValues.Values {
 						if nil != value.URL {
 							dest := value.URL.Content
-							if !util.IsAssetLinkDest([]byte(dest)) {
+							if !util.IsAssetLinkDest([]byte(dest), includeServePath) {
 								continue
 							}
-
 							ret = append(ret, strings.TrimSpace(dest))
 						}
 					}
 				}
-
 			}
 		} else {
 			if ast.NodeWidget == n.Type {
@@ -1120,15 +1450,16 @@ func assetsLinkDestsInNode(node *ast.Node) (ret []string) {
 					// 兼容两种属性名 custom-data-assets 和 data-assets https://github.com/siyuan-note/siyuan/issues/4122#issuecomment-1154796568
 					dataAssets = n.IALAttr("data-assets")
 				}
-				if "" == dataAssets || !util.IsAssetLinkDest([]byte(dataAssets)) {
+				if !util.IsAssetLinkDest([]byte(dataAssets), includeServePath) {
 					return ast.WalkContinue
 				}
 				ret = append(ret, dataAssets)
 			} else { // HTMLBlock/InlineHTML/IFrame/Audio/Video
 				dest := treenode.GetNodeSrcTokens(n)
-				if "" != dest {
-					ret = append(ret, dest)
+				if !util.IsAssetLinkDest([]byte(dest), includeServePath) {
+					return ast.WalkContinue
 				}
+				ret = append(ret, dest)
 			}
 		}
 		return ast.WalkContinue
@@ -1140,6 +1471,23 @@ func assetsLinkDestsInNode(node *ast.Node) (ret []string) {
 			ret[i] = dest + "/"
 		}
 	}
+	return
+}
+
+func getAssetsLinkDestsInTree(tree *parse.Tree, includeServePath bool) (nodes []*ast.Node) {
+	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering {
+			return ast.WalkContinue
+		}
+
+		dests := getAssetsLinkDests(n, includeServePath)
+		if 1 > len(dests) {
+			return ast.WalkContinue
+		}
+
+		nodes = append(nodes, n)
+		return ast.WalkContinue
+	})
 	return
 }
 
@@ -1195,7 +1543,7 @@ func getRemoteAssetsLinkDests(node *ast.Node, onlyImg bool) (ret []string) {
 	if onlyImg {
 		if ast.NodeLinkDest == node.Type {
 			if node.ParentIs(ast.NodeImage) {
-				if !util.IsAssetLinkDest(node.Tokens) {
+				if !util.IsAssetLinkDest(node.Tokens, false) {
 					ret = append(ret, string(node.Tokens))
 				}
 
@@ -1222,7 +1570,7 @@ func getRemoteAssetsLinkDests(node *ast.Node, onlyImg bool) (ret []string) {
 						}
 
 						dest := asset.Content
-						if !util.IsAssetLinkDest([]byte(dest)) {
+						if !util.IsAssetLinkDest([]byte(dest), false) {
 							ret = append(ret, strings.TrimSpace(dest))
 						}
 					}
@@ -1231,16 +1579,16 @@ func getRemoteAssetsLinkDests(node *ast.Node, onlyImg bool) (ret []string) {
 		}
 	} else {
 		if ast.NodeLinkDest == node.Type {
-			if !util.IsAssetLinkDest(node.Tokens) {
+			if !util.IsAssetLinkDest(node.Tokens, false) {
 				ret = append(ret, string(node.Tokens))
 			}
 		} else if node.IsTextMarkType("a") {
-			if !util.IsAssetLinkDest([]byte(node.TextMarkAHref)) {
+			if !util.IsAssetLinkDest([]byte(node.TextMarkAHref), false) {
 				ret = append(ret, node.TextMarkAHref)
 			}
 		} else if ast.NodeAudio == node.Type || ast.NodeVideo == node.Type {
 			src := treenode.GetNodeSrcTokens(node)
-			if !util.IsAssetLinkDest([]byte(src)) {
+			if !util.IsAssetLinkDest([]byte(src), false) {
 				ret = append(ret, src)
 			}
 		} else if ast.NodeAttributeView == node.Type {
@@ -1261,7 +1609,7 @@ func getRemoteAssetsLinkDests(node *ast.Node, onlyImg bool) (ret []string) {
 
 					for _, asset := range value.MAsset {
 						dest := asset.Content
-						if !util.IsAssetLinkDest([]byte(dest)) {
+						if !util.IsAssetLinkDest([]byte(dest), false) {
 							ret = append(ret, strings.TrimSpace(dest))
 						}
 					}
@@ -1411,4 +1759,8 @@ func copyAssetsToDataAssets(rootPath string) {
 			logging.LogErrorf("copy tree assets from [%s] to [%s] failed: %s", assetsDirPaths, dataAssetsPath, err)
 		}
 	}
+}
+
+func isFileWatcherAvailable() bool {
+	return util.ContainerAndroid != util.Container && util.ContainerIOS != util.Container && util.ContainerHarmony != util.Container
 }

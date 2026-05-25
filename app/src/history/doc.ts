@@ -8,6 +8,7 @@ import {fetchPost} from "../util/fetch";
 import {isMobile} from "../util/functions";
 import {App} from "../index";
 import {resizeSide} from "./resizeSide";
+import {escapeHtml} from "../util/escape";
 
 let historyEditor: Protyle;
 let isLoading = false;
@@ -92,7 +93,7 @@ export const openDocHistory = (options: {
 </div>
 <div class="fn__flex fn__flex-1 history__panel">
     <ul class="b3-list b3-list--background history__side" ${isMobile() ? "" : `style="width: ${window.siyuan.storage[Constants.LOCAL_HISTORY].sideDocWidth}"`}>
-        <li class="b3-list--empty">${window.siyuan.languages.emptyContent}</li>
+        <li class="fn__loading"><img style="height: 64px;width: 64px" src="/stage/loading-pure.svg"></li>
     </ul>
     <div class="history__resize"></div>
     <div class="fn__flex-1 fn__flex-column">
@@ -145,7 +146,7 @@ export const openDocHistory = (options: {
                 getHistoryPath(target.parentElement, opElement.value, options.id, (item) => {
                     const dataPath = item.path;
                     isLoading = false;
-                    const confirmTip = window.siyuan.languages.rollbackConfirm.replace("${name}", item.title)
+                    const confirmTip = window.siyuan.languages.rollbackConfirm.replace("${name}", escapeHtml(item.title))
                         .replace("${time}", target.previousElementSibling.previousElementSibling.textContent.trim());
                     confirmDialog("⚠️ " + window.siyuan.languages.rollback, confirmTip, () => {
                         fetchPost("/api/history/rollbackDocHistory", {

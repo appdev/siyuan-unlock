@@ -32,8 +32,8 @@ declare namespace Config {
         bazaar: IBazaar;
         /**
          * Cloud Service Provider Region
-         * - `0`: Chinese mainland
-         * - `1`: North America
+         * - `0`: Chinese mainland (LianDi)
+         * - `1`: North America (LiuYun)
          */
         cloudRegion: number;
         editor: IEditor;
@@ -52,9 +52,9 @@ declare namespace Config {
          */
         langs: ILang[];
         /**
-         * A list of the IP addresses of the devices on which the kernel resides
+         * A list of the kernel server addresses
          */
-        localIPs: string[];
+        serverAddrs: string[];
         /**
          * Log level
          */
@@ -64,7 +64,7 @@ declare namespace Config {
          */
         openHelp: boolean;
         /**
-         * Publishing service
+         * Publish service
          * 发布服务
          */
         publish: IPublish;
@@ -260,6 +260,14 @@ declare namespace Config {
          * The version number of the theme currently in use
          */
         themeVer: string;
+        statusBar: IAppearanceStatusBar;
+    }
+
+    export interface IAppearanceStatusBar {
+        msgTaskDatabaseIndexCommitDisabled: boolean;
+        msgTaskHistoryDatabaseIndexCommitDisabled: boolean;
+        msgTaskAssetDatabaseIndexCommitDisabled: boolean;
+        msgTaskHistoryGenerateFileDisabled: boolean;
     }
 
     /**
@@ -270,17 +278,21 @@ declare namespace Config {
      */
     export type TLang =
         "en_US"
+        | "ar_SA"
+        | "de_DE"
         | "es_ES"
         | "fr_FR"
-        | "zh_CHT"
-        | "zh_CN"
-        | "ja_JP"
-        | "it_IT"
-        | "de_DE"
         | "he_IL"
-        | "ru_RU"
+        | "it_IT"
+        | "ja_JP"
+        | "ko_KR"
         | "pl_PL"
-        | "ar_SA";
+        | "pt_BR"
+        | "ru_RU"
+        | "sk_SK"
+        | "tr_TR"
+        | "zh_CN"
+        | "zh_CHT";
 
     /**
      * SiYuan bazaar related configuration
@@ -328,12 +340,21 @@ declare namespace Config {
          * Whether to enable the inline strikethrough
          */
         inlineStrikethrough: boolean;
+        /**
+         * Whether to enable the inline mark
+         */
+        inlineMark: boolean;
     }
 
     /**
      * SiYuan editor related configuration
      */
     export interface IEditor {
+
+        /**
+         * Whether to allow to execute javascript in the SVG
+         */
+        allowSVGScript: boolean;
 
         /**
          * Whether to allow to execute javascript in the HTML block
@@ -357,6 +378,14 @@ declare namespace Config {
          * Whether the backlink contains children
          */
         backlinkContainChildren: boolean;
+        /**
+         * Backlink sort mode
+         */
+        backlinkSort: number;
+        /**
+         * Backmention sort mode
+         */
+        backmentionSort: number;
         /**
          * The maximum length of the dynamic anchor text for block references
          */
@@ -395,6 +424,13 @@ declare namespace Config {
          */
         embedBlockBreadcrumb: boolean;
         /**
+         * Heading embed mode for embedded blocks
+         * - `0`: Show title with blocks below (default)
+         * - `1`: Show only title
+         * - `2`: Show only blocks below title
+         */
+        headingEmbedMode: number;
+        /**
          * Common emoji icons
          */
         emoji: string[];
@@ -405,6 +441,11 @@ declare namespace Config {
          * - `2`: Do not trigger the floating window
          */
         floatWindowMode: number;
+        /**
+         * Hover delay of the floating window in milliseconds.
+         * Only takes effect when `floatWindowMode` is `0`.
+         */
+        floatWindowDelay: number;
         /**
          * The font used in the editor
          */
@@ -455,6 +496,10 @@ declare namespace Config {
          */
         plantUMLServePath: string;
         /**
+         * Whether to auto-convert pasted URLs to links
+         */
+        pasteURLAutoConvert: boolean;
+        /**
          * Whether to enable read-only mode
          */
         readOnly: boolean;
@@ -466,6 +511,10 @@ declare namespace Config {
          * Whether to enable spell checking
          */
         spellcheck: boolean;
+        /**
+         * Support spell check languages
+         */
+        spellcheckLanguages: string[];
         /**
          * Whether to enable virtual references
          */
@@ -514,10 +563,6 @@ declare namespace Config {
          */
         blockRefTextRight: string;
         /**
-         * The path of the template file used when exporting to Docx
-         */
-        docxTemplate: string;
-        /**
          * File annotation reference export mode
          * - `0`: File name - page number - anchor text
          * - `1`: Anchor text only
@@ -536,9 +581,29 @@ declare namespace Config {
          */
         markdownYFM: boolean;
         /**
+         * Whether to remove the asset ID when exporting to Markdown
+         */
+        removeAssetsID: boolean;
+        /**
+         * Whether to export the inline memo
+         */
+        inlineMemo: boolean;
+        /**
+         * Whether to include sub-documents when exporting
+         */
+        includeSubDocs: boolean;
+        /**
+         * Whether to include related documents when exporting
+         */
+        includeRelatedDocs: boolean;
+        /**
          * Pandoc executable file path
          */
         pandocBin: string;
+        /**
+         * Pandoc parameters
+         */
+        pandocParams: string;
         /**
          * Whether the beginning of the paragraph is empty two spaces.
          * Insert two full-width spaces `U+3000` at the beginning of the paragraph.
@@ -574,6 +639,10 @@ declare namespace Config {
          * Whether to allow the creation of sub-documents deeper than 7 levels
          */
         allowCreateDeeper: boolean;
+        /**
+         * Don't automatically split the screen when opening search, PDF and other tabs
+         */
+        noSplitScreenWhenOpenTab: boolean;
         /**
          * Whether to automatically locate the currently open document in the document tree
          */
@@ -634,6 +703,18 @@ declare namespace Config {
          * Whether to save the content of the .sy file as a single-line JSON object
          */
         useSingleLineSave: boolean;
+        /**
+         * The .sy and database .json files larger than this value will prompt a warning (unit: MB)
+         */
+        largeFileWarningSize: number;
+        /**
+         * Whether to create new documents at the top of the document tree
+         */
+        createDocAtTop: boolean;
+        /**
+         * The maximum number of recent documents listed
+         */
+        recentDocsMaxListCount: number;
     }
 
     /**
@@ -763,6 +844,10 @@ declare namespace Config {
          * Display quote block
          */
         blockquote: boolean;
+        /**
+         * Display callout
+         */
+        callout: boolean;
         /**
          * Display code block
          */
@@ -980,29 +1065,35 @@ declare namespace Config {
      * SiYuan general shortcut keys
      */
     export interface IKeymapGeneral extends IKeys {
-        addToDatabase: IKey;
-        backlinks: IKey;
-        bookmark: IKey;
-        closeAll: IKey;
-        closeLeft: IKey;
-        closeOthers: IKey;
-        closeRight: IKey;
-        closeTab: IKey;
-        closeUnmodified: IKey;
+        mainMenu: IKey;
         commandPanel: IKey;
-        config: IKey;
-        dailyNote: IKey;
-        dataHistory: IKey;
         editReadonly: IKey;
-        enter: IKey;
+        syncNow: IKey;
         enterBack: IKey;
-        fileTree: IKey;
-        globalGraph: IKey;
-        globalSearch: IKey;
-        goBack: IKey;
+        enter: IKey;
         goForward: IKey;
-        goToEditTabNext: IKey;
-        goToEditTabPrev: IKey;
+        goBack: IKey;
+        newFile: IKey;
+        search: IKey;
+        globalSearch: IKey;
+        stickSearch: IKey;
+        replace: IKey;
+        closeTab: IKey;
+        fileTree: IKey;
+        outline: IKey;
+        bookmark: IKey;
+        tag: IKey;
+        dailyNote: IKey;
+        inbox: IKey;
+        backlinks: IKey;
+        graphView: IKey;
+        globalGraph: IKey;
+        riffCard: IKey;
+        config: IKey;
+        dataHistory: IKey;
+        toggleWin: IKey;
+        lockScreen: IKey;
+        recentDocs: IKey;
         goToTab1: IKey;
         goToTab2: IKey;
         goToTab3: IKey;
@@ -1014,28 +1105,25 @@ declare namespace Config {
         goToTab9: IKey;
         goToTabNext: IKey;
         goToTabPrev: IKey;
-        graphView: IKey;
-        inbox: IKey;
-        lockScreen: IKey;
-        mainMenu: IKey;
+        goToEditTabNext: IKey;
+        goToEditTabPrev: IKey;
+        recentClosed: IKey;
         move: IKey;
-        newFile: IKey;
-        outline: IKey;
-        recentDocs: IKey;
-        replace: IKey;
-        riffCard: IKey;
-        search: IKey;
         selectOpen1: IKey;
+        toggleDock: IKey;
         splitLR: IKey;
-        splitMoveB: IKey;
         splitMoveR: IKey;
         splitTB: IKey;
-        stickSearch: IKey;
-        syncNow: IKey;
+        splitMoveB: IKey;
+        closeOthers: IKey;
+        closeAll: IKey;
+        closeUnmodified: IKey;
+        closeLeft: IKey;
+        closeRight: IKey;
         tabToWindow: IKey;
-        tag: IKey;
-        toggleDock: IKey;
-        toggleWin: IKey;
+        addToDatabase: IKey;
+        unsplit: IKey;
+        unsplitAll: IKey;
     }
 
     /**
@@ -1065,29 +1153,29 @@ declare namespace Config {
     export type TLogLevel = "off" | "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
     /**
-     * Publishing service
+     * Publish service
      */
     export interface IPublish {
         /**
-         * Whether to open the publishing service
+         * Whether to open the publish service
          */
         enable: boolean;
         /**
-         * The basic authentication settings of publishing service
+         * The basic authentication settings of publish service
          */
         auth: IPublishAuth;
         /**
-         * Port on which the publishing service listens
+         * Port on which the publish service listens
          */
         port: number;
     }
 
     /**
-     * Publishing service authentication settings
+     * Publish service authentication settings
      */
     export interface IPublishAuth {
         /**
-         * Whether to enable basic authentication for publishing services
+         * Whether to enable basic authentication for publish services
          */
         enable: boolean;
         /**
@@ -1173,6 +1261,10 @@ declare namespace Config {
          * Whether to search quote blocks
          */
         blockquote: boolean;
+        /**
+         * Whether to search callout
+         */
+        callout: boolean;
         /**
          * Whether to distinguish between uppercase and lowercase letters when searching
          */
@@ -1364,6 +1456,7 @@ declare namespace Config {
          * - `0`: SiYuan official cloud storage service
          * - `2`: Object storage service compatible with S3 protocol
          * - `3`: Network storage service using WebDAV protocol
+         * - `4`: Local file system
          */
         provider: number;
         s3: ISyncS3;
@@ -1376,6 +1469,7 @@ declare namespace Config {
          */
         synced: number;
         webdav: ISyncWebDAV;
+        local: ISyncLocal;
     }
 
     /**
@@ -1451,6 +1545,28 @@ declare namespace Config {
     }
 
     /**
+     * Local file system related configuration
+     */
+    export interface ISyncLocal {
+        /**
+         * The full path of local directory
+         *
+         * Examples:
+         * - Windows: `"D:/path/to/repos/directory"`
+         * - Unix: `"/path/to/repos/directory"`
+         */
+        endpoint: string;
+        /**
+         * Timeout (unit: seconds)
+         */
+        timeout: number;
+        /**
+         * Concurrent requests.
+         */
+        concurrentReqs: number;
+    }
+
+    /**
      * System related information
      */
     export interface ISystem {
@@ -1474,6 +1590,7 @@ declare namespace Config {
          * - `docker`: Docker container
          * - `android`: Android device
          * - `ios`: iOS device
+         * - `harmony`: HarmonyOS device
          * - `std`: Desktop Electron environment
          */
         container: TSystemContainer;
@@ -1481,10 +1598,6 @@ declare namespace Config {
          * The absolute path of the `data` directory of the current workspace
          */
         dataDir: string;
-        /**
-         * Whether to disable Google Analytics
-         */
-        disableGoogleAnalytics: boolean;
         /**
          * Whether to automatically download the installation package for the new version
          */
@@ -1524,6 +1637,10 @@ declare namespace Config {
          * Whether to enable network serve (whether to allow connections from other devices)
          */
         networkServe: boolean;
+        /**
+         * Whether to enable HTTPS for network serve (TLS encryption)
+         */
+        networkServeTLS: boolean;
         /**
          * The operating system name determined at compile time (obtained using the command `go tool
          * dist list`)
@@ -2029,6 +2146,10 @@ declare namespace Config {
      */
     export interface IUILayoutTabSearchConfig {
         /**
+         * 搜索传入的查询内容
+         */
+        query?: string;
+        /**
          * Grouping strategy
          * - `0`: No grouping
          * - `1`: Group by document
@@ -2234,6 +2355,11 @@ declare namespace Config {
          * @default false
          */
         blockquote: boolean;
+        /**
+         * Search results contain callout blocks
+         * @default false
+         */
+        callout: boolean;
         /**
          * Search results contain code blocks
          * @default false

@@ -22,9 +22,11 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"text/template/parse"
 	"time"
 
-	"github.com/88250/lute/ast"
+	"github.com/88250/gulu"
+	"github.com/jinzhu/copier"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/av"
 	"github.com/siyuan-note/siyuan/kernel/filesys"
@@ -32,398 +34,97 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-func RenderAttributeViewTable(attrView *av.AttributeView, view *av.View, query string) (ret *av.Table) {
-	ret = &av.Table{
-		ID:               view.ID,
-		Icon:             view.Icon,
-		Name:             view.Name,
-		Desc:             view.Desc,
-		HideAttrViewName: view.HideAttrViewName,
-		Columns:          []*av.TableColumn{},
-		Rows:             []*av.TableRow{},
-		Filters:          view.Table.Filters,
-		Sorts:            view.Table.Sorts,
+func RenderGroupView(attrView *av.AttributeView, view, groupView *av.View, query string) (ret av.Viewable) {
+	var err error
+	switch groupView.LayoutType {
+	case av.LayoutTypeTable:
+		// 这里需要使用深拷贝，因为字段上可能会带有计算（FieldCalc），每个分组视图的计算结果都需要分别存储在不同的字段实例上
+		err = copier.CopyWithOption(&groupView.Table.Columns, &view.Table.Columns, copier.Option{DeepCopy: true})
+		groupView.Table.ShowIcon = view.Table.ShowIcon
+		groupView.Table.WrapField = view.Table.WrapField
+	case av.LayoutTypeGallery:
+		err = copier.CopyWithOption(&groupView.Gallery.CardFields, &view.Gallery.CardFields, copier.Option{DeepCopy: true})
+		groupView.Gallery.ShowIcon = view.Gallery.ShowIcon
+		groupView.Gallery.WrapField = view.Gallery.WrapField
+
+		groupView.Gallery.CoverFrom = view.Gallery.CoverFrom
+		groupView.Gallery.CoverFromAssetKeyID = view.Gallery.CoverFromAssetKeyID
+		groupView.Gallery.CardAspectRatio = view.Gallery.CardAspectRatio
+		groupView.Gallery.CardSize = view.Gallery.CardSize
+		groupView.Gallery.FitImage = view.Gallery.FitImage
+		groupView.Gallery.DisplayFieldName = view.Gallery.DisplayFieldName
+	case av.LayoutTypeKanban:
+		err = copier.CopyWithOption(&groupView.Kanban.Fields, &view.Kanban.Fields, copier.Option{DeepCopy: true})
+		groupView.Kanban.ShowIcon = view.Kanban.ShowIcon
+		groupView.Kanban.WrapField = view.Kanban.WrapField
+
+		groupView.Kanban.CoverFrom = view.Kanban.CoverFrom
+		groupView.Kanban.CoverFromAssetKeyID = view.Kanban.CoverFromAssetKeyID
+		groupView.Kanban.CardAspectRatio = view.Kanban.CardAspectRatio
+		groupView.Kanban.CardSize = view.Kanban.CardSize
+		groupView.Kanban.FitImage = view.Kanban.FitImage
+		groupView.Kanban.DisplayFieldName = view.Kanban.DisplayFieldName
+		groupView.Kanban.FillColBackgroundColor = view.Kanban.FillColBackgroundColor
 	}
-
-	// 组装列
-	for _, col := range view.Table.Columns {
-		key, getErr := attrView.GetKey(col.ID)
-		if nil != getErr {
-			// 找不到字段则在视图中删除
-
-			switch view.LayoutType {
-			case av.LayoutTypeTable:
-				for i, column := range view.Table.Columns {
-					if column.ID == col.ID {
-						view.Table.Columns = append(view.Table.Columns[:i], view.Table.Columns[i+1:]...)
-						break
-					}
-				}
-			}
-
-			logging.LogWarnf("get key [%s] failed: %s", col.ID, getErr)
-			av.SaveAttributeView(attrView)
-			continue
-		}
-
-		ret.Columns = append(ret.Columns, &av.TableColumn{
-			ID:           key.ID,
-			Name:         key.Name,
-			Type:         key.Type,
-			Icon:         key.Icon,
-			Options:      key.Options,
-			NumberFormat: key.NumberFormat,
-			Template:     key.Template,
-			Relation:     key.Relation,
-			Rollup:       key.Rollup,
-			Date:         key.Date,
-			Wrap:         col.Wrap,
-			Hidden:       col.Hidden,
-			Width:        col.Width,
-			Desc:         key.Desc,
-			Pin:          col.Pin,
-			Calc:         col.Calc,
-		})
-	}
-
-	// 生成行
-	rows := map[string][]*av.KeyValues{}
-	for _, keyValues := range attrView.KeyValues {
-		for _, val := range keyValues.Values {
-			values := rows[val.BlockID]
-			if nil == values {
-				values = []*av.KeyValues{{Key: keyValues.Key, Values: []*av.Value{val}}}
-			} else {
-				values = append(values, &av.KeyValues{Key: keyValues.Key, Values: []*av.Value{val}})
-			}
-			rows[val.BlockID] = values
+	if nil != err {
+		logging.LogErrorf("copy view fields [%s] to group [%s] failed: %s", view.ID, groupView.ID, err)
+		switch groupView.LayoutType {
+		case av.LayoutTypeTable:
+			groupView.Table.Columns = view.Table.Columns
+		case av.LayoutTypeGallery:
+			groupView.Gallery.CardFields = view.Gallery.CardFields
+		case av.LayoutTypeKanban:
+			groupView.Kanban.Fields = view.Kanban.Fields
 		}
 	}
 
-	// 过滤掉不存在的行
-	var notFound []string
-	var toCheckBlockIDs []string
-	for blockID, keyValues := range rows {
-		blockValue := getRowBlockValue(keyValues)
-		if nil == blockValue {
-			notFound = append(notFound, blockID)
-			continue
-		}
+	groupView.Filters = view.Filters
+	groupView.Sorts = view.Sorts
+	return RenderView(attrView, groupView, query)
+}
 
-		if blockValue.IsDetached {
-			continue
-		}
+func RenderView(attrView *av.AttributeView, view *av.View, query string) (ret av.Viewable) {
+	depth := 1
+	renderedAttrViews := map[string]*av.AttributeView{}
+	renderedAttrViews[attrView.ID] = attrView
+	ret = renderView(attrView, view, query, &depth, renderedAttrViews)
 
-		if nil != blockValue.Block && "" == blockValue.Block.ID {
-			notFound = append(notFound, blockID)
-			continue
-		}
-
-		toCheckBlockIDs = append(toCheckBlockIDs, blockID)
-	}
-	checkRet := treenode.ExistBlockTrees(toCheckBlockIDs)
-	for blockID, exist := range checkRet {
-		if !exist {
-			notFound = append(notFound, blockID)
-		}
-	}
-	for _, blockID := range notFound {
-		delete(rows, blockID)
-	}
-
-	// 生成行单元格
-	for rowID, row := range rows {
-		var tableRow av.TableRow
-		for _, col := range ret.Columns {
-			var tableCell *av.TableCell
-			for _, keyValues := range row {
-				if keyValues.Key.ID == col.ID {
-					tableCell = &av.TableCell{
-						ID:        keyValues.Values[0].ID,
-						Value:     keyValues.Values[0],
-						ValueType: col.Type,
-					}
-					break
-				}
-			}
-			if nil == tableCell {
-				tableCell = &av.TableCell{
-					ID:        ast.NewNodeID(),
-					ValueType: col.Type,
-				}
-			}
-			tableRow.ID = rowID
-
-			switch tableCell.ValueType {
-			case av.KeyTypeNumber: // 格式化数字
-				if nil != tableCell.Value && nil != tableCell.Value.Number && tableCell.Value.Number.IsNotEmpty {
-					tableCell.Value.Number.Format = col.NumberFormat
-					tableCell.Value.Number.FormatNumber()
-				}
-			case av.KeyTypeTemplate: // 渲染模板列
-				tableCell.Value = &av.Value{ID: tableCell.ID, KeyID: col.ID, BlockID: rowID, Type: av.KeyTypeTemplate, Template: &av.ValueTemplate{Content: col.Template}}
-			case av.KeyTypeCreated: // 填充创建时间列值，后面再渲染
-				tableCell.Value = &av.Value{ID: tableCell.ID, KeyID: col.ID, BlockID: rowID, Type: av.KeyTypeCreated}
-			case av.KeyTypeUpdated: // 填充更新时间列值，后面再渲染
-				tableCell.Value = &av.Value{ID: tableCell.ID, KeyID: col.ID, BlockID: rowID, Type: av.KeyTypeUpdated}
-			case av.KeyTypeRelation: // 清空关联列值，后面再渲染 https://ld246.com/article/1703831044435
-				if nil != tableCell.Value && nil != tableCell.Value.Relation {
-					tableCell.Value.Relation.Contents = nil
-				}
-			}
-
-			FillAttributeViewTableCellNilValue(tableCell, rowID, col.ID)
-
-			tableRow.Cells = append(tableRow.Cells, tableCell)
-		}
-		ret.Rows = append(ret.Rows, &tableRow)
-	}
-
-	// 批量获取块属性以提升性能
-	var ialIDs []string
-	for _, row := range ret.Rows {
-		block := row.GetBlockValue()
-		if nil != block && !block.IsDetached {
-			ialIDs = append(ialIDs, row.ID)
-		}
-	}
-	ials := BatchGetBlockAttrs(ialIDs)
-
-	// 渲染自动生成的列值，比如关联列、汇总列、创建时间列和更新时间列
-	avCache := map[string]*av.AttributeView{}
-	avCache[attrView.ID] = attrView
-	for _, row := range ret.Rows {
-		for _, cell := range row.Cells {
-			switch cell.ValueType {
-			case av.KeyTypeBlock: // 对于主键可能需要填充静态锚文本 Database-bound block primary key supports setting static anchor text https://github.com/siyuan-note/siyuan/issues/10049
-				if nil != cell.Value.Block {
-					for k, v := range ials[row.ID] {
-						if k == av.NodeAttrViewStaticText+"-"+attrView.ID {
-							cell.Value.Block.Content = v
-							break
-						}
-					}
-				}
-			case av.KeyTypeRollup: // 渲染汇总列
-				rollupKey, _ := attrView.GetKey(cell.Value.KeyID)
-				if nil == rollupKey || nil == rollupKey.Rollup {
-					break
-				}
-
-				relKey, _ := attrView.GetKey(rollupKey.Rollup.RelationKeyID)
-				if nil == relKey || nil == relKey.Relation {
-					break
-				}
-
-				relVal := attrView.GetValue(relKey.ID, row.ID)
-				if nil == relVal || nil == relVal.Relation {
-					break
-				}
-
-				destAv := avCache[relKey.Relation.AvID]
-				if nil == destAv {
-					destAv, _ = av.ParseAttributeView(relKey.Relation.AvID)
-					if nil != destAv {
-						avCache[relKey.Relation.AvID] = destAv
-					}
-				}
-				if nil == destAv {
-					break
-				}
-
-				destKey, _ := destAv.GetKey(rollupKey.Rollup.KeyID)
-				if nil == destKey {
-					continue
-				}
-
-				for _, blockID := range relVal.Relation.BlockIDs {
-					destVal := destAv.GetValue(rollupKey.Rollup.KeyID, blockID)
-					if nil == destVal {
-						if destAv.ExistBlock(blockID) { // 数据库中存在行但是列值不存在是数据未初始化，这里补一个默认值
-							destVal = av.GetAttributeViewDefaultValue(ast.NewNodeID(), rollupKey.Rollup.KeyID, blockID, destKey.Type)
-						}
-						if nil == destVal {
-							continue
-						}
-					}
-					if av.KeyTypeNumber == destKey.Type {
-						destVal.Number.Format = destKey.NumberFormat
-						destVal.Number.FormatNumber()
-					}
-
-					cell.Value.Rollup.Contents = append(cell.Value.Rollup.Contents, destVal.Clone())
-				}
-
-				cell.Value.Rollup.RenderContents(rollupKey.Rollup.Calc, destKey)
-
-				// 将汇总列的值保存到 rows 中，后续渲染模板列的时候会用到，下同
-				// Database table view template columns support reading relation, rollup, created and updated columns https://github.com/siyuan-note/siyuan/issues/10442
-				keyValues := rows[row.ID]
-				keyValues = append(keyValues, &av.KeyValues{Key: rollupKey, Values: []*av.Value{{ID: cell.Value.ID, KeyID: rollupKey.ID, BlockID: row.ID, Type: av.KeyTypeRollup, Rollup: cell.Value.Rollup}}})
-				rows[row.ID] = keyValues
-			case av.KeyTypeRelation: // 渲染关联列
-				relKey, _ := attrView.GetKey(cell.Value.KeyID)
-				if nil != relKey && nil != relKey.Relation {
-					destAv := avCache[relKey.Relation.AvID]
-					if nil == destAv {
-						destAv, _ = av.ParseAttributeView(relKey.Relation.AvID)
-						if nil != destAv {
-							avCache[relKey.Relation.AvID] = destAv
-						}
-					}
-					if nil != destAv {
-						blocks := map[string]*av.Value{}
-						blockValues := destAv.GetBlockKeyValues()
-						if nil != blockValues {
-							for _, blockValue := range blockValues.Values {
-								blocks[blockValue.BlockID] = blockValue
-							}
-							for _, blockID := range cell.Value.Relation.BlockIDs {
-								if val := blocks[blockID]; nil != val {
-									cell.Value.Relation.Contents = append(cell.Value.Relation.Contents, val)
-								}
-							}
-						}
-					}
-				}
-
-				keyValues := rows[row.ID]
-				keyValues = append(keyValues, &av.KeyValues{Key: relKey, Values: []*av.Value{{ID: cell.Value.ID, KeyID: relKey.ID, BlockID: row.ID, Type: av.KeyTypeRelation, Relation: cell.Value.Relation}}})
-				rows[row.ID] = keyValues
-			case av.KeyTypeCreated: // 渲染创建时间
-				createdStr := row.ID[:len("20060102150405")]
-				created, parseErr := time.ParseInLocation("20060102150405", createdStr, time.Local)
-				if nil == parseErr {
-					cell.Value.Created = av.NewFormattedValueCreated(created.UnixMilli(), 0, av.CreatedFormatNone)
-					cell.Value.Created.IsNotEmpty = true
-				} else {
-					cell.Value.Created = av.NewFormattedValueCreated(time.Now().UnixMilli(), 0, av.CreatedFormatNone)
-				}
-
-				keyValues := rows[row.ID]
-				createdKey, _ := attrView.GetKey(cell.Value.KeyID)
-				keyValues = append(keyValues, &av.KeyValues{Key: createdKey, Values: []*av.Value{{ID: cell.Value.ID, KeyID: createdKey.ID, BlockID: row.ID, Type: av.KeyTypeCreated, Created: cell.Value.Created}}})
-				rows[row.ID] = keyValues
-			case av.KeyTypeUpdated: // 渲染更新时间
-				ial := ials[row.ID]
-				if nil == ial {
-					ial = map[string]string{}
-				}
-				block := row.GetBlockValue()
-				updatedStr := ial["updated"]
-				if "" == updatedStr && nil != block {
-					cell.Value.Updated = av.NewFormattedValueUpdated(block.Block.Updated, 0, av.UpdatedFormatNone)
-					cell.Value.Updated.IsNotEmpty = true
-				} else {
-					updated, parseErr := time.ParseInLocation("20060102150405", updatedStr, time.Local)
-					if nil == parseErr {
-						cell.Value.Updated = av.NewFormattedValueUpdated(updated.UnixMilli(), 0, av.UpdatedFormatNone)
-						cell.Value.Updated.IsNotEmpty = true
-					} else {
-						cell.Value.Updated = av.NewFormattedValueUpdated(time.Now().UnixMilli(), 0, av.UpdatedFormatNone)
-					}
-				}
-
-				keyValues := rows[row.ID]
-				updatedKey, _ := attrView.GetKey(cell.Value.KeyID)
-				keyValues = append(keyValues, &av.KeyValues{Key: updatedKey, Values: []*av.Value{{ID: cell.Value.ID, KeyID: updatedKey.ID, BlockID: row.ID, Type: av.KeyTypeUpdated, Updated: cell.Value.Updated}}})
-				rows[row.ID] = keyValues
-			}
-		}
-	}
-
-	// 最后单独渲染模板列，这样模板列就可以使用汇总、关联、创建时间和更新时间列的值了
-	// Database table view template columns support reading relation, rollup, created and updated columns https://github.com/siyuan-note/siyuan/issues/10442
-
-	var renderTemplateErr error
-	for _, row := range ret.Rows {
-		for _, cell := range row.Cells {
-			switch cell.ValueType {
-			case av.KeyTypeTemplate: // 渲染模板列
-				keyValues := rows[row.ID]
-				ial := ials[row.ID]
-				if nil == ial {
-					ial = map[string]string{}
-				}
-				content, renderErr := RenderTemplateCol(ial, keyValues, cell.Value.Template.Content)
-				cell.Value.Template.Content = content
-				if nil != renderErr {
-					key, _ := attrView.GetKey(cell.Value.KeyID)
-					keyName := ""
-					if nil != key {
-						keyName = key.Name
-					}
-					renderTemplateErr = fmt.Errorf("database [%s] template field [%s] rendering failed: %s", getAttrViewName(attrView), keyName, renderErr)
-				}
-			}
-		}
-	}
-	if nil != renderTemplateErr {
-		util.PushErrMsg(fmt.Sprintf(util.Langs[util.Lang][44], util.EscapeHTML(renderTemplateErr.Error())), 30000)
-	}
-
-	// 根据搜索条件过滤
-	query = strings.TrimSpace(query)
-	if "" != query {
-		// 将连续空格转换为一个空格
-		query = strings.Join(strings.Fields(query), " ")
-		// 按空格分割关键字
-		keywords := strings.Split(query, " ")
-		// 使用 AND 逻辑 https://github.com/siyuan-note/siyuan/issues/11535
-		var hitRows []*av.TableRow
-		for _, row := range ret.Rows {
-			hit := false
-			for _, cell := range row.Cells {
-				allKeywordsHit := true
-				for _, keyword := range keywords {
-					if !strings.Contains(strings.ToLower(cell.Value.String(true)), strings.ToLower(keyword)) {
-						allKeywordsHit = false
-						break
-					}
-				}
-				if allKeywordsHit {
-					hit = true
-					break
-				}
-			}
-			if hit {
-				hitRows = append(hitRows, row)
-			}
-		}
-		ret.Rows = hitRows
-		if 1 > len(ret.Rows) {
-			ret.Rows = []*av.TableRow{}
-		}
-	}
-
-	// 自定义排序
-	sortRowIDs := map[string]int{}
-	if 0 < len(view.Table.RowIDs) {
-		for i, rowID := range view.Table.RowIDs {
-			sortRowIDs[rowID] = i
-		}
-	}
-
-	sort.Slice(ret.Rows, func(i, j int) bool {
-		iv := sortRowIDs[ret.Rows[i].ID]
-		jv := sortRowIDs[ret.Rows[j].ID]
-		if iv == jv {
-			return ret.Rows[i].ID < ret.Rows[j].ID
-		}
-		return iv < jv
-	})
+	attrView.RenderedViewables[ret.GetID()] = ret
+	renderedAttrViews[attrView.ID] = attrView
 	return
 }
 
-func RenderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplContent string) (ret string, err error) {
+func renderView(attrView *av.AttributeView, view *av.View, query string, depth *int, cachedAttrViews map[string]*av.AttributeView) (ret av.Viewable) {
+	if 7 < *depth {
+		return
+	}
+
+	*depth++
+	switch view.LayoutType {
+	case av.LayoutTypeTable:
+		ret = RenderAttributeViewTable(attrView, view, query, depth, cachedAttrViews)
+	case av.LayoutTypeGallery:
+		ret = RenderAttributeViewGallery(attrView, view, query, depth, cachedAttrViews)
+	case av.LayoutTypeKanban:
+		ret = RenderAttributeViewKanban(attrView, view, query, depth, cachedAttrViews)
+	}
+	return
+}
+
+func renderTemplateField(ial map[string]string, keyValues []*av.KeyValues, tplContent string) (ret string, err error) {
 	if "" == ial["id"] {
-		block := getRowBlockValue(rowValues)
-		if nil != block && nil != block.Block {
-			ial["id"] = block.Block.ID
+		block := getBlockValue(keyValues)
+		if nil != block {
+			if nil != block.Block {
+				ial["id"] = block.Block.ID
+			}
+			if "" == ial["id"] {
+				ial["id"] = block.BlockID
+			}
 		}
 	}
 	if "" == ial["updated"] {
-		block := getRowBlockValue(rowValues)
+		block := getBlockValue(keyValues)
 		if nil != block && nil != block.Block {
 			ial["updated"] = time.UnixMilli(block.Block.Updated).Format("20060102150405")
 		}
@@ -440,7 +141,7 @@ func RenderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplCont
 	}
 
 	buf := &bytes.Buffer{}
-	dataModel := map[string]interface{}{} // 复制一份 IAL 以避免修改原始数据
+	dataModel := map[string]any{} // 复制一份 IAL 以避免修改原始数据
 	for k, v := range ial {
 		dataModel[k] = v
 
@@ -479,23 +180,25 @@ func RenderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplCont
 		}
 	}
 
-	for _, rowValue := range rowValues {
-		if 1 > len(rowValue.Values) {
+	dataModel["id_mod"] = map[string]any{}
+	dataModel["id_mod_raw"] = map[string]any{}
+	for _, keyValue := range keyValues {
+		if 1 > len(keyValue.Values) {
 			continue
 		}
 
-		v := rowValue.Values[0]
+		v := keyValue.Values[0]
 		if av.KeyTypeNumber == v.Type {
 			if nil != v.Number && v.Number.IsNotEmpty {
-				dataModel[rowValue.Key.Name] = v.Number.Content
+				dataModel[keyValue.Key.Name] = v.Number.Content
 			}
 		} else if av.KeyTypeDate == v.Type {
 			if nil != v.Date {
 				if v.Date.IsNotEmpty {
-					dataModel[rowValue.Key.Name] = time.UnixMilli(v.Date.Content)
+					dataModel[keyValue.Key.Name] = time.UnixMilli(v.Date.Content)
 				}
 				if v.Date.IsNotEmpty2 {
-					dataModel[rowValue.Key.Name+"_end"] = time.UnixMilli(v.Date.Content2)
+					dataModel[keyValue.Key.Name+"_end"] = time.UnixMilli(v.Date.Content2)
 				}
 			}
 		} else if av.KeyTypeRollup == v.Type {
@@ -505,15 +208,19 @@ func RenderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplCont
 				for _, content := range v.Rollup.Contents {
 					if av.KeyTypeNumber == content.Type {
 						numbers = append(numbers, content.Number.Content)
+					} else if av.KeyTypeMSelect == content.Type {
+						for _, s := range content.MSelect {
+							contents = append(contents, s.Content)
+						}
 					} else {
 						contents = append(contents, content.String(true))
 					}
 				}
 
 				if 0 < len(numbers) {
-					dataModel[rowValue.Key.Name] = numbers
+					dataModel[keyValue.Key.Name] = numbers
 				} else {
-					dataModel[rowValue.Key.Name] = contents
+					dataModel[keyValue.Key.Name] = contents
 				}
 			}
 		} else if av.KeyTypeRelation == v.Type {
@@ -522,10 +229,10 @@ func RenderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplCont
 				for _, content := range v.Relation.Contents {
 					contents = append(contents, content.String(true))
 				}
-				dataModel[rowValue.Key.Name] = contents
+				dataModel[keyValue.Key.Name] = contents
 			}
 		} else if av.KeyTypeBlock == v.Type {
-			dataModel[rowValue.Key.Name+"_created"] = time.Now()
+			dataModel[keyValue.Key.Name+"_created"] = time.Now()
 			if nil != v.Block {
 				dataModel["entryCreated"] = time.UnixMilli(v.Block.Created)
 			}
@@ -533,10 +240,24 @@ func RenderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplCont
 			if nil != v.Block {
 				dataModel["entryUpdated"] = time.UnixMilli(v.Block.Updated)
 			}
-			dataModel[rowValue.Key.Name] = v.String(true)
+			dataModel[keyValue.Key.Name] = v.String(true)
+		} else if av.KeyTypeMSelect == v.Type {
+			dataModel[keyValue.Key.Name+"_str"] = v.String(true)
+			var contents []string
+			for _, s := range v.MSelect {
+				contents = append(contents, s.Content)
+			}
+			dataModel[keyValue.Key.Name] = contents
 		} else {
-			dataModel[rowValue.Key.Name] = v.String(true)
+			dataModel[keyValue.Key.Name] = v.String(true)
 		}
+
+		// Database template fields support access to the raw value https://github.com/siyuan-note/siyuan/issues/14903
+		dataModel[keyValue.Key.Name+"_raw"] = v
+
+		// Database template fields support access by ID https://github.com/siyuan-note/siyuan/issues/11237
+		dataModel["id_mod"].(map[string]any)[keyValue.Key.ID] = dataModel[keyValue.Key.Name]
+		dataModel["id_mod_raw"].(map[string]any)[keyValue.Key.ID] = v
 	}
 
 	if err = tpl.Execute(buf, dataModel); err != nil {
@@ -544,137 +265,483 @@ func RenderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplCont
 		return
 	}
 	ret = buf.String()
+	if ret == "<no value>" {
+		ret = ""
+		return
+	}
+
+	if util.HasUnclosedHtmlTag(ret) {
+		ret = util.EscapeHTML(ret)
+	}
 	return
 }
 
-func FillAttributeViewTableCellNilValue(tableCell *av.TableCell, rowID, colID string) {
-	if nil == tableCell.Value {
-		tableCell.Value = av.GetAttributeViewDefaultValue(tableCell.ID, colID, rowID, tableCell.ValueType)
-		return
+func generateAttrViewItems(attrView *av.AttributeView, view *av.View) (ret map[string][]*av.KeyValues) {
+	ret = map[string][]*av.KeyValues{}
+	for _, keyValues := range attrView.KeyValues {
+		for _, val := range keyValues.Values {
+			values := ret[val.BlockID]
+			if nil == values {
+				values = []*av.KeyValues{{Key: keyValues.Key, Values: []*av.Value{val}}}
+			} else {
+				values = append(values, &av.KeyValues{Key: keyValues.Key, Values: []*av.Value{val}})
+			}
+			ret[val.BlockID] = values
+		}
 	}
 
-	tableCell.Value.Type = tableCell.ValueType
-	switch tableCell.ValueType {
-	case av.KeyTypeText:
-		if nil == tableCell.Value.Text {
-			tableCell.Value.Text = &av.ValueText{}
+	// 如果是分组视图，则需要过滤掉不在分组中的项目
+	if nil != view.GroupItemIDs {
+		tmp := map[string][]*av.KeyValues{}
+		for _, groupItemID := range view.GroupItemIDs {
+			if _, ok := ret[groupItemID]; ok {
+				tmp[groupItemID] = ret[groupItemID]
+			}
 		}
-	case av.KeyTypeNumber:
-		if nil == tableCell.Value.Number {
-			tableCell.Value.Number = &av.ValueNumber{}
+		ret = tmp
+	}
+	return
+}
+
+func filterNotFoundAttrViewItems(keyValuesMap map[string][]*av.KeyValues) {
+	var notFound []string
+	var toCheckBlockIDs []string
+	for blockID, keyValues := range keyValuesMap {
+		blockValue := getBlockValue(keyValues)
+		if nil == blockValue || nil == blockValue.Block {
+			notFound = append(notFound, blockID)
+			continue
 		}
-	case av.KeyTypeDate:
-		if nil == tableCell.Value.Date {
-			tableCell.Value.Date = &av.ValueDate{}
+
+		if blockValue.IsDetached {
+			continue
 		}
-	case av.KeyTypeSelect:
-		if 1 > len(tableCell.Value.MSelect) {
-			tableCell.Value.MSelect = []*av.ValueSelect{}
+
+		if "" == blockValue.Block.ID {
+			notFound = append(notFound, blockID)
+			continue
 		}
-	case av.KeyTypeMSelect:
-		if 1 > len(tableCell.Value.MSelect) {
-			tableCell.Value.MSelect = []*av.ValueSelect{}
+
+		toCheckBlockIDs = append(toCheckBlockIDs, blockValue.Block.ID)
+	}
+	checkRet := treenode.ExistBlockTrees(toCheckBlockIDs)
+	for blockID, exist := range checkRet {
+		if !exist {
+			notFound = append(notFound, blockID)
 		}
-	case av.KeyTypeURL:
-		if nil == tableCell.Value.URL {
-			tableCell.Value.URL = &av.ValueURL{}
+	}
+	for _, blockID := range notFound {
+		delete(keyValuesMap, blockID)
+	}
+}
+
+func fillAttributeViewBaseValue(baseValue *av.BaseValue, fieldID, itemID string, fieldNumberFormat av.NumberFormat, fieldTemplate string, fieldDateIsTime bool) {
+	switch baseValue.ValueType {
+	case av.KeyTypeNumber: // 格式化数字
+		if nil != baseValue.Value && nil != baseValue.Value.Number && baseValue.Value.Number.IsNotEmpty {
+			baseValue.Value.Number.Format = fieldNumberFormat
+			baseValue.Value.Number.FormatNumber()
 		}
-	case av.KeyTypeEmail:
-		if nil == tableCell.Value.Email {
-			tableCell.Value.Email = &av.ValueEmail{}
+	case av.KeyTypeTemplate: // 渲染模板字段
+		baseValue.Value = &av.Value{ID: baseValue.ID, KeyID: fieldID, BlockID: itemID, Type: av.KeyTypeTemplate, Template: &av.ValueTemplate{Content: fieldTemplate}}
+	case av.KeyTypeCreated: // 填充创建时间字段值，后面再渲染
+		baseValue.Value = &av.Value{ID: baseValue.ID, KeyID: fieldID, BlockID: itemID, Type: av.KeyTypeCreated}
+	case av.KeyTypeUpdated: // 填充更新时间字段值，后面再渲染
+		baseValue.Value = &av.Value{ID: baseValue.ID, KeyID: fieldID, BlockID: itemID, Type: av.KeyTypeUpdated}
+	}
+
+	if nil == baseValue.Value {
+		baseValue.Value = av.GetAttributeViewDefaultValue(baseValue.ID, fieldID, itemID, baseValue.ValueType, fieldDateIsTime)
+	} else {
+		FillAttributeViewNilValue(baseValue.Value, baseValue.ValueType)
+	}
+}
+
+func fillAttributeViewAutoGeneratedValues(attrView *av.AttributeView, collection av.Collection, ials map[string]map[string]string, depth *int, cachedAttrViews map[string]*av.AttributeView) {
+	// 渲染主键、创建时间、更新时间
+
+	for _, item := range collection.GetItems() {
+		for _, value := range item.GetValues() {
+			itemID := item.GetID()
+
+			switch value.Type {
+			case av.KeyTypeBlock: // 对于主键可能需要填充静态锚文本 Database-bound block primary key supports setting static anchor text https://github.com/siyuan-note/siyuan/issues/10049
+				if nil != value.Block {
+					for k, v := range ials[value.Block.ID] {
+						if k == av.NodeAttrViewStaticText+"-"+attrView.ID {
+							value.Block.Content = v
+							break
+						}
+					}
+				}
+			case av.KeyTypeCreated: // 渲染创建时间
+				key, _ := attrView.GetKey(value.KeyID)
+				isNotTime := false
+				if nil != key && nil != key.Created {
+					isNotTime = !key.Created.IncludeTime
+				}
+
+				ial := map[string]string{}
+				block := item.GetBlockValue()
+				if nil != block {
+					ial = ials[block.Block.ID]
+				}
+				if nil == ial {
+					ial = map[string]string{}
+				}
+				id := itemID
+				if "" != ial["id"] {
+					id = ial["id"]
+				}
+				createdStr := id[:len("20060102150405")]
+				created, parseErr := time.ParseInLocation("20060102150405", createdStr, time.Local)
+				if nil == parseErr {
+					value.Created = av.NewFormattedValueCreated(created.UnixMilli(), 0, av.CreatedFormatNone, isNotTime)
+					value.Created.IsNotEmpty = true
+				} else {
+					value.Created = av.NewFormattedValueCreated(time.Now().UnixMilli(), 0, av.CreatedFormatNone, isNotTime)
+				}
+			case av.KeyTypeUpdated: // 渲染更新时间
+				key, _ := attrView.GetKey(value.KeyID)
+				isNotTime := false
+				if nil != key && nil != key.Updated {
+					isNotTime = !key.Updated.IncludeTime
+				}
+
+				ial := map[string]string{}
+				block := item.GetBlockValue()
+				if nil != block {
+					ial = ials[block.Block.ID]
+				}
+				if nil == ial {
+					ial = map[string]string{}
+				}
+				updatedStr := ial["updated"]
+				if "" == updatedStr && nil != block {
+					value.Updated = av.NewFormattedValueUpdated(block.Block.Updated, 0, av.UpdatedFormatNone, isNotTime)
+					value.Updated.IsNotEmpty = true
+				} else {
+					updated, parseErr := time.ParseInLocation("20060102150405", updatedStr, time.Local)
+					if nil == parseErr {
+						value.Updated = av.NewFormattedValueUpdated(updated.UnixMilli(), 0, av.UpdatedFormatNone, isNotTime)
+						value.Updated.IsNotEmpty = true
+					} else {
+						value.Updated = av.NewFormattedValueUpdated(time.Now().UnixMilli(), 0, av.UpdatedFormatNone, isNotTime)
+					}
+				}
+			}
 		}
-	case av.KeyTypePhone:
-		if nil == tableCell.Value.Phone {
-			tableCell.Value.Phone = &av.ValuePhone{}
+	}
+
+	// 渲染关联
+	for _, item := range collection.GetItems() {
+		for _, value := range item.GetValues() {
+			if av.KeyTypeRelation != value.Type {
+				continue
+			}
+
+			value.Relation.Contents = nil
+			relKey, _ := attrView.GetKey(value.KeyID)
+			if nil != relKey && nil != relKey.Relation {
+				destAv := cachedAttrViews[relKey.Relation.AvID]
+				if nil == destAv {
+					destAv, _ = av.ParseAttributeView(relKey.Relation.AvID)
+					if nil != destAv {
+						cachedAttrViews[relKey.Relation.AvID] = destAv
+					}
+				}
+				if nil != destAv {
+					blocks := map[string]*av.Value{}
+					blockValues := destAv.GetBlockKeyValues()
+					if nil != blockValues {
+						for _, blockValue := range blockValues.Values {
+							blocks[blockValue.BlockID] = blockValue
+						}
+						for _, blockID := range value.Relation.BlockIDs {
+							if val := blocks[blockID]; nil != val {
+								value.Relation.Contents = append(value.Relation.Contents, val)
+							}
+						}
+					}
+				}
+			}
 		}
-	case av.KeyTypeMAsset:
-		if 1 > len(tableCell.Value.MAsset) {
-			tableCell.Value.MAsset = []*av.ValueAsset{}
+	}
+
+	// 渲染汇总
+	rollupFurtherCollections := map[string]av.Collection{}
+	for _, field := range collection.GetFields() {
+		if av.KeyTypeRollup != field.GetType() {
+			continue
 		}
-	case av.KeyTypeTemplate:
-		if nil == tableCell.Value.Template {
-			tableCell.Value.Template = &av.ValueTemplate{}
+
+		rollupKey, _ := attrView.GetKey(field.GetID())
+		if nil == rollupKey || nil == rollupKey.Rollup {
+			continue
 		}
-	case av.KeyTypeCreated:
-		if nil == tableCell.Value.Created {
-			tableCell.Value.Created = &av.ValueCreated{}
+
+		relKey, _ := attrView.GetKey(rollupKey.Rollup.RelationKeyID)
+		if nil == relKey || nil == relKey.Relation {
+			continue
 		}
-	case av.KeyTypeUpdated:
-		if nil == tableCell.Value.Updated {
-			tableCell.Value.Updated = &av.ValueUpdated{}
+
+		destAv := cachedAttrViews[relKey.Relation.AvID]
+		if nil == destAv {
+			destAv, _ = av.ParseAttributeView(relKey.Relation.AvID)
+			if nil != destAv {
+				cachedAttrViews[relKey.Relation.AvID] = destAv
+			}
 		}
-	case av.KeyTypeCheckbox:
-		if nil == tableCell.Value.Checkbox {
-			tableCell.Value.Checkbox = &av.ValueCheckbox{}
+		if nil == destAv {
+			continue
 		}
-	case av.KeyTypeRelation:
-		if nil == tableCell.Value.Relation {
-			tableCell.Value.Relation = &av.ValueRelation{}
+
+		destKey, _ := destAv.GetKey(rollupKey.Rollup.KeyID)
+		if nil == destKey {
+			continue
 		}
-	case av.KeyTypeRollup:
-		if nil == tableCell.Value.Rollup {
-			tableCell.Value.Rollup = &av.ValueRollup{}
+
+		isSameAv := destAv.ID == attrView.ID
+		var furtherCollection av.Collection
+		if av.KeyTypeTemplate == destKey.Type || (!isSameAv && (av.KeyTypeUpdated == destKey.Type || av.KeyTypeCreated == destKey.Type || av.KeyTypeRelation == destKey.Type)) {
+			viewable := renderView(destAv, destAv.Views[0], "", depth, cachedAttrViews)
+			if nil != viewable {
+				furtherCollection = viewable.(av.Collection)
+			} else {
+				fillAttributeViewTemplateValues(destAv, destAv.Views[0], collection, ials)
+				furtherCollection = collection
+			}
+		}
+		rollupFurtherCollections[rollupKey.ID] = furtherCollection
+	}
+
+	for _, item := range collection.GetItems() {
+		for _, value := range item.GetValues() {
+			if av.KeyTypeRollup != value.Type {
+				continue
+			}
+
+			rollupKey, _ := attrView.GetKey(value.KeyID)
+			if nil == rollupKey || nil == rollupKey.Rollup {
+				break
+			}
+
+			relKey, _ := attrView.GetKey(rollupKey.Rollup.RelationKeyID)
+			if nil == relKey || nil == relKey.Relation {
+				break
+			}
+
+			relVal := attrView.GetValue(relKey.ID, item.GetID())
+			if nil == relVal || nil == relVal.Relation {
+				break
+			}
+
+			destAv := cachedAttrViews[relKey.Relation.AvID]
+			if nil == destAv {
+				destAv, _ = av.ParseAttributeView(relKey.Relation.AvID)
+				if nil != destAv {
+					cachedAttrViews[relKey.Relation.AvID] = destAv
+				}
+			}
+			if nil == destAv {
+				break
+			}
+
+			destKey, _ := destAv.GetKey(rollupKey.Rollup.KeyID)
+			if nil == destKey {
+				break
+			}
+
+			furtherCollection := rollupFurtherCollections[rollupKey.ID]
+			value.Rollup.BuildContents(destAv.KeyValues, destKey, relVal, rollupKey.Rollup.Calc, furtherCollection)
 		}
 	}
 }
 
-func getAttributeViewContent(avID string) (content string) {
-	if "" == avID {
-		return
-	}
+func GetFurtherCollections(attrView *av.AttributeView, cachedAttrViews map[string]*av.AttributeView) (ret map[string]av.Collection) {
+	ret = map[string]av.Collection{}
+	for _, kv := range attrView.KeyValues {
+		if av.KeyTypeRollup != kv.Key.Type {
+			continue
+		}
 
-	attrView, err := av.ParseAttributeView(avID)
-	if err != nil {
-		logging.LogErrorf("parse attribute view [%s] failed: %s", avID, err)
-		return
-	}
+		if nil == kv.Key.Rollup {
+			continue
+		}
 
-	buf := bytes.Buffer{}
-	buf.WriteString(attrView.Name)
-	buf.WriteByte(' ')
-	for _, v := range attrView.Views {
-		buf.WriteString(v.Name)
-		buf.WriteByte(' ')
-	}
+		relKey, _ := attrView.GetKey(kv.Key.Rollup.RelationKeyID)
+		if nil == relKey {
+			continue
+		}
 
-	if 1 > len(attrView.Views) {
-		content = strings.TrimSpace(buf.String())
-		return
-	}
+		destAv := cachedAttrViews[relKey.Relation.AvID]
+		if nil == destAv {
+			destAv, _ = av.ParseAttributeView(relKey.Relation.AvID)
+			if nil == destAv {
+				continue
+			}
+			cachedAttrViews[relKey.Relation.AvID] = destAv
+		}
 
-	var view *av.View
-	for _, v := range attrView.Views {
-		if av.LayoutTypeTable == v.LayoutType {
-			view = v
+		destKey, _ := destAv.GetKey(kv.Key.Rollup.KeyID)
+		if nil == destKey {
+			continue
+		}
+		isSameAv := destAv.ID == attrView.ID
+
+		var furtherCollection av.Collection
+		if av.KeyTypeTemplate == destKey.Type || (!isSameAv && (av.KeyTypeUpdated == destKey.Type || av.KeyTypeCreated == destKey.Type || av.KeyTypeRelation == destKey.Type)) {
+			viewable := RenderView(destAv, destAv.Views[0], "")
+			if nil != viewable {
+				furtherCollection = viewable.(av.Collection)
+			}
+		}
+		ret[kv.Key.ID] = furtherCollection
+	}
+	return
+}
+
+func fillAttributeViewTemplateValues(attrView *av.AttributeView, view *av.View, collection av.Collection, ials map[string]map[string]string) (err error) {
+	items := generateAttrViewItems(attrView, view)
+	existTemplateField := false
+	for _, kVals := range attrView.KeyValues {
+		if av.KeyTypeTemplate == kVals.Key.Type {
+			existTemplateField = true
 			break
 		}
 	}
-	if nil == view {
-		content = strings.TrimSpace(buf.String())
+	if !existTemplateField {
 		return
 	}
 
-	table := RenderAttributeViewTable(attrView, view, "")
-	for _, col := range table.Columns {
-		buf.WriteString(col.Name)
-		buf.WriteByte(' ')
-	}
-
-	for _, row := range table.Rows {
-		for _, cell := range row.Cells {
-			if nil == cell.Value {
+	templateKeys, _ := GetTemplateKeysByResolutionOrder(attrView)
+	for _, templateKey := range templateKeys {
+		for _, item := range collection.GetItems() {
+			value := item.GetValue(templateKey.ID)
+			if nil == value || nil == value.Template {
 				continue
 			}
-			buf.WriteString(cell.Value.String(true))
-			buf.WriteByte(' ')
+
+			keyValues := items[item.GetID()]
+			var ial map[string]string
+			blockVal := item.GetBlockValue()
+			if nil != blockVal {
+				ial = ials[blockVal.Block.ID]
+			}
+			if nil == ial {
+				ial = map[string]string{}
+			}
+
+			content, renderErr := renderTemplateField(ial, keyValues, value.Template.Content)
+			if nil != renderErr {
+				key, _ := attrView.GetKey(value.KeyID)
+				keyName := ""
+				if nil != key {
+					keyName = key.Name
+				}
+				err = fmt.Errorf("database [%s] template field [%s] rendering failed: %s", getAttrViewName(attrView), keyName, renderErr)
+			}
+
+			value.Template.Content = content
+			items[item.GetID()] = append(keyValues, &av.KeyValues{Key: templateKey, Values: []*av.Value{value}})
 		}
 	}
-
-	content = strings.TrimSpace(buf.String())
 	return
 }
 
-func getRowBlockValue(keyValues []*av.KeyValues) (ret *av.Value) {
+func fillAttributeViewKeyValues(attrView *av.AttributeView, collection av.Collection) {
+	fieldValues := map[string][]*av.Value{}
+	for _, item := range collection.GetItems() {
+		for _, val := range item.GetValues() {
+			keyID := val.KeyID
+			fieldValues[keyID] = append(fieldValues[keyID], val)
+		}
+	}
+	for keyID, values := range fieldValues {
+		keyValues, _ := attrView.GetKeyValues(keyID)
+		for _, val := range values {
+			exist := false
+			for _, kv := range keyValues.Values {
+				if kv.ID == val.ID {
+					exist = true
+					break
+				}
+			}
+			if !exist {
+				val.IsRenderAutoFill = true
+				keyValues.Values = append(keyValues.Values, val)
+			}
+		}
+	}
+}
+
+func FillAttributeViewNilValue(value *av.Value, typ av.KeyType) {
+	value.Type = typ
+	switch typ {
+	case av.KeyTypeText:
+		if nil == value.Text {
+			value.Text = &av.ValueText{}
+		}
+	case av.KeyTypeNumber:
+		if nil == value.Number {
+			value.Number = &av.ValueNumber{}
+		}
+	case av.KeyTypeDate:
+		if nil == value.Date {
+			value.Date = &av.ValueDate{}
+		}
+	case av.KeyTypeSelect:
+		if 1 > len(value.MSelect) {
+			value.MSelect = []*av.ValueSelect{}
+		}
+	case av.KeyTypeMSelect:
+		if 1 > len(value.MSelect) {
+			value.MSelect = []*av.ValueSelect{}
+		}
+	case av.KeyTypeURL:
+		if nil == value.URL {
+			value.URL = &av.ValueURL{}
+		}
+	case av.KeyTypeEmail:
+		if nil == value.Email {
+			value.Email = &av.ValueEmail{}
+		}
+	case av.KeyTypePhone:
+		if nil == value.Phone {
+			value.Phone = &av.ValuePhone{}
+		}
+	case av.KeyTypeMAsset:
+		if 1 > len(value.MAsset) {
+			value.MAsset = []*av.ValueAsset{}
+		}
+	case av.KeyTypeTemplate:
+		if nil == value.Template {
+			value.Template = &av.ValueTemplate{}
+		}
+	case av.KeyTypeCreated:
+		if nil == value.Created {
+			value.Created = &av.ValueCreated{}
+		}
+	case av.KeyTypeUpdated:
+		if nil == value.Updated {
+			value.Updated = &av.ValueUpdated{}
+		}
+	case av.KeyTypeCheckbox:
+		if nil == value.Checkbox {
+			value.Checkbox = &av.ValueCheckbox{}
+		}
+	case av.KeyTypeRelation:
+		if nil == value.Relation {
+			value.Relation = &av.ValueRelation{}
+		}
+	case av.KeyTypeRollup:
+		if nil == value.Rollup {
+			value.Rollup = &av.ValueRollup{}
+		}
+	}
+}
+
+func getBlockValue(keyValues []*av.KeyValues) (ret *av.Value) {
 	for _, kv := range keyValues {
 		if av.KeyTypeBlock == kv.Key.Type && 0 < len(kv.Values) {
 			ret = kv.Values[0]
@@ -690,4 +757,236 @@ func getAttrViewName(attrView *av.AttributeView) string {
 		ret = util.Langs[util.Lang][105]
 	}
 	return ret
+}
+
+func removeMissingField(attrView *av.AttributeView, view *av.View, missingKeyID string) {
+	logging.LogWarnf("key [%s] is missing", missingKeyID)
+
+	changed := false
+	if nil != view.Table {
+		for i, column := range view.Table.Columns {
+			if column.ID == missingKeyID {
+				view.Table.Columns = append(view.Table.Columns[:i], view.Table.Columns[i+1:]...)
+				changed = true
+				break
+			}
+		}
+	}
+
+	if nil != view.Gallery {
+		for i, cardField := range view.Gallery.CardFields {
+			if cardField.ID == missingKeyID {
+				view.Gallery.CardFields = append(view.Gallery.CardFields[:i], view.Gallery.CardFields[i+1:]...)
+				changed = true
+				break
+			}
+		}
+	}
+
+	if nil != view.Kanban {
+		for i, kanbanField := range view.Kanban.Fields {
+			if kanbanField.ID == missingKeyID {
+				view.Kanban.Fields = append(view.Kanban.Fields[:i], view.Kanban.Fields[i+1:]...)
+				changed = true
+				break
+			}
+		}
+	}
+
+	if changed {
+		av.SaveAttributeView(attrView)
+	}
+}
+
+// filterByQuery 根据搜索条件过滤
+func filterByQuery(query string, collection av.Collection) {
+	query = strings.TrimSpace(query)
+	if "" != query {
+		query = strings.Join(strings.Fields(query), " ") // 将连续空格转换为一个空格
+		keywords := strings.Split(query, " ")            // 按空格分割关键字
+
+		// 使用 AND 逻辑 https://github.com/siyuan-note/siyuan/issues/11535
+		var hitItems []av.Item
+		for _, item := range collection.GetItems() {
+			hit := false
+			for _, cell := range item.GetValues() {
+				allKeywordsHit := true
+				for _, keyword := range keywords {
+					if !util.SearchCaseSensitive {
+						if !strings.Contains(strings.ToLower(cell.String(true)), strings.ToLower(keyword)) {
+							allKeywordsHit = false
+							break
+						}
+					} else {
+						if !strings.Contains(cell.String(true), keyword) {
+							allKeywordsHit = false
+							break
+						}
+					}
+				}
+				if allKeywordsHit {
+					hit = true
+					break
+				}
+			}
+			if hit {
+				hitItems = append(hitItems, item)
+			}
+		}
+		collection.SetItems(hitItems)
+		if 1 > len(collection.GetItems()) {
+			collection.SetItems([]av.Item{})
+		}
+	}
+}
+
+// manualSort 处理用户手动排序。
+func manualSort(view *av.View, collection av.Collection) {
+	itemIDs := view.ItemIDs
+	// 如果是分组视图，则需要根据分组项的顺序进行排序
+	if 0 < len(view.GroupItemIDs) {
+		itemIDs = view.GroupItemIDs
+	}
+
+	sortItemIDs := map[string]int{}
+	for i, itemID := range itemIDs {
+		sortItemIDs[itemID] = i
+	}
+
+	items := collection.GetItems()
+	sort.Slice(items, func(i, j int) bool {
+		iv := sortItemIDs[items[i].GetID()]
+		jv := sortItemIDs[items[j].GetID()]
+		if iv == jv {
+			return items[i].GetID() < items[j].GetID()
+		}
+		return iv < jv
+	})
+	collection.SetItems(items)
+}
+
+func GetTemplateKeysByResolutionOrder(attrView *av.AttributeView) (ret []*av.Key, resolved bool) {
+	ret = []*av.Key{}
+
+	resolvedTemplateKeys := map[string]bool{}
+	for i := 0; i < 7; i++ {
+		templateKeyCount := 0
+		for _, keyValues := range attrView.KeyValues {
+			if av.KeyTypeTemplate != keyValues.Key.Type {
+				continue
+			}
+
+			templateKeyCount++
+			vars, err := getTemplateVars(keyValues.Key.Template)
+			if nil != err {
+				resolvedTemplateKeys[keyValues.Key.ID] = true
+				ret = append(ret, keyValues.Key)
+				continue
+			}
+
+			currentTemplateKeyResolved := true
+			for _, kValues := range attrView.KeyValues {
+				if gulu.Str.Contains(kValues.Key.Name, vars) {
+					if av.KeyTypeTemplate == kValues.Key.Type {
+						if _, ok := resolvedTemplateKeys[kValues.Key.ID]; !ok {
+							currentTemplateKeyResolved = false
+							break
+						}
+					}
+				}
+			}
+			if currentTemplateKeyResolved {
+				resolvedTemplateKeys[keyValues.Key.ID] = true
+				ret = append(ret, keyValues.Key)
+			}
+		}
+
+		resolved = len(resolvedTemplateKeys) == templateKeyCount
+		if resolved {
+			break
+		}
+	}
+	return
+}
+
+func GetTemplateKeyRelevantKeys(attrView *av.AttributeView, templateKey *av.Key) (ret []*av.Key) {
+	ret = []*av.Key{}
+	if nil == templateKey || "" == templateKey.Template {
+		return
+	}
+
+	vars, err := getTemplateVars(templateKey.Template)
+	if nil != err {
+		return
+	}
+
+	for _, kValues := range attrView.KeyValues {
+		if gulu.Str.Contains(kValues.Key.Name, vars) {
+			ret = append(ret, kValues.Key)
+		}
+	}
+
+	if 1 > len(ret) {
+		// 没有相关字段情况下直接尝试解析模板，如果能解析成功则返回模板字段本身 https://github.com/siyuan-note/siyuan/issues/15560#issuecomment-3182691193
+		goTpl := template.New("").Delims(".action{", "}")
+		tplFuncMap := filesys.BuiltInTemplateFuncs()
+		SQLTemplateFuncs(&tplFuncMap)
+		goTpl = goTpl.Funcs(tplFuncMap)
+		_, parseErr := goTpl.Funcs(tplFuncMap).Parse(templateKey.Template)
+		if nil != parseErr {
+			return
+		}
+		ret = append(ret, templateKey)
+	}
+	return
+}
+
+func getTemplateVars(tplContent string) ([]string, error) {
+	goTpl := template.New("").Delims(".action{", "}")
+	tplFuncMap := filesys.BuiltInTemplateFuncs()
+	SQLTemplateFuncs(&tplFuncMap)
+	goTpl = goTpl.Funcs(tplFuncMap)
+	tpl, parseErr := goTpl.Funcs(tplFuncMap).Parse(tplContent)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+	vars := make(map[string]struct{})
+	collectVars(tpl.Tree.Root, vars)
+	var result []string
+	for v := range vars {
+		result = append(result, v)
+	}
+	return result, nil
+}
+
+func collectVars(node parse.Node, vars map[string]struct{}) {
+	switch n := node.(type) {
+	case *parse.ListNode:
+		for _, child := range n.Nodes {
+			collectVars(child, vars)
+		}
+	case *parse.ActionNode:
+		collectVars(n.Pipe, vars)
+	case *parse.PipeNode:
+		for _, cmd := range n.Cmds {
+			collectVars(cmd, vars)
+		}
+	case *parse.CommandNode:
+		for _, arg := range n.Args {
+			collectVars(arg, vars)
+		}
+
+		if 3 <= len(n.Args) && n.Args[0].Type() == parse.NodeIdentifier && n.Args[1].Type() == parse.NodeDot && n.Args[2].Type() == parse.NodeString {
+			vars[n.Args[2].(*parse.StringNode).Text] = struct{}{}
+		}
+
+	case *parse.FieldNode:
+		if len(n.Ident) > 0 {
+			vars[n.Ident[0]] = struct{}{}
+		}
+	case *parse.VariableNode:
+		if len(n.Ident) > 0 {
+			vars[n.Ident[0]] = struct{}{}
+		}
+	}
 }

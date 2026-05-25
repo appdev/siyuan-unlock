@@ -1,6 +1,6 @@
 import {confirmDialog} from "../dialog/confirmDialog";
 import {Plugin} from "./index";
-import {showMessage} from "../dialog/message";
+import {hideMessage, showMessage} from "../dialog/message";
 import {Dialog} from "../dialog";
 import {fetchGet, fetchPost, fetchSyncPost} from "../util/fetch";
 import {getBackend, getFrontend} from "../util/functions";
@@ -10,7 +10,7 @@ import {openNewWindow, openNewWindowById} from "../window/openNewWindow";
 import {Tab} from "../layout/Tab";
 /// #endif
 import {updateHotkeyTip} from "../protyle/util/compatibility";
-import * as platformUtils from "../protyle/util/compatibility";
+import * as platformUtils from "./platformUtils";
 import {App} from "../index";
 import {Constants} from "../constants";
 import {Setting} from "./Setting";
@@ -19,8 +19,20 @@ import {Protyle} from "../protyle";
 import {openMobileFileById} from "../mobile/editor";
 import {lockScreen, exitSiYuan} from "../dialog/processSystem";
 import {Model} from "../layout/Model";
-import {getDockByType} from "../layout/tabUtil";
-import {getAllEditor, getAllModels} from "../layout/getAll";
+import {getActiveTab, getDockByType} from "../layout/tabUtil";
+/// #if !MOBILE
+import {getAllModels, getAllTabs} from "../layout/getAll";
+/// #endif
+import {getAllEditor} from "../layout/getAll";
+import {openSetting} from "../config";
+import {openAttr, openFileAttr} from "../menus/commonMenuItem";
+import {globalCommand} from "../boot/globalEvent/command/global";
+import {exportLayout} from "../layout/util";
+import {saveScroll} from "../protyle/scroll/saveScroll";
+import {hasClosestByClassName} from "../protyle/util/hasClosest";
+import {Files} from "../layout/dock/Files";
+import {ProtyleMethod} from "./ProtyleMethod";
+import {openEmojiPanel} from "../emoji";
 
 let openTab;
 let openWindow;
@@ -37,16 +49,27 @@ openWindow = (options: {
     height?: number,
     width?: number,
     tab?: Tab,
+    alwaysOnTop?: boolean,
     doc?: {
         id: string,     // 块 id
     },
 }) => {
     if (options.doc && options.doc.id) {
-        openNewWindowById(options.doc.id, {position: options.position, width: options.width, height: options.height});
+        openNewWindowById(options.doc.id, {
+            alwaysOnTop: options.alwaysOnTop,
+            position: options.position,
+            width: options.width,
+            height: options.height
+        });
         return;
     }
     if (options.tab) {
-        openNewWindow(options.tab, {position: options.position, width: options.width, height: options.height});
+        openNewWindow(options.tab, {
+            alwaysOnTop: options.alwaysOnTop,
+            position: options.position,
+            width: options.width,
+            height: options.height
+        });
         return;
     }
 };
@@ -57,6 +80,7 @@ openTab = (options: {
         id: string,     // 块 id
         action?: TProtyleAction [] // cb-get-all：获取所有内容；cb-get-focus：打开后光标定位在 id 所在的块；cb-get-hl: 打开后 id 块高亮
         zoomIn?: boolean // 是否缩放
+        mode?: TEditorMode  // 文档打开模式，默认 "wysiwyg"
     },
     pdf?: {
         path: string,
@@ -102,7 +126,9 @@ openTab = (options: {
             afterOpen: options.afterOpen,
             id: options.doc.id,
             action: options.doc.action,
-            zoomIn: options.doc.zoomIn
+            zoomIn: options.doc.zoomIn,
+            scrollPosition: "start",
+            mode: options.doc.mode,
         });
     }
     if (options.asset) {
@@ -176,11 +202,147 @@ const getModelByDockType = (type: TDock | string) => {
     /// #endif
 };
 
+const openAttributePanel = (options: {
+    data?: IObject  // 块属性值
+    nodeElement?: HTMLElement,  // 块元素
+    focusName: "bookmark" | "name" | "alias" | "memo" | "av" | "custom",    // av 为数据库页签，custom 为自定义页签，其余为内置输入框
+    protyle?: IProtyle, // 有数据库时需要传入 protyle
+}) => {
+    if (options.data) {
+        openFileAttr(options.data, options.focusName, options.protyle);
+    } else {
+        openAttr(options.nodeElement, options.focusName, options.protyle);
+    }
+};
+
+const saveLayout = (cb: () => void) => {
+    /// #if MOBILE
+    if (window.siyuan.mobile.editor) {
+        const result = saveScroll(window.siyuan.mobile.editor.protyle);
+        if (cb && result instanceof Promise) {
+            result.then(() => {
+                cb();
+            });
+        }
+    }
+    /// #else
+    exportLayout({cb, errorExit: false});
+    /// #endif
+};
+
+const getActiveEditor = (wndActive = true) => {
+    let editor;
+    /// #if !MOBILE
+    const range = getSelection().rangeCount > 0 ? getSelection().getRangeAt(0) : null;
+    const allEditor = getAllEditor();
+    if (range) {
+        editor = allEditor.find(item => {
+            if (item.protyle.element.contains(range.startContainer)) {
+                return true;
+            }
+        });
+    }
+    if (!editor) {
+        editor = allEditor.find(item => {
+            if (!item.protyle.element.classList.contains("fn__none") &&
+                hasClosestByClassName(item.protyle.element, "layout__wnd--active", true)) {
+                return true;
+            }
+        });
+    }
+    if (!editor && !wndActive) {
+        let activeTime = 0;
+        allEditor.forEach(item => {
+            let headerElement = item.protyle.model?.parent.headElement;
+            if (!headerElement && item.protyle.element.getBoundingClientRect().height > 0) {
+                const tabBodyElement = item.protyle.element.closest(".fn__flex-1[data-id]");
+                if (tabBodyElement) {
+                    headerElement = document.querySelector(`.layout-tab-bar .item[data-id="${tabBodyElement.getAttribute("data-id")}"]`);
+                }
+            }
+            if (headerElement) {
+                if (headerElement.classList.contains("item--focus") && parseInt(headerElement.dataset.activetime) > activeTime) {
+                    activeTime = parseInt(headerElement.dataset.activetime);
+                    editor = item;
+                }
+            } else if (item.protyle.element.getBoundingClientRect().height > 0) {
+                editor = item;
+            }
+        });
+    }
+    /// #else
+    editor = window.siyuan.mobile.popEditor || window.siyuan.mobile.editor;
+    if (editor?.protyle.element.classList.contains("fn__none")) {
+        return undefined;
+    }
+    /// #endif
+    return editor;
+};
+
+export const expandDocTree = async (options: {
+    id: string,
+    isSetCurrent?: boolean
+}) => {
+    let isNotebook = false;
+    window.siyuan.notebooks.find(item => {
+        if (options.id === item.id) {
+            isNotebook = true;
+            return true;
+        }
+    });
+    let liElement: HTMLElement;
+    let notebookId = options.id;
+    const file = getModelByDockType("file") as Files;
+    if (typeof options.isSetCurrent === "undefined") {
+        options.isSetCurrent = true;
+    }
+    if (isNotebook) {
+        liElement = file.element.querySelector(`.b3-list[data-url="${options.id}"]`)?.firstElementChild as HTMLElement;
+    } else {
+        const response = await fetchSyncPost("api/block/getBlockInfo", {id: options.id});
+        if (response.code === -1) {
+            return;
+        }
+        notebookId = response.data.box;
+        liElement = await file.selectItem(response.data.box, response.data.path, undefined, undefined, options.isSetCurrent);
+    }
+    if (!liElement) {
+        return;
+    }
+    if (options.isSetCurrent || typeof options.isSetCurrent === "undefined") {
+        file.setCurrent(liElement);
+    }
+    const toggleElement = liElement.querySelector(".b3-list-item__arrow");
+    if (toggleElement.classList.contains("b3-list-item__arrow--open")) {
+        return;
+    }
+    file.getLeaf(liElement, notebookId);
+};
+
+const openEmoji = (options: {
+    position: IPosition,
+    selectedCB?: (emoji: string) => void,
+    dynamicIconURL?: string
+    hideDynamicIcon?: boolean
+    hideCustomIcon?: boolean
+}) => {
+    let dynamicImgElement: HTMLImageElement;
+    if (options.dynamicIconURL) {
+        dynamicImgElement = document.createElement("img");
+        dynamicImgElement.src = options.dynamicIconURL;
+    }
+    openEmojiPanel("", "av", options.position, options.selectedCB, dynamicImgElement, {
+        dynamic: options.hideDynamicIcon,
+        custom: options.hideCustomIcon
+    });
+};
+
 export const API = {
     adaptHotkey: updateHotkeyTip,
     confirm: confirmDialog,
     Constants,
     showMessage,
+    hideMessage,
     fetchPost,
     fetchSyncPost,
     fetchGet,
@@ -193,11 +355,23 @@ export const API = {
     lockScreen,
     exitSiYuan,
     Protyle,
+    ProtyleMethod,
     Plugin,
     Dialog,
     Menu,
     Setting,
     getAllEditor,
+    /// #if !MOBILE
+    getActiveTab,
     getAllModels,
-    platformUtils
+    getAllTabs,
+    /// #endif
+    getActiveEditor,
+    platformUtils,
+    openSetting,
+    openAttributePanel,
+    saveLayout,
+    globalCommand,
+    expandDocTree,
+    openEmoji
 };

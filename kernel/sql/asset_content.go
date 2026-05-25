@@ -39,7 +39,7 @@ const (
 	AssetContentsPlaceholder              = "(?, ?, ?, ?, ?, ?, ?)"
 )
 
-func insertAssetContents(tx *sql.Tx, assetContents []*AssetContent, context map[string]interface{}) (err error) {
+func insertAssetContents(tx *sql.Tx, assetContents []*AssetContent, context map[string]any) (err error) {
 	if 1 > len(assetContents) {
 		return
 	}
@@ -64,9 +64,9 @@ func insertAssetContents(tx *sql.Tx, assetContents []*AssetContent, context map[
 	return
 }
 
-func insertAssetContents0(tx *sql.Tx, bulk []*AssetContent, context map[string]interface{}) (err error) {
+func insertAssetContents0(tx *sql.Tx, bulk []*AssetContent, context map[string]any) (err error) {
 	valueStrings := make([]string, 0, len(bulk))
-	valueArgs := make([]interface{}, 0, len(bulk)*strings.Count(AssetContentsPlaceholder, "?"))
+	valueArgs := make([]any, 0, len(bulk)*strings.Count(AssetContentsPlaceholder, "?"))
 	for _, b := range bulk {
 		valueStrings = append(valueStrings, AssetContentsPlaceholder)
 		valueArgs = append(valueArgs, b.ID)
@@ -87,7 +87,7 @@ func insertAssetContents0(tx *sql.Tx, bulk []*AssetContent, context map[string]i
 	return
 }
 
-func deleteAssetContentsByPath(tx *sql.Tx, path string, context map[string]interface{}) (err error) {
+func deleteAssetContentsByPath(tx *sql.Tx, path string) (err error) {
 	stmt := "DELETE FROM asset_contents_fts_case_insensitive WHERE path = ?"
 	if err = execStmtTx(tx, stmt, path); err != nil {
 		return

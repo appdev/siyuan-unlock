@@ -1,22 +1,3 @@
-export const hasClosestByTag = (element: Node, nodeName: string) => {
-    if (!element || element.nodeType === 9) {
-        return false;
-    }
-    if (element.nodeType === 3) {
-        element = element.parentElement;
-    }
-    let e = element as HTMLElement;
-    let isClosest = false;
-    while (e && !isClosest && !e.classList.contains("b3-typography")) {
-        if (e.nodeName.indexOf(nodeName) === 0) {
-            isClosest = true;
-        } else {
-            e = e.parentElement;
-        }
-    }
-    return isClosest && e;
-};
-
 export const hasTopClosestByClassName = (element: Node, className: string, top = false) => {
     let closest = hasClosestByClassName(element, className, top);
     let parentClosest: boolean | HTMLElement = false;
@@ -83,15 +64,7 @@ export const hasClosestByAttribute = (element: Node, attr: string, value: string
     return isClosest && e;
 };
 
-export const hasClosestBlock = (element: Node) => {
-    const nodeElement = hasClosestByAttribute(element, "data-node-id", null);
-    if (nodeElement && nodeElement.tagName !== "BUTTON" && nodeElement.getAttribute("data-type")?.startsWith("Node")) {
-        return nodeElement;
-    }
-    return false;
-};
-
-export const hasClosestByMatchTag = (element: Node, nodeName: string) => {
+export const hasClosestByTag = (element: Node, nodeName: string) => {
     if (!element || element.nodeType === 9) {
         return false;
     }
@@ -129,10 +102,18 @@ export const hasClosestByClassName = (element: Node, className: string, top = fa
     return isClosest && e;
 };
 
+export const hasClosestBlock = (element: Node) => {
+    const nodeElement = hasClosestByAttribute(element, "data-node-id", null);
+    if (nodeElement && nodeElement.tagName !== "BUTTON" && nodeElement.getAttribute("data-type")?.startsWith("Node")) {
+        return nodeElement;
+    }
+    return false;
+};
+
 export const isInEmbedBlock = (element: Element) => {
     const embedElement = hasTopClosestByAttribute(element, "data-type", "NodeBlockQueryEmbed");
     if (embedElement) {
-        if (embedElement.isSameNode(element)) {
+        if (embedElement === element) {
             return false;
         } else {
             return embedElement;
@@ -140,4 +121,11 @@ export const isInEmbedBlock = (element: Element) => {
     } else {
         return false;
     }
+};
+
+export const isInAVBlock = (element: Element) => {
+    if (hasClosestByClassName(element, "av__gallery-cover")) {
+        return hasClosestByClassName(element, "av");
+    }
+    return false;
 };

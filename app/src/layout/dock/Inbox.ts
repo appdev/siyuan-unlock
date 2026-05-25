@@ -3,8 +3,8 @@ import {Tab} from "../Tab";
 import {setPanelFocus} from "../util";
 import {getDockByType} from "../tabUtil";
 /// #endif
-import {fetchPost} from "../../util/fetch";
-import {updateHotkeyTip} from "../../protyle/util/compatibility";
+import {fetchPost, fetchSyncPost} from "../../util/fetch";
+import {updateHotkeyAfterTip} from "../../protyle/util/compatibility";
 import {Model} from "../Model";
 import {needSubscribe} from "../../util/needSubscribe";
 import {MenuItem} from "../../menus/Menu";
@@ -52,23 +52,21 @@ export class Inbox extends Model {
 <div class="fn__flex-1 fn__none inboxDetails fn__flex-column" style="min-height: auto;background-color: var(--b3-theme-background)"></div>
 <div class="fn__flex-1"></div>`;
         /// #else
-        this.element.classList.add("fn__flex-column", "file-tree", "sy__inbox");
+        this.element.classList.add("fn__flex-column", "file-tree", "sy__inbox", "dockPanel");
         this.element.innerHTML = `<div class="block__icons">
-    <div class="block__logo">
+    <div class="block__logo fn__flex-1">
         <svg class="block__logoicon"><use xlink:href="#iconInbox"></use></svg>${window.siyuan.languages.inbox}&nbsp;
         <span class="inboxSelectCount"></span>
     </div>
-    <span class="fn__flex-1"></span>
-    <span class="fn__space"></span>
     <span data-type="selectall" class="block__icon"><svg><use xlink:href="#iconUncheck"></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="previous" class="block__icon b3-tooltips b3-tooltips__w" disabled="disabled" aria-label="${window.siyuan.languages.previousLabel}"><svg><use xlink:href="#iconLeft"></use></svg></span>
+    <span data-type="previous" class="block__icon ariaLabel" disabled="disabled" data-position="north" aria-label="${window.siyuan.languages.previousLabel}"><svg><use xlink:href="#iconLeft"></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="next" class="block__icon b3-tooltips b3-tooltips__w" disabled="disabled" aria-label="${window.siyuan.languages.nextLabel}"><svg><use xlink:href="#iconRight"></use></svg></span>
+    <span data-type="next" class="block__icon ariaLabel" disabled="disabled" data-position="north" aria-label="${window.siyuan.languages.nextLabel}"><svg><use xlink:href="#iconRight"></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="more" data-menu="true" class="block__icon b3-tooltips b3-tooltips__w" aria-label="${window.siyuan.languages.more}"><svg><use xlink:href="#iconMore"></use></svg></span>
+    <span data-type="more" data-menu="true" class="block__icon ariaLabel" data-position="north" aria-label="${window.siyuan.languages.more}"><svg><use xlink:href="#iconMore"></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="min" class="block__icon b3-tooltips b3-tooltips__w" aria-label="${window.siyuan.languages.min} ${updateHotkeyTip(window.siyuan.config.keymap.general.closeTab.custom)}"><svg><use xlink:href="#iconMin"></use></svg></span>
+    <span data-type="min" class="block__icon ariaLabel" data-position="north" aria-label="${window.siyuan.languages.min}${updateHotkeyAfterTip(window.siyuan.config.keymap.general.closeTab.custom)}"><svg><use xlink:href="#iconMin"></use></svg></span>
 </div>
 <div class="fn__loading fn__none">
     <img width="64px" src="/stage/loading-pure.svg"></div>
@@ -97,7 +95,7 @@ export class Inbox extends Model {
                 }
                 const type = target.getAttribute("data-type");
                 if (type === "min") {
-                    getDockByType("inbox").toggleModel("inbox");
+                    getDockByType("inbox").toggleModel("inbox", false, true);
                     event.preventDefault();
                     break;
                 } else if (type === "selectall") {
@@ -203,7 +201,7 @@ ${data.shorthandContent}
 </div>`;
         /// #else
         if (data.shorthandURL) {
-            linkHTML = `<span class="fn__space"></span><a href="${data.shorthandURL}" target="_blank" class="block__icon block__icon--show b3-tooltips b3-tooltips__w" aria-label="${window.siyuan.languages.link}">
+            linkHTML = `<span class="fn__space"></span><a href="${data.shorthandURL}" target="_blank" class="block__icon block__icon--show ariaLabel" data-position="north" aria-label="${window.siyuan.languages.link}">
         <svg><use xlink:href="#iconLink"></use></svg>
     </a>`;
         }
@@ -284,11 +282,11 @@ ${data.shorthandContent}
                     });
                     confirmDialog(window.siyuan.languages.deleteOpConfirm, `${window.siyuan.languages.confirmDelete} ${removeTitle}?`, () => {
                         if (itemElement) {
-                            this.remove(itemElement.dataset.id);
+                            this.remove([itemElement.dataset.id]);
                         } else if (detailsElement.classList.contains("fn__none")) {
                             this.remove();
                         } else {
-                            this.remove(detailsElement.getAttribute("data-id"));
+                            this.remove([detailsElement.getAttribute("data-id")]);
                         }
                     }, undefined, true);
                 }
@@ -308,22 +306,18 @@ ${data.shorthandContent}
         window.siyuan.menus.menu.popup({x: event.clientX, y: event.clientY + 16});
     }
 
-    private remove(id?: string) {
-        let ids: string[];
-        if (id) {
-            ids = [id];
-        } else {
-            ids = this.selectIds;
+    private remove(removeIds?: string[]) {
+        if (!removeIds) {
+            removeIds = this.selectIds;
         }
-        fetchPost("/api/inbox/removeShorthands", {ids}, () => {
-            if (id) {
+        fetchPost("/api/inbox/removeShorthands", {ids: removeIds}, () => {
+            if (removeIds) {
                 this.back();
-                this.selectIds.find((item, index) => {
-                    if (item === id) {
-                        this.selectIds.splice(index, 1);
-                        return true;
+                for (let i = this.selectIds.length - 1; i >= 0; i--) {
+                    if (removeIds.includes(this.selectIds[i])) {
+                        this.selectIds.splice(i, 1);
                     }
-                });
+                }
             } else {
                 this.selectIds = [];
             }
@@ -333,26 +327,29 @@ ${data.shorthandContent}
     }
 
     private move(ids: string[]) {
-        movePathTo((toPath, toNotebook) => {
-            ids.forEach(item => {
-                fetchPost("/api/inbox/getShorthand", {
-                    id: item
-                }, (response) => {
+        movePathTo({
+            cb: async (toPath, toNotebook) => {
+                for (let i = 0; i < ids.length; i++) {
+                    const idItem = ids[i];
+                    const response = await fetchSyncPost("/api/inbox/getShorthand", {
+                        id: idItem
+                    });
                     this.data[response.data.oId] = response.data;
                     let md = response.data.shorthandMd;
                     if ("" === md && "" === response.data.shorthandContent && "" != response.data.shorthandURL) {
                         md = "[" + response.data.shorthandTitle + "](" + response.data.shorthandURL + ")";
                     }
-                    fetchPost("/api/filetree/createDoc", {
+                    await fetchSyncPost("/api/filetree/createDoc", {
                         notebook: toNotebook[0],
                         path: pathPosix().join(getDisplayName(toPath[0], false, true), Lute.NewNodeID() + ".sy"),
                         title: replaceFileName(response.data.shorthandTitle),
-                        md: md,
-                    }, () => {
-                        this.remove(item);
+                        md,
+                        listDocTree: true,
                     });
-                });
-            });
+                }
+                this.remove(ids);
+            },
+            flashcard: false
         });
     }
 
@@ -364,7 +361,7 @@ ${data.shorthandContent}
         ${window.siyuan.languages.inboxTip}
     </li>
     <li class="b3-list--empty">
-        ${window.siyuan.config.system.container === "ios" ? window.siyuan.languages._kernel[122] : window.siyuan.languages._kernel[29].replace("${url}", getCloudURL("subscribe/siyuan"))}
+        ${window.siyuan.config.system.container === "ios" ? window.siyuan.languages._kernel[122] : window.siyuan.languages._kernel[29].replaceAll("${accountServer}", getCloudURL(""))}
     </li>
 </ul>`;
             loadingElement.classList.add("fn__none");

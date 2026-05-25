@@ -27,8 +27,10 @@ export const unicode2Emoji = (unicode: string, className = "", needSpan = false,
     let emoji = "";
     if (unicode.startsWith("api/icon/getDynamicIcon")) {
         emoji = `<img class="${className}" ${lazy ? "data-" : ""}src="${unicode}"/>`;
+        emoji = Lute.Sanitize(emoji);
     } else if (unicode.indexOf(".") > -1) {
         emoji = `<img class="${className}" ${lazy ? "data-" : ""}src="/emojis/${unicode}"/>`;
+        emoji = Lute.Sanitize(emoji);
     } else {
         try {
             unicode.split("-").forEach(item => {
@@ -85,7 +87,7 @@ export const lazyLoadEmojiImg = (element: Element) => {
     });
 };
 
-export const filterEmoji = (key = "", max?: number) => {
+export const filterEmoji = (key = "", max?: number, hideCustom = false) => {
     let html = "";
     const recentEmojis: IEmojiItem[] = [];
     if (key) {
@@ -95,6 +97,9 @@ export const filterEmoji = (key = "", max?: number) => {
     let keyHTML = "";
     const customStore: IEmojiItem[] = [];
     window.siyuan.emojis.forEach((category, index) => {
+        if (hideCustom && category.id === "custom") {
+            return;
+        }
         if (!key) {
             html += `<div class="emojis__title" data-type="${index + 1}">${getEmojiTitle(index)}</div><div style="min-height:${index === 0 ? "30px" : "300px"}" class="emojis__content"${index > 1 ? ' data-index="' + index + '"' : ""}>`;
         }
@@ -216,7 +221,29 @@ const genWeekdayOptions = (lang: string, weekdayType: string) => {
 <option value="4" ${weekdayType === "4" ? " selected" : ""}>${dynamicWeekdayLang[4][currentLang]}</option>`;
 };
 
-export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", position: IPosition, avCB?: (emoji: string) => void, dynamicImgElement?: HTMLElement) => {
+const renderEmojiContent = (previousIndex: string, previousContentElement: Element) => {
+    if (!previousIndex) {
+        return;
+    }
+    let html = "";
+    window.siyuan.emojis[parseInt(previousIndex)].items.forEach(emoji => {
+        html += `<button data-unicode="${emoji.unicode}" class="emojis__item ariaLabel" aria-label="${getEmojiDesc(emoji)}">${unicode2Emoji(emoji.unicode)}</button>`;
+    });
+    previousContentElement.innerHTML = html;
+    previousContentElement.removeAttribute("data-index");
+    previousContentElement.removeAttribute("style");
+};
+
+export const openEmojiPanel = (
+    id: string,
+    type: "doc" | "notebook" | "av",
+    position: IPosition,
+    callback?: (emoji: string) => void,
+    dynamicImgElement?: HTMLElement,
+    hide?: {
+        dynamic: boolean,
+        custom: boolean
+    }) => {
     if (type !== "av") {
         window.siyuan.menus.menu.remove();
     } else {
@@ -227,7 +254,7 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
     const dynamicCurrentObj: IObject = {
         color: "#d23f31",
         lang: "",
-        date: "",
+        date: dayjs().format("YYYY-MM-DD"),
         weekdayType: "1",
         type: "1",
         content: "SiYuan",
@@ -255,7 +282,7 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
     <div class="emojis__tabheader">
         <div data-type="tab-emoji" class="ariaLabel block__icon block__icon--show" aria-label="${window.siyuan.languages.emoji}"><svg><use xlink:href="#iconEmoji"></use></svg></div>
         <div class="fn__space"></div>
-        <div data-type="tab-dynamic" class="ariaLabel block__icon block__icon--show" aria-label="${window.siyuan.languages.dynamicEmoji}"><svg><use xlink:href="#iconCalendar"></use></svg></div>
+        <div data-type="tab-dynamic" class="ariaLabel block__icon block__icon--show${hide?.dynamic ? " fn__none" : ""}" aria-label="${window.siyuan.languages.dynamicIcon}"><svg><use xlink:href="#iconCalendar"></use></svg></div>
         <div class="fn__flex-1"></div>
         <span class="block__icon block__icon--show fn__flex-center ariaLabel" data-action="remove" aria-label="${window.siyuan.languages.remove}"><svg><use xlink:href="#iconTrashcan"></use></svg></span>
     </div>
@@ -272,7 +299,7 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
                 <span class="block__icon block__icon--show fn__flex-center ariaLabel" data-action="random" aria-label="${window.siyuan.languages.random}"><svg><use xlink:href="#iconRefresh"></use></svg></span>
                 <span class="fn__space"></span>
             </div>
-            <div class="emojis__panel">${filterEmoji()}</div>
+            <div class="emojis__panel">${filterEmoji("", null, hide?.custom)}</div>
             <div class="fn__flex">
                 ${[
             ["2b50", window.siyuan.languages.recentEmoji],
@@ -285,9 +312,12 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
             ["1f52e", getEmojiTitle(6)],
             ["267e-fe0f", getEmojiTitle(7)],
             ["1f6a9", getEmojiTitle(8)],
-        ].map(([unicode, title], index) =>
-            `<div data-type="${index}" class="emojis__type ariaLabel" aria-label="${title}">${unicode2Emoji(unicode)}</div>`
-        ).join("")}
+        ].map(([unicode, title], index) => {
+            if (hide?.custom && index === 1) {
+                return "";
+            }
+            return `<div data-type="${index}" class="emojis__type ariaLabel" aria-label="${title}">${unicode2Emoji(unicode)}</div>`;
+        }).join("")}
             </div>
         </div>
         <div class="fn__none" data-type="tab-dynamic">
@@ -320,7 +350,9 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
                 <span class="fn__space"></span>
                 <span class="fn__flex-center ft__on-surface" style="width: 89px">${window.siyuan.languages.date}</span>
                 <span class="fn__space--small"></span>
-                <input type="date" class="b3-text-field fn__flex-1" value="${dynamicCurrentObj.date}"/>
+                <input type="date" max="9999-12-31" class="b3-text-field fn__flex-1" value="${dynamicCurrentObj.date}"/>
+                <span class="fn__space--small"></span>
+                <span data-action="clearDate" class="ariaLabel block__icon block__icon--show" aria-label="${window.siyuan.languages.dynamicIconDateEmptyInfo}"><svg><use xlink:href="#iconTrashcan"></use></svg></span>
                 <span class="fn__space"></span>
             </div>
             <div class="fn__hr"></div>
@@ -347,11 +379,11 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
                 <span class="fn__space"></span>
                 <span class="fn__flex-center ft__on-surface" style="width: 89px">${window.siyuan.languages.custom}</span>
                 <span class="fn__space--small"></span>
-                <input type="text" class="b3-text-field fn__flex-1" value="${dynamicCurrentObj.content}">
+                <input type="text" class="b3-text-field fn__flex-1" value="">
                 <span class="fn__space"></span>
             </div>
             <div>
-                <img data-type="text" class="emoji__dynamic-item${dynamicCurrentObj.type === "8" ? " emoji__dynamic-item--current" : ""}" src="${dynamicURL}type=8&color=${encodeURIComponent(dynamicCurrentObj.color)}&content=${dynamicCurrentObj.content}&id=${id}">
+                <img data-type="text" class="emoji__dynamic-item${dynamicCurrentObj.type === "8" ? " emoji__dynamic-item--current" : ""}" src="${dynamicURL}type=8&color=${encodeURIComponent(dynamicCurrentObj.color)}&content=${encodeURIComponent(dynamicCurrentObj.content)}&id=${id}">
             </div>
         </div>
     </div>
@@ -370,7 +402,7 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
     const emojiSearchInputElement = dialog.element.querySelector('[data-type="tab-emoji"] .b3-text-field') as HTMLInputElement;
     const emojisContentElement = dialog.element.querySelector(".emojis__panel");
     emojiSearchInputElement.addEventListener("compositionend", () => {
-        emojisContentElement.innerHTML = filterEmoji(emojiSearchInputElement.value);
+        emojisContentElement.innerHTML = filterEmoji(emojiSearchInputElement.value, null, hide?.custom);
         if (emojiSearchInputElement.value) {
             emojisContentElement.nextElementSibling.classList.add("fn__none");
         } else {
@@ -387,7 +419,7 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
         if (event.isComposing) {
             return;
         }
-        emojisContentElement.innerHTML = filterEmoji(emojiSearchInputElement.value);
+        emojisContentElement.innerHTML = filterEmoji(emojiSearchInputElement.value, null, hide?.custom);
         if (emojiSearchInputElement.value) {
             emojisContentElement.nextElementSibling.classList.add("fn__none");
         } else {
@@ -419,7 +451,6 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
                     icon: unicode
                 }, () => {
                     dialog.destroy();
-                    addEmoji(unicode);
                     updateFileTreeEmoji(unicode, id, "iconFilesRoot");
                 });
             } else if (type === "doc") {
@@ -428,13 +459,14 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
                     attrs: {"icon": unicode}
                 }, () => {
                     dialog.destroy();
-                    addEmoji(unicode);
                     updateFileTreeEmoji(unicode, id);
                     updateOutlineEmoji(unicode, id);
                 });
-            } else {
-                avCB(unicode);
             }
+            if (callback) {
+                callback(unicode);
+            }
+            addEmoji(unicode);
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -525,15 +557,9 @@ export const openEmojiPanel = (id: string, type: "doc" | "notebook" | "av", posi
                 if (titleElement) {
                     const index = titleElement.nextElementSibling.getAttribute("data-index");
                     if (index) {
-                        let html = "";
-                        window.siyuan.emojis[parseInt(index)].items.forEach(emoji => {
-                            html += `<button data-unicode="${emoji.unicode}" class="emojis__item ariaLabel" aria-label="${getEmojiDesc(emoji)}">
-${unicode2Emoji(emoji.unicode)}</button>`;
-                        });
-                        titleElement.nextElementSibling.innerHTML = html;
-                        titleElement.nextElementSibling.removeAttribute("data-index");
+                        renderEmojiContent(titleElement.previousElementSibling?.getAttribute("data-index"), titleElement.previousElementSibling);
+                        renderEmojiContent(index, titleElement.nextElementSibling);
                     }
-
                     emojisContentElement.scrollTo({
                         top: titleElement.offsetTop - 77,
                         // behavior: "smooth"  不能使用，否则无法定位
@@ -546,7 +572,6 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
                         notebook: id,
                         icon: ""
                     }, () => {
-                        dialog.destroy();
                         updateFileTreeEmoji("", id, "iconFilesRoot");
                     });
                 } else if (type === "doc") {
@@ -554,13 +579,14 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
                         id: id,
                         attrs: {"icon": ""}
                     }, () => {
-                        dialog.destroy();
                         updateFileTreeEmoji("", id);
                         updateOutlineEmoji("", id);
                     });
-                } else {
-                    avCB("");
                 }
+                if (callback) {
+                    callback("");
+                }
+                dialog.destroy();
                 break;
             } else if (target.classList.contains("emojis__item") || target.getAttribute("data-action") === "random" || target.classList.contains("emoji__dynamic-item")) {
                 let unicode = "";
@@ -579,7 +605,6 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
                         notebook: id,
                         icon: unicode
                     }, () => {
-                        addEmoji(unicode);
                         updateFileTreeEmoji(unicode, id, "iconFilesRoot");
                     });
                 } else if (type === "doc") {
@@ -587,13 +612,14 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
                         id,
                         attrs: {"icon": unicode}
                     }, () => {
-                        addEmoji(unicode);
                         updateFileTreeEmoji(unicode, id);
                         updateOutlineEmoji(unicode, id);
                     });
-                } else {
-                    avCB(unicode);
                 }
+                if (callback) {
+                    callback(unicode);
+                }
+                addEmoji(unicode);
                 break;
             } else if (target.getAttribute("data-type")?.startsWith("tab-")) {
                 dialogElement.querySelectorAll('.emojis__tabheader [data-type|="tab"]').forEach((item: HTMLElement) => {
@@ -616,6 +642,10 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
             } else if (target.classList.contains("color__square")) {
                 dynamicTextElements[0].value = target.getAttribute("style").replace("background-color:", "");
                 dynamicTextElements[0].dispatchEvent(new CustomEvent("input"));
+                break;
+            } else if ("clearDate" === target.dataset.action) {
+                dynamicDateElement.value = "";
+                dynamicDateElement.dispatchEvent(new CustomEvent("change"));
                 break;
             }
             target = target.parentElement;
@@ -668,6 +698,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
             }
         });
     });
+    dynamicTextElements[1].value = dynamicCurrentObj.content;
     dynamicTextElements[1].addEventListener("input", () => {
         const url = new URLSearchParams(dynamicTextImgElement.getAttribute("src").replace(dynamicURL, ""));
         url.set("content", dynamicTextElements[1].value);

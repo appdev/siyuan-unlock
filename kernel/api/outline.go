@@ -22,6 +22,7 @@ import (
 	"github.com/88250/gulu"
 	"github.com/gin-gonic/gin"
 	"github.com/siyuan-note/siyuan/kernel/model"
+	"github.com/siyuan-note/siyuan/kernel/treenode"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
@@ -44,11 +45,29 @@ func getDocOutline(c *gin.Context) {
 	}
 
 	rootID := arg["id"].(string)
+	if util.InvalidIDPattern(rootID, ret) {
+		return
+	}
+
 	headings, err := model.Outline(rootID, preview)
 	if err != nil {
 		ret.Code = 1
 		ret.Msg = err.Error()
 		return
+	}
+	if model.IsReadOnlyRoleContext(c) {
+		publishAccess := model.GetPublishAccess()
+		bt := treenode.GetBlockTree(rootID)
+		if bt != nil {
+			passwordID, password := model.GetPathPasswordByPublishAccess(bt.BoxID, bt.Path, publishAccess)
+			if password != "" && !model.CheckPublishAuthCookie(c, passwordID, password) {
+				headings = nil
+			}
+			publishIgnore := model.GetDisablePublishAccess(publishAccess)
+			if !model.CheckPathAccessableByPublishIgnore(bt.BoxID, bt.Path, publishIgnore) {
+				headings = nil
+			}
+		}
 	}
 	ret.Data = headings
 }

@@ -64,7 +64,7 @@ func FlushAssetContentQueue() {
 		groupOpsTotal[op.action]++
 	}
 
-	context := map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
+	context := map[string]any{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
 	groupOpsCurrent := map[string]int{}
 	for i, op := range ops {
 		if util.IsExiting.Load() {
@@ -101,18 +101,18 @@ func FlushAssetContentQueue() {
 		debug.FreeOSMemory()
 	}
 
-	elapsed := time.Now().Sub(start).Milliseconds()
+	elapsed := time.Since(start).Milliseconds()
 	if 7000 < elapsed {
 		logging.LogInfof("database asset content op tx [%dms]", elapsed)
 	}
 }
 
-func execAssetContentOp(op *assetContentDBQueueOperation, tx *sql.Tx, context map[string]interface{}) (err error) {
+func execAssetContentOp(op *assetContentDBQueueOperation, tx *sql.Tx, context map[string]any) (err error) {
 	switch op.action {
 	case "index":
 		err = insertAssetContents(tx, op.assetContents, context)
 	case "deletePath":
-		err = deleteAssetContentsByPath(tx, op.path, context)
+		err = deleteAssetContentsByPath(tx, op.path)
 	default:
 		msg := fmt.Sprintf("unknown asset content operation [%s]", op.action)
 		logging.LogErrorf(msg)

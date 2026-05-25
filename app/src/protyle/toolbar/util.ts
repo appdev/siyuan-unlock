@@ -66,20 +66,14 @@ export const removeSearchMark = (element: HTMLElement) => {
 };
 
 export const removeInlineType = (inlineElement: HTMLElement, type: string, range?: Range) => {
-    const types = inlineElement.getAttribute("data-type").split(" ");
-    if (types.length === 1) {
+    const types = (inlineElement.getAttribute("data-type") || "").split(" ").filter((item) => item !== "" && item !== type);
+    if (types.length === 0) {
         const linkParentElement = inlineElement.parentElement;
         inlineElement.outerHTML = inlineElement.innerHTML.replace(Constants.ZWSP, "") + "<wbr>";
         if (range) {
             focusByWbr(linkParentElement, range);
         }
     } else {
-        types.find((itemType, index) => {
-            if (type === itemType) {
-                types.splice(index, 1);
-                return true;
-            }
-        });
         inlineElement.setAttribute("data-type", types.join(" "));
         if (type === "a") {
             inlineElement.removeAttribute("data-href");
@@ -215,13 +209,46 @@ export const toolbarKeyToMenu = (toolbar: Array<string | IMenuItem>) => {
     return toolbarResult;
 };
 
+/**
+ * Detect a URL from text, handling the `assets/` prefix and `GetLinkDest`.
+ * Returns the resolved href, or an empty string if no URL was detected.
+ */
+export const resolveLinkDest = (text: string, lute: Lute): string => {
+    if (text.startsWith("assets/")) {
+        return text;
+    }
+    return lute.GetLinkDest(text);
+};
+
+/**
+ * Generate a display label for a link URL: decode, optionally strip protocol, and truncate.
+ * Shared between Ctrl+K link handler and paste URL auto-convert.
+ * @param stripScheme When true, removes https:// and http:// prefixes (used by Ctrl+K).
+ */
+export const genLinkText = (href: string, stripScheme: boolean = true, decodeURI: boolean = false): string => {
+    try {
+        let text = stripScheme
+            ? href.replace("https://", "").replace("http://", "")
+            : href;
+        if (decodeURI) {
+            text = decodeURIComponent(text);
+        }
+        if (text.length > Constants.SIZE_LINK_TEXT_MAX) {
+            text = text.substring(0, Constants.SIZE_LINK_TEXT_MAX) + "...";
+        }
+        return text;
+    } catch {
+        return href;
+    }
+};
+
 export const copyTextByType = async (ids: string[],
-                                     type: "ref" | "blockEmbed" | "protocol" | "protocolMd" | "hPath" | "id") => {
+                                     type: "ref" | "blockEmbed" | "protocol" | "protocolMd" | "hPath" | "id" | "webURL") => {
     let text = "";
     for (let i = 0; i < ids.length; i++) {
         const id = ids[i];
         if (ids.length > 1) {
-            text += "* ";
+            text += "- ";
         }
         if (type === "ref") {
             const response = await fetchSyncPost("/api/block/getRefText", {id});
@@ -236,6 +263,8 @@ export const copyTextByType = async (ids: string[],
         } else if (type === "hPath") {
             const response = await fetchSyncPost("/api/filetree/getHPathByID", {id});
             text += response.data;
+        } else if (type === "webURL") {
+            text += `${window.location.origin}?id=${id}`;
         } else if (type === "id") {
             text += id;
         }

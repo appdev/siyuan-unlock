@@ -1,13 +1,13 @@
 {
 	"ID": "20200923234731-h3zkwm2",
-	"Spec": "1",
+	"Spec": "2",
 	"Type": "NodeDocument",
 	"Properties": {
 		"icon": "2753",
 		"id": "20200923234731-h3zkwm2",
 		"title": "FAQ",
 		"type": "doc",
-		"updated": "20230820183340"
+		"updated": "20250518103440"
 	},
 	"Children": [
 		{
@@ -442,7 +442,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20220808181753-3ligpvz",
-				"updated": "20220808181753"
+				"updated": "20250518103440"
 			},
 			"Children": [
 				{
@@ -608,7 +608,7 @@
 								},
 								{
 									"Type": "NodeText",
-									"Data": "​​ - "
+									"Data": "​ - "
 								},
 								{
 									"Type": "NodeTextMark",
@@ -617,7 +617,7 @@
 								},
 								{
 									"Type": "NodeText",
-									"Data": "​​ - "
+									"Data": "​ - "
 								},
 								{
 									"Type": "NodeTextMark",
@@ -626,7 +626,7 @@
 								},
 								{
 									"Type": "NodeText",
-									"Data": "​​ / "
+									"Data": "​ / "
 								},
 								{
 									"Type": "NodeTextMark",
@@ -635,11 +635,25 @@
 								},
 								{
 									"Type": "NodeText",
-									"Data": "​​"
+									"Data": "​"
 								}
 							]
 						}
 					]
+				}
+			]
+		},
+		{
+			"ID": "20250518103412-4mf2mer",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20250518103412-4mf2mer",
+				"updated": "20250518103440"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "On macOS, SiYuan will access the Desktop, Documents, and iCloud drive folders to detect whether the workspace is placed under the iCloud synchronization path. Please rest assured that SiYuan will never snoop on your personal data."
 				}
 			]
 		},
@@ -913,7 +927,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20220708111435-xmj42q4",
-				"updated": "20220708111439"
+				"updated": "20250115163037"
 			},
 			"Children": [
 				{
@@ -928,7 +942,7 @@
 			"ListData": {},
 			"Properties": {
 				"id": "20220708111435-a2z4tpd",
-				"updated": "20220708111614"
+				"updated": "20250115163037"
 			},
 			"Children": [
 				{
@@ -1004,7 +1018,7 @@
 					},
 					"Properties": {
 						"id": "20220708111435-ptoqng0",
-						"updated": "20220708111603"
+						"updated": "20250115163037"
 					},
 					"Children": [
 						{
@@ -1029,7 +1043,7 @@
 							},
 							"Properties": {
 								"id": "20220708111435-w2hbl28",
-								"updated": "20220708111603"
+								"updated": "20250115163037"
 							},
 							"Children": [
 								{
@@ -1043,7 +1057,7 @@
 									},
 									"Properties": {
 										"id": "20220708111435-nev43mp",
-										"updated": "20220708111435"
+										"updated": "20250115163037"
 									},
 									"Children": [
 										{
@@ -1051,7 +1065,7 @@
 											"Type": "NodeParagraph",
 											"Properties": {
 												"id": "20220708111435-zrahxh3",
-												"updated": "20220708111435"
+												"updated": "20250115163037"
 											},
 											"Children": [
 												{
@@ -1065,16 +1079,16 @@
 												},
 												{
 													"Type": "NodeText",
-													"Data": " or directly copy the "
+													"Data": "​ or directly copy the "
 												},
 												{
 													"Type": "NodeTextMark",
-													"TextMarkType": "kbd",
+													"TextMarkType": "code",
 													"TextMarkTextContent": "workspace/data/"
 												},
 												{
 													"Type": "NodeText",
-													"Data": " folder on the file system"
+													"Data": "​ folder on the file system"
 												}
 											]
 										}

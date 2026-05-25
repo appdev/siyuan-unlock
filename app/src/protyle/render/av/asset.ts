@@ -7,17 +7,23 @@ import {uploadFiles} from "../../upload";
 import {pathPosix} from "../../../util/pathName";
 import {openMenu} from "../../../menus/commonMenuItem";
 import {MenuItem} from "../../../menus/Menu";
-import {copyPNGByLink, exportAsset} from "../../../menus/util";
+import {writeAssetToClipboard, copyPNGByLink, exportAsset} from "../../../menus/util";
 import {setPosition} from "../../../util/setPosition";
-import {previewImage} from "../../preview/image";
+import {previewAttrViewImages} from "../../preview/image";
 import {genAVValueHTML} from "./blockAttr";
 import {hideMessage, showMessage} from "../../../dialog/message";
 import {fetchPost} from "../../../util/fetch";
-import {hasClosestBlock, hasClosestByClassName} from "../../util/hasClosest";
+import {hasClosestBlock} from "../../util/hasClosest";
 import {genCellValueByElement, getTypeByCellElement} from "./cell";
 import {writeText} from "../../util/compatibility";
 import {escapeAttr} from "../../../util/escape";
 import {renameAsset} from "../../../editor/rename";
+import * as dayjs from "dayjs";
+import {getColId} from "./col";
+import {getFieldIdByCellElement} from "./row";
+import {base64ToURL, getCompressURL, removeCompressURL} from "../../../util/image";
+import {confirmDialog} from "../../../dialog/confirmDialog";
+import {filesize} from "filesize";
 
 export const bindAssetEvent = (options: {
     protyle: IProtyle,
@@ -56,8 +62,8 @@ export const getAssetHTML = (cellElements: HTMLElement[]) => {
     genCellValueByElement("mAsset", cellElements[0]).mAsset.forEach((item, index) => {
         let contentHTML;
         if (item.type === "image") {
-            contentHTML = `<span data-type="openAssetItem" class="fn__flex-1 ariaLabel" aria-label="${item.content}">
-    <img style="max-height: 180px;max-width: 360px;border-radius: var(--b3-border-radius);margin: 4px 0;" src="${item.content}"/>
+            contentHTML = `<span data-type="openAssetItem" class="fn__flex-1 ariaLabel" aria-label="${escapeAttr(item.content)}">
+    <img style="max-height: 180px;max-width: 360px;border-radius: var(--b3-border-radius);margin: 4px 0;" src="${getCompressURL(encodeURI(item.content))}"/>
 </span>`;
         } else {
             contentHTML = `<span data-type="openAssetItem" class="fn__ellipsis b3-menu__label ariaLabel" aria-label="${escapeAttr(item.content)}" style="max-width: 360px">${item.name || item.content}</span>`;
@@ -69,9 +75,13 @@ ${contentHTML}
 <svg class="b3-menu__action" data-type="editAssetItem"><use xlink:href="#iconEdit"></use></svg>
 </button>`;
     });
-    return `<div class="b3-menu__items">
+    const ids: string[] = [];
+    cellElements.forEach(item => {
+        ids.push(item.dataset.id);
+    });
+    return `<div class="b3-menu__items" data-ids="${ids}">
     ${html}
-    <button data-type="addAssetExist" class="b3-menu__item">
+    <button data-type="addAssetExist" class="b3-menu__item b3-menu__item--current">
         <svg class="b3-menu__icon"><use xlink:href="#iconImage"></use></svg>
         <span class="b3-menu__label">${window.siyuan.languages.assets}</span>
     </button>
@@ -96,22 +106,22 @@ export const updateAssetCell = (options: {
     removeIndex?: number,
     blockElement: Element
 }) => {
-    const colId = options.cellElements[0].dataset.colId;
+    const viewType = options.blockElement.getAttribute("data-av-type") as TAVView;
+    const colId = getColId(options.cellElements[0], viewType);
     const cellDoOperations: IOperation[] = [];
     const cellUndoOperations: IOperation[] = [];
     let mAssetValue: IAVCellAssetValue[];
     options.cellElements.forEach((item, elementIndex) => {
+        const rowID = getFieldIdByCellElement(item, viewType);
         if (!options.blockElement.contains(item)) {
-            const rowElement = hasClosestByClassName(item, "av__row");
-            if (rowElement) {
-                item = options.cellElements[elementIndex] =
-                    (options.blockElement.querySelector(`.av__row[data-id="${rowElement.dataset.id}"] .av__cell[data-col-id="${item.dataset.colId}"]`) ||
-                        // block attr
-                        options.blockElement.querySelector(`.fn__flex-1[data-col-id="${item.dataset.colId}"]`)) as HTMLElement;
+            if (viewType === "table") {
+                item = options.cellElements[elementIndex] = (options.blockElement.querySelector(`.av__row[data-id="${rowID}"] .av__cell[data-col-id="${item.dataset.colId}"]`) ||
+                    options.blockElement.querySelector(`.fn__flex-1[data-col-id="${item.dataset.colId}"]`)) as HTMLElement;
+            } else {
+                item = options.cellElements[elementIndex] = (options.blockElement.querySelector(`.av__gallery-item[data-id="${rowID}"] .av__cell[data-field-id="${item.dataset.fieldId}"]`)) as HTMLElement;
             }
         }
         const cellValue = genCellValueByElement(getTypeByCellElement(item) || item.dataset.type as TAVCol, item);
-        const rowID = (hasClosestByClassName(item, "av__row") as HTMLElement).dataset.id;
         const oldValue = JSON.parse(JSON.stringify(cellValue));
         if (elementIndex === 0) {
             if (typeof options.removeIndex === "number") {
@@ -157,6 +167,11 @@ export const updateAssetCell = (options: {
             updateAttrViewCellAnimation(item, cellValue);
         }
     });
+    cellDoOperations.push({
+        action: "doUpdateUpdated",
+        id: options.blockElement.getAttribute("data-node-id"),
+        data: dayjs().format("YYYYMMDDHHmmss"),
+    });
     transaction(options.protyle, cellDoOperations, cellUndoOperations);
     const menuElement = document.querySelector(".av__panel > .b3-menu") as HTMLElement;
     if (menuElement) {
@@ -184,13 +199,19 @@ export const editAssetItem = (options: {
     index: number,
     rect: DOMRect
 }) => {
-    const linkAddress = options.content;
+    const linkAddress = removeCompressURL(options.content);
     const type = options.type as "image" | "file";
-    const menu = new Menu("av-asset-edit", () => {
-        if ((!textElements[1] && textElements[0].value === linkAddress) ||
-            (textElements[1] && textElements[0].value === linkAddress && textElements[1].value === options.name)) {
+    const menu = new Menu(Constants.MENU_AV_ASSET_EDIT, async () => {
+        let currentLink = textElements[0].value;
+        if ((!textElements[1] && currentLink === decodeURI(linkAddress)) ||
+            (textElements[1] && currentLink === decodeURI(linkAddress) && textElements[1].value === options.name)) {
             return;
         }
+        if (type === "image" && currentLink.startsWith("data:image/")) {
+            const base64Src = await base64ToURL([currentLink]);
+            currentLink = base64Src[0];
+        }
+
         updateAssetCell({
             protyle: options.protyle,
             cellElements: options.cellElements,
@@ -198,7 +219,7 @@ export const editAssetItem = (options: {
             updateValue: {
                 index: options.index,
                 value: {
-                    content: textElements[0].value,
+                    content: currentLink,
                     name: textElements[1] ? textElements[1].value : "",
                     type
                 }
@@ -210,37 +231,91 @@ export const editAssetItem = (options: {
     }
     if (type === "file") {
         menu.addItem({
+            id: "linkAndTitle",
             iconHTML: "",
             type: "readonly",
-            label: `${window.siyuan.languages.link}
-<textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px;resize: vertical;" class="b3-text-field"></textarea>
-<div class="fn__hr"></div>
-${window.siyuan.languages.title}
-<textarea style="width: ${isMobile() ? "200" : "360"}px;margin: 4px 0;resize: vertical;" rows="1" class="b3-text-field"></textarea>`,
+            label: `<div class="fn__flex">
+    <span class="fn__flex-center">${window.siyuan.languages.link}</span>
+    <span class="fn__space"></span>
+    <span data-action="copy" class="block__icon block__icon--show b3-tooltips b3-tooltips__e fn__flex-center" aria-label="${window.siyuan.languages.copy}">
+        <svg><use xlink:href="#iconCopy"></use></svg>
+    </span>   
+</div><textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "100%" : "360px"};resize: vertical;" class="b3-text-field"></textarea><div class="fn__hr"></div><div class="fn__flex">
+    <span class="fn__flex-center">${window.siyuan.languages.title}</span>
+    <span class="fn__space"></span>
+    <span data-action="copy" class="block__icon block__icon--show b3-tooltips b3-tooltips__e fn__flex-center" aria-label="${window.siyuan.languages.copy}">
+        <svg><use xlink:href="#iconCopy"></use></svg>
+    </span>   
+</div><textarea style="width: ${isMobile() ? "100%" : "360px"};margin: 4px 0;resize: vertical;" rows="1" class="b3-text-field"></textarea>`,
+            bind(element) {
+                element.addEventListener("click", (event) => {
+                    let target = event.target as HTMLElement;
+                    while (target) {
+                        if (target.dataset.action === "copy") {
+                            writeText((target.parentElement.nextElementSibling as HTMLTextAreaElement).value);
+                            showMessage(window.siyuan.languages.copied);
+                            break;
+                        }
+                        target = target.parentElement;
+                    }
+                });
+            }
         });
-    } else {
+        menu.addSeparator({id: "separator_1"});
         menu.addItem({
-            iconHTML: "",
-            type: "readonly",
-            label: `${window.siyuan.languages.link}
-<textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "200" : "360"}px;resize: vertical;" class="b3-text-field"></textarea>`,
-        });
-        menu.addItem({
+            id: "copy",
             label: window.siyuan.languages.copy,
             icon: "iconCopy",
             click() {
-                writeText(`![](${linkAddress.replace(/%20/g, " ")})`);
+                writeText(`[${textElements[1].value || textElements[0].value}](${textElements[0].value})`);
+            }
+        });
+    } else {
+        menu.addItem({
+            id: "link",
+            iconHTML: "",
+            type: "readonly",
+            label: `<div class="fn__flex">
+    <span class="fn__flex-center">${window.siyuan.languages.link}</span>
+    <span class="fn__space"></span>
+    <span data-action="copy" class="block__icon block__icon--show b3-tooltips b3-tooltips__e fn__flex-center" aria-label="${window.siyuan.languages.copy}">
+        <svg><use xlink:href="#iconCopy"></use></svg>
+    </span>   
+</div><textarea rows="1" style="margin:4px 0;width: ${isMobile() ? "100%" : "360px"};resize: vertical;" class="b3-text-field"></textarea>`,
+            bind(element) {
+                element.addEventListener("click", (event) => {
+                    let target = event.target as HTMLElement;
+                    while (target) {
+                        if (target.dataset.action === "copy") {
+                            writeText((target.parentElement.nextElementSibling as HTMLTextAreaElement).value);
+                            showMessage(window.siyuan.languages.copied);
+                            break;
+                        }
+                        target = target.parentElement;
+                    }
+                });
+            }
+        });
+        menu.addSeparator({id: "separator_1"});
+        menu.addItem({
+            id: "copy",
+            label: window.siyuan.languages.copy,
+            icon: "iconCopy",
+            click() {
+                writeText(`![](${textElements[0].value})`);
             }
         });
         menu.addItem({
+            id: "copyAsPNG",
             label: window.siyuan.languages.copyAsPNG,
             icon: "iconImage",
             click() {
-                copyPNGByLink(linkAddress);
+                copyPNGByLink(textElements[0].value);
             }
         });
     }
     menu.addItem({
+        id: "delete",
         icon: "iconTrashcan",
         label: window.siyuan.languages.delete,
         click() {
@@ -254,37 +329,59 @@ ${window.siyuan.languages.title}
     });
     if (linkAddress?.startsWith("assets/")) {
         menu.addItem({
+            id: "rename",
             label: window.siyuan.languages.rename,
             icon: "iconEdit",
             click() {
-                renameAsset(linkAddress);
+                renameAsset(decodeURI(linkAddress));
                 document.querySelector(".av__panel")?.remove();
             }
         });
     }
-    menu.addSeparator();
+    const openSubMenu = openMenu(options.protyle ? options.protyle.app : window.siyuan.ws.app, linkAddress, true, false);
+    if (type !== "file" || openSubMenu.length > 0) {
+        menu.addSeparator({id: "separator_2"});
+    }
     if (type !== "file") {
         menu.addItem({
+            id: "cardPreview",
             icon: "iconPreview",
             label: window.siyuan.languages.cardPreview,
             click() {
-                previewImage(linkAddress);
+                previewAttrViewImages(
+                    linkAddress,
+                    options.blockElement.getAttribute("data-av-id"),
+                    options.blockElement.getAttribute(Constants.CUSTOM_SY_AV_VIEW),
+                    options.blockElement.querySelector('[data-type="av-search"]')?.textContent.trim() || ""
+                );
             }
         });
     }
-    openMenu(options.protyle ? options.protyle.app : window.siyuan.ws.app, linkAddress, false, false);
+    if (openSubMenu.length > 0) {
+        window.siyuan.menus.menu.append(new MenuItem({
+            id: "openBy",
+            label: window.siyuan.languages.openBy,
+            icon: "iconOpen",
+            submenu: openSubMenu
+        }).element);
+    }
     if (linkAddress?.startsWith("assets/")) {
         window.siyuan.menus.menu.append(new MenuItem(exportAsset(linkAddress)).element);
+        window.siyuan.menus.menu.append(new MenuItem(writeAssetToClipboard(linkAddress)).element);
     }
     const rect = options.rect;
+    /// #if MOBILE
+    menu.fullscreen();
+    /// #else
     menu.open({
         x: rect.right,
         y: rect.top,
         w: rect.width,
         h: rect.height,
     });
+    /// #endif
     const textElements = menu.element.querySelectorAll("textarea");
-    textElements[0].value = linkAddress;
+    textElements[0].value = decodeURI(linkAddress);
     textElements[0].focus();
     textElements[0].select();
     if (textElements.length > 1) {
@@ -293,7 +390,7 @@ ${window.siyuan.languages.title}
 };
 
 export const addAssetLink = (protyle: IProtyle, cellElements: HTMLElement[], target: HTMLElement, blockElement: Element) => {
-    const menu = new Menu("av-asset-link", () => {
+    const menu = new Menu(Constants.MENU_AV_ASSET_EDIT, () => {
         const textElements = menu.element.querySelectorAll("textarea");
         if (!textElements[0].value && !textElements[1].value) {
             return;
@@ -331,40 +428,51 @@ ${window.siyuan.languages.title}
     menu.element.querySelector("textarea").focus();
 };
 
-export const dragUpload = (files: string[], protyle: IProtyle, cellElement: HTMLElement) => {
-    const msgId = showMessage(window.siyuan.languages.uploading, 0);
-    fetchPost("/api/asset/insertLocalAssets", {
-        assetPaths: files,
-        isUpload: true,
-        id: protyle.block.rootID
-    }, (response) => {
-        const blockElement = hasClosestBlock(cellElement);
-        if (blockElement) {
-            hideMessage(msgId);
-            const addValue: IAVCellAssetValue[] = [];
-            Object.keys(response.data.succMap).forEach(key => {
-                const type = pathPosix().extname(key).toLowerCase();
-                const name = key.substring(0, key.length - type.length);
-                if (Constants.SIYUAN_ASSETS_IMAGE.includes(type)) {
-                    addValue.push({
-                        type: "image",
-                        name,
-                        content: response.data.succMap[key],
-                    });
-                } else {
-                    addValue.push({
-                        type: "file",
-                        name,
-                        content: response.data.succMap[key],
-                    });
-                }
-            });
-            updateAssetCell({
-                protyle,
-                blockElement,
-                cellElements: [cellElement],
-                addValue
-            });
+export const dragUpload = (files: ILocalFiles[], protyle: IProtyle, cellElement: HTMLElement) => {
+    let msg = "";
+    const assetPaths: string[] = [];
+    files.forEach(item => {
+        if (item.size && Constants.SIZE_UPLOAD_TIP_SIZE <= item.size) {
+            msg += window.siyuan.languages.uploadFileTooLarge.replace("${x}", item.path).replace("${y}", filesize(item.size, {standard: "iec"})) + "<br>";
         }
+        assetPaths.push(item.path);
+    });
+
+    confirmDialog(msg ? window.siyuan.languages.upload : "", msg, () => {
+        const msgId = showMessage(window.siyuan.languages.uploading, 0);
+        fetchPost("/api/asset/insertLocalAssets", {
+            assetPaths,
+            isUpload: true,
+            id: protyle.block.rootID
+        }, (response) => {
+            const blockElement = hasClosestBlock(cellElement);
+            if (blockElement) {
+                hideMessage(msgId);
+                const addValue: IAVCellAssetValue[] = [];
+                Object.keys(response.data.succMap).forEach(key => {
+                    const type = pathPosix().extname(key).toLowerCase();
+                    const name = key.substring(0, key.length - type.length);
+                    if (Constants.SIYUAN_ASSETS_IMAGE.includes(type)) {
+                        addValue.push({
+                            type: "image",
+                            name,
+                            content: response.data.succMap[key],
+                        });
+                    } else {
+                        addValue.push({
+                            type: "file",
+                            name,
+                            content: response.data.succMap[key],
+                        });
+                    }
+                });
+                updateAssetCell({
+                    protyle,
+                    blockElement,
+                    cellElements: [cellElement],
+                    addValue
+                });
+            }
+        });
     });
 };

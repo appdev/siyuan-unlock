@@ -34,16 +34,33 @@ func getTag(c *gin.Context) {
 		return
 	}
 
-	sortParam := arg["sort"]
-	sortMode := model.Conf.Tag.Sort
-	if nil != sortParam {
-		sortMode = int(sortParam.(float64))
+	var ignoreMaxListHint bool
+	var app string
+	if !util.ParseJsonArgs(arg, ret,
+		// API `getTag` add an optional parameter `ignoreMaxListHint` https://github.com/siyuan-note/siyuan/issues/16000
+		util.BindJsonArg("ignoreMaxListHint", &ignoreMaxListHint, false, false),
+		util.BindJsonArg("app", &app, false, false),
+	) {
+		return
 	}
 
-	model.Conf.Tag.Sort = sortMode
-	model.Conf.Save()
+	if nil != arg["sort"] {
+		sortVal, ok := util.ParseJsonArg[float64]("sort", arg, ret, true, false)
+		if !ok {
+			return
+		}
+		model.Conf.Tag.Sort = int(sortVal)
+		model.Conf.Save()
+	}
 
-	ret.Data = model.BuildTags()
+	tags := model.BuildTags(ignoreMaxListHint, app)
+
+	if model.IsReadOnlyRoleContext(c) {
+		publishAccess := model.GetPublishAccess()
+		publishIgnore := model.GetInvisiblePublishAccess(publishAccess)
+		tags = model.FilterTagsByPublishIgnore(publishIgnore, tags)
+	}
+	ret.Data = tags
 }
 
 func renameTag(c *gin.Context) {
@@ -55,12 +72,18 @@ func renameTag(c *gin.Context) {
 		return
 	}
 
-	oldLabel := arg["oldLabel"].(string)
-	newLabel := arg["newLabel"].(string)
+	var oldLabel, newLabel string
+	if !util.ParseJsonArgs(arg, ret,
+		util.BindJsonArg("oldLabel", &oldLabel, true, false),
+		util.BindJsonArg("newLabel", &newLabel, true, true),
+	) {
+		return
+	}
+
 	if err := model.RenameTag(oldLabel, newLabel); err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
-		ret.Data = map[string]interface{}{"closeTimeout": 5000}
+		ret.Data = map[string]any{"closeTimeout": 5000}
 		return
 	}
 }
@@ -74,11 +97,14 @@ func removeTag(c *gin.Context) {
 		return
 	}
 
-	label := arg["label"].(string)
+	var label string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("label", &label, true, false)) {
+		return
+	}
 	if err := model.RemoveTag(label); err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
-		ret.Data = map[string]interface{}{"closeTimeout": 5000}
+		ret.Data = map[string]any{"closeTimeout": 5000}
 		return
 	}
 }

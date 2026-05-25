@@ -15,12 +15,13 @@ import {fetchPost} from "../util/fetch";
 import {showMessage} from "../dialog/message";
 import {App} from "../index";
 import {resize} from "../protyle/util/resize";
+import {checkFold} from "../util/noRelyPCFunction";
+import {updateHotkeyAfterTip} from "../protyle/util/compatibility";
 
 export class BlockPanel {
     public element: HTMLElement;
     public targetElement: HTMLElement;
-    public nodeIds: string[];
-    public defIds: string[] = [];
+    public refDefs: IRefDefs[];
     public id: string;
     private app: App;
     public x: number;
@@ -29,25 +30,26 @@ export class BlockPanel {
     public editors: Protyle[] = [];
     private observerResize: ResizeObserver;
     private observerLoad: IntersectionObserver;
+    private originalRefBlockIDs: IObject;
 
     // x,y 和 targetElement 二选一必传
     constructor(options: {
         app: App,
         targetElement?: HTMLElement,
-        nodeIds?: string[],
-        defIds?: string[],
+        refDefs: IRefDefs[]
         isBacklink: boolean,
+        originalRefBlockIDs?: IObject,  // isBacklink 为 true 时有效
         x?: number,
-        y?: number
+        y?: number,
     }) {
         this.id = genUUID();
         this.targetElement = options.targetElement;
-        this.nodeIds = options.nodeIds;
-        this.defIds = options.defIds || [];
+        this.refDefs = options.refDefs;
         this.app = options.app;
         this.x = options.x;
         this.y = options.y;
         this.isBacklink = options.isBacklink;
+        this.originalRefBlockIDs = options.originalRefBlockIDs;
 
         this.element = document.createElement("div");
         this.element.classList.add("block__popover");
@@ -58,7 +60,7 @@ export class BlockPanel {
             this.element.setAttribute("data-oid", parentElement.getAttribute("data-oid"));
             level = parseInt(parentElement.getAttribute("data-level")) + 1;
         } else {
-            this.element.setAttribute("data-oid", this.nodeIds[0]);
+            this.element.setAttribute("data-oid", this.refDefs[0].refID);
         }
         // 移除同层级其他更高级的 block popover
         this.element.setAttribute("data-level", level.toString());
@@ -118,14 +120,20 @@ export class BlockPanel {
                         }
                     } else if (type === "open") {
                         /// #if !BROWSER
-                        openNewWindowById(this.nodeIds[0]);
+                        openNewWindowById(this.refDefs[0].refID);
                         /// #endif
                     } else if (type === "stickTab") {
-                        openFileById({
-                            app: options.app,
-                            id: this.nodeIds[0],
-                            action: this.editors[0].protyle.block.rootID !== this.nodeIds[0] ? [Constants.CB_GET_ALL, Constants.CB_GET_FOCUS] : [Constants.CB_GET_CONTEXT],
+                        checkFold(this.refDefs[0].refID, (zoomIn, action) => {
+                            openFileById({
+                                app: options.app,
+                                id: this.refDefs[0].refID,
+                                action,
+                                zoomIn,
+                                openNewTab: true,
+                                scrollPosition: "start"
+                            });
                         });
+                        this.destroy();
                     }
                     event.preventDefault();
                     event.stopPropagation();
@@ -147,7 +155,7 @@ export class BlockPanel {
 
     private initProtyle(editorElement: HTMLElement, afterCB?: () => void) {
         const index = parseInt(editorElement.getAttribute("data-index"));
-        fetchPost("/api/block/getBlockInfo", {id: this.nodeIds[index]}, (response) => {
+        fetchPost("/api/block/getBlockInfo", {id: this.refDefs[index].refID}, (response) => {
             if (response.code === 3) {
                 showMessage(response.msg);
                 return;
@@ -156,7 +164,7 @@ export class BlockPanel {
                 return;
             }
             const action: TProtyleAction[] = [];
-            if (response.data.rootID !== this.nodeIds[index]) {
+            if (response.data.rootID !== this.refDefs[index].refID) {
                 action.push(Constants.CB_GET_ALL);
             } else {
                 action.push(Constants.CB_GET_CONTEXT);
@@ -167,17 +175,19 @@ export class BlockPanel {
                 action.push(Constants.CB_GET_BACKLINK);
             }
             const editor = new Protyle(this.app, editorElement, {
-                blockId: this.nodeIds[index],
-                defId: this.defIds[index] || this.defIds[0] || "",
+                blockId: this.refDefs[index].refID,
+                defIds: this.refDefs[index].defIDs || [],
+                originalRefBlockIDs: this.isBacklink ? this.originalRefBlockIDs : undefined,
                 action,
                 render: {
                     scroll: true,
                     gutter: true,
                     breadcrumbDocName: true,
+                    title: response.data.rootID === this.refDefs[index].refID, // 如果块是文档，显示文档标题
                 },
                 typewriterMode: false,
                 after: (editor) => {
-                    if (response.data.rootID !== this.nodeIds[index]) {
+                    if (response.data.rootID !== this.refDefs[index].refID) {
                         editor.protyle.breadcrumb.element.parentElement.lastElementChild.classList.remove("fn__none");
                     }
                     if (afterCB) {
@@ -219,7 +229,7 @@ export class BlockPanel {
         this.targetElement = undefined;
         // 移除弹出上使用右键菜单
         const menuLevel = parseInt(window.siyuan.menus.menu.element.dataset.from);
-        if (window.siyuan.menus.menu.element.dataset.from !== "app" && menuLevel && menuLevel >= level) {
+        if (menuLevel && menuLevel >= level && window.siyuan.menus.menu.element.dataset.from?.includes("popover")) {
             // https://github.com/siyuan-note/siyuan/issues/9854 右键菜单不是从浮窗中弹出的则不进行移除
             window.siyuan.menus.menu.remove();
         }
@@ -231,8 +241,8 @@ export class BlockPanel {
             return;
         }
         let openHTML = "";
-        if (this.nodeIds.length === 1) {
-            openHTML = `<span data-type="stickTab" class="block__icon block__icon--show b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.openBy}"><svg><use xlink:href="#iconOpen"></use></svg></span>
+        if (this.refDefs.length === 1) {
+            openHTML = `<span data-type="stickTab" class="block__icon block__icon--show b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.openInNewTab}${updateHotkeyAfterTip(window.siyuan.config.keymap.editor.general.openInNewTab.custom)}"><svg><use xlink:href="#iconOpen"></use></svg></span>
 <span class="fn__space"></span>`;
             /// #if !BROWSER
             openHTML += `<span data-type="open" class="block__icon block__icon--show b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.openByNewWindow}"><svg><use xlink:href="#iconOpenWindow"></use></svg></span>
@@ -243,13 +253,13 @@ export class BlockPanel {
     <span class="fn__space fn__flex-1 resize__move"></span>${openHTML}
     <span data-type="pin" class="block__icon block__icon--show b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.pin}"><svg><use xlink:href="#iconPin"></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="close" class="block__icon block__icon--show b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.close}"><svg style="width: 12px;margin: 0 1px;"><use xlink:href="#iconClose"></use></svg></span>
+    <span data-type="close" class="block__icon block__icon--show b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.close}${updateHotkeyAfterTip(window.siyuan.config.keymap.general.closeTab.custom)}"><svg style="width: 12px;margin: 0 1px;"><use xlink:href="#iconClose"></use></svg></span>
 </div>
 <div class="block__content">`;
-        if (this.nodeIds.length === 0) {
+        if (this.refDefs.length === 0) {
             html += `<div class="ft__smaller ft__smaller ft__secondary b3-form__space--small" contenteditable="false">${window.siyuan.languages.refExpired}</div>`;
         } else {
-            this.nodeIds.forEach((item, index) => {
+            this.refDefs.forEach((item, index) => {
                 html += `<div class="block__edit fn__flex-1 protyle" data-index="${index}"></div>`;
             });
         }

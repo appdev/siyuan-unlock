@@ -1,9 +1,8 @@
 import {matchHotKey} from "../util/hotKey";
-import {fetchPost} from "../../util/fetch";
+import {fetchPost, fetchSyncPost} from "../../util/fetch";
 import {isMac, writeText} from "../util/compatibility";
 import {focusBlock, getSelectionOffset, setFirstNodeRange, setLastNodeRange,} from "../util/selection";
 import {getContenteditableElement, getNextBlock} from "./getBlock";
-import {hasClosestByMatchTag} from "../util/hasClosest";
 import {hideElements} from "../ui/hideElements";
 import {countBlockWord} from "../../layout/status";
 import {scrollCenter} from "../../util/highlightById";
@@ -14,6 +13,9 @@ import * as dayjs from "dayjs";
 import {net2LocalAssets} from "../breadcrumb/action";
 import {processClonePHElement} from "../render/util";
 import {copyTextByType} from "../toolbar/util";
+import {hasClosestByTag, hasTopClosestByClassName} from "../util/hasClosest";
+import {removeEmbed} from "./removeEmbed";
+import {clearBlockElement} from "../util/clear";
 
 export const commonHotkey = (protyle: IProtyle, event: KeyboardEvent, nodeElement?: HTMLElement) => {
     if (matchHotKey(window.siyuan.config.keymap.editor.general.netImg2LocalAsset.custom, event)) {
@@ -140,7 +142,7 @@ export const upSelect = (options: {
         options.event.stopPropagation();
         options.event.preventDefault();
     } else {
-        const tdElement = hasClosestByMatchTag(options.range.startContainer, "TD") || hasClosestByMatchTag(options.range.startContainer, "TH");
+        const tdElement = hasClosestByTag(options.range.startContainer, "TD") || hasClosestByTag(options.range.startContainer, "TH");
         const nodeEditableElement = (tdElement || getContenteditableElement(options.nodeElement) || options.nodeElement) as HTMLElement;
         const startIndex = getSelectionOffset(nodeEditableElement, options.editorElement, options.range).start;
         const innerText = nodeEditableElement.innerText;
@@ -187,7 +189,7 @@ export const downSelect = (options: {
         options.event.stopPropagation();
         options.event.preventDefault();
     } else {
-        const tdElement = hasClosestByMatchTag(options.range.startContainer, "TD") || hasClosestByMatchTag(options.range.startContainer, "TH");
+        const tdElement = hasClosestByTag(options.range.startContainer, "TD") || hasClosestByTag(options.range.startContainer, "TH");
         const nodeEditableElement = (tdElement || getContenteditableElement(options.nodeElement) || options.nodeElement) as HTMLElement;
         const endIndex = getSelectionOffset(nodeEditableElement, options.editorElement, options.range).end;
         const innerText = nodeEditableElement.innerText;
@@ -205,6 +207,9 @@ export const downSelect = (options: {
                     // 代码块中 shift+alt 向下选中到末尾时，最后一个字符无法选中
                     options.event.preventDefault();
                 }
+            } else if (tdElement) {
+                setLastNodeRange(tdElement, options.range, false);
+                options.event.preventDefault();
             }
             return;
         }
@@ -250,41 +255,124 @@ export const getStartEndElement = (selectElements: NodeListOf<Element> | Element
     };
 };
 
-export const duplicateBlock = (nodeElements: Element[], protyle: IProtyle) => {
+export const duplicateBlock = async (nodeElements: Element[], protyle: IProtyle) => {
     let focusElement: Element;
     const doOperations: IOperation[] = [];
     const undoOperations: IOperation[] = [];
     let starIndex: number;
-    if (nodeElements[nodeElements.length - 1].getAttribute("data-subtype") === "o") {
-        starIndex = parseInt(nodeElements[nodeElements.length - 1].getAttribute("data-marker"), 10);
+    let lastElement = nodeElements[nodeElements.length - 1];
+    let isSameLi = true;
+    if (lastElement.classList.contains("li")) {
+        if (lastElement.getAttribute("data-subtype") === "o") {
+            starIndex = parseInt(lastElement.getAttribute("data-marker"), 10);
+        }
+        nodeElements.find(item => {
+            if (!item.classList.contains("li") ||
+                lastElement.getAttribute("data-subtype") !== item.getAttribute("data-subtype")) {
+                isSameLi = false;
+                return true;
+            }
+        });
+        if (!isSameLi) {
+            lastElement = hasTopClosestByClassName(lastElement, "list") || lastElement;
+        }
     }
-    nodeElements.reverse().forEach((item, index) => {
-        const tempElement = item.cloneNode(true) as HTMLElement;
-        if (index === 0) {
+    let listHTML = "";
+    const foldHeadingIds = [];
+    for (let index = nodeElements.length - 1; index >= 0; --index) {
+        const item = nodeElements[index];
+        item.classList.remove("protyle-wysiwyg--select");
+        let tempElement = item.cloneNode(true) as HTMLElement;
+        const newId = Lute.NewNodeID();
+        if (item.getAttribute("data-type") !== "NodeBlockQueryEmbed" &&
+            item.querySelector('[data-type="NodeHeading"][fold="1"]')) {
+            const response = await fetchSyncPost("/api/block/getBlockDOM", {
+                id: item.getAttribute("data-node-id"),
+            });
+            const foldTempElement = document.createElement("template");
+            foldTempElement.innerHTML = response.data.dom;
+            tempElement = foldTempElement.content.firstElementChild as HTMLElement;
+        }
+        if (item.getAttribute("data-type") === "NodeListItem" && !isSameLi) {
+            if (!listHTML) {
+                listHTML = `<div class="protyle-attr" contenteditable="false">${Constants.ZWSP}</div></div>`;
+            }
+            listHTML = removeEmbed(item) + listHTML;
+            if (index === 0 ||
+                nodeElements[index - 1].getAttribute("data-type") !== "NodeListItem" ||
+                nodeElements[index - 1].getAttribute("data-subtype") !== item.getAttribute("data-subtype")
+            ) {
+                const foldTempElement = document.createElement("template");
+                foldTempElement.innerHTML = `<div data-subtype="${item.getAttribute("data-subtype")}" data-node-id="${Lute.NewNodeID()}" data-type="NodeList" class="list">${listHTML}`;
+                tempElement = foldTempElement.content.firstElementChild as HTMLElement;
+                listHTML = "";
+            } else {
+                continue;
+            }
+        }
+        if (index === nodeElements.length - 1) {
             focusElement = tempElement;
         }
-        const newId = Lute.NewNodeID();
         tempElement.setAttribute("data-node-id", newId);
+        tempElement.setAttribute("updated", newId.split("-")[0]);
+        clearBlockElement(tempElement);
+        tempElement.classList.add("protyle-wysiwyg--select");
         tempElement.querySelectorAll("[data-node-id]").forEach(childItem => {
-            childItem.setAttribute("data-node-id", Lute.NewNodeID());
+            const subNewId = Lute.NewNodeID();
+            childItem.setAttribute("data-node-id", subNewId);
+            childItem.setAttribute("updated", subNewId.split("-")[0]);
+            clearBlockElement(childItem);
         });
-        item.classList.remove("protyle-wysiwyg--select");
         if (typeof starIndex === "number") {
-            const orderIndex = starIndex + (nodeElements.length - index);
+            const orderIndex = starIndex + index + 1;
             tempElement.setAttribute("data-marker", (orderIndex) + ".");
             tempElement.querySelector(".protyle-action--order").textContent = (orderIndex) + ".";
         }
-        nodeElements[0].after(processClonePHElement(tempElement));
+        lastElement.after(processClonePHElement(tempElement));
         doOperations.push({
             action: "insert",
             data: tempElement.outerHTML,
             id: newId,
-            previousID: nodeElements[0].getAttribute("data-node-id"),
+            previousID: lastElement.getAttribute("data-node-id"),
         });
         undoOperations.push({
             action: "delete",
             id: newId,
         });
+        if (item.getAttribute("data-type") === "NodeHeading" && item.getAttribute("fold") === "1") {
+            foldHeadingIds.push({oldId: item.getAttribute("data-node-id"), newId});
+            const responseHTML = await fetchSyncPost("/api/block/getHeadingChildrenDOM", {id: item.getAttribute("data-node-id")});
+            const foldElement = document.createElement("template");
+            foldElement.innerHTML = responseHTML.data;
+            Array.from(foldElement.content.children).reverse().forEach((childItem: HTMLElement, childIndex) => {
+                if (childIndex === foldElement.content.children.length - 1) {
+                    return;
+                }
+                childItem.querySelectorAll("[data-node-id]").forEach(subItem => {
+                    subItem.setAttribute("data-node-id", Lute.NewNodeID());
+                    clearBlockElement(subItem);
+                });
+                const newChildId = Lute.NewNodeID();
+                childItem.setAttribute("data-node-id", newChildId);
+                clearBlockElement(childItem);
+                doOperations.push({
+                    context: {
+                        ignoreProcess: "true"
+                    },
+                    action: "insert",
+                    data: childItem.outerHTML,
+                    id: newChildId,
+                    previousID: newId,
+                });
+                undoOperations.push({
+                    action: "delete",
+                    id: newChildId,
+                });
+            });
+        }
+    }
+    protyle.wysiwyg.element.querySelectorAll("[parent-heading]").forEach(item => {
+        item.remove();
     });
     if (typeof starIndex === "number") {
         let nextElement = focusElement.nextElementSibling;

@@ -11,6 +11,7 @@ import {hideTooltip, showTooltip} from "../dialog/tooltip";
 import {isTouchDevice} from "../util/functions";
 /// #if !BROWSER
 import {openNewWindow} from "../window/openNewWindow";
+import {ipcRenderer} from "electron";
 /// #endif
 import {layoutToJSON, saveLayout} from "./util";
 
@@ -48,6 +49,16 @@ export class Tab {
             this.headElement.addEventListener("mouseenter", (event) => {
                 event.stopPropagation();
                 event.preventDefault();
+                const dragElement = Array.from(this.headElement.parentElement.childNodes).find((item: HTMLElement) => {
+                    if (item.style?.opacity === "0.38") {
+                        return true;
+                    }
+                });
+                if (dragElement) {
+                    hideTooltip();
+                    return;
+                }
+
                 let id = "";
                 if (this.model instanceof Editor && this.model.editor?.protyle?.block?.rootID) {
                     id = (this.model as Editor).editor.protyle.block.rootID;
@@ -85,17 +96,17 @@ export class Tab {
                     layoutToJSON(this, modeJSON);
                     event.dataTransfer.setData(Constants.SIYUAN_DROP_TAB, JSON.stringify(modeJSON));
                     event.dataTransfer.dropEffect = "move";
-                    tabElement.style.opacity = "0.1";
+                    tabElement.style.opacity = "0.38";
                     window.siyuan.dragElement = this.headElement;
                 }
+                /// #if !BROWSER
+                ipcRenderer.send(Constants.SIYUAN_SEND_WINDOWS, {cmd: "resetTabsStyle", data: "removeRegionStyle"});
+                /// #endif
             });
             this.headElement.addEventListener("dragend", (event: DragEvent & { target: HTMLElement }) => {
                 const tabElement = hasClosestByTag(event.target, "LI");
                 if (tabElement) {
                     tabElement.style.opacity = "1";
-                    document.querySelectorAll(".layout-tab-bar li[data-clone='true']").forEach((item) => {
-                        item.remove();
-                    });
                 }
                 /// #if !BROWSER
                 // 拖拽到屏幕外
@@ -105,13 +116,21 @@ export class Tab {
                         openNewWindow(this);
                     }
                 }, Constants.TIMEOUT_LOAD); // 等待主进程发送关闭消息
+                ipcRenderer.send(Constants.SIYUAN_SEND_WINDOWS, {cmd: "resetTabsStyle", data: "rmDragStyle"});
+                /// #else
+                document.querySelectorAll(".layout-tab-bars--drag").forEach(item => {
+                    item.classList.remove("layout-tab-bars--drag");
+                });
+                document.querySelectorAll(".layout-tab-bar li[data-clone='true']").forEach(tabItem => {
+                    tabItem.remove();
+                });
                 /// #endif
                 window.siyuan.dragElement = undefined;
                 if (event.dataTransfer.dropEffect === "none") {
                     // 按 esc 取消的时候应该还原在 dragover 时交换的 tab
                     this.parent.children.forEach((item, index) => {
                         const currentElement = this.headElement.parentElement.children[index];
-                        if (!item.headElement.isSameNode(currentElement)) {
+                        if (item.headElement !== currentElement) {
                             if (index === 0) {
                                 this.headElement.parentElement.firstElementChild.before(item.headElement);
                             } else {
@@ -120,6 +139,7 @@ export class Tab {
                         }
                     });
                 }
+                ipcRenderer.send(Constants.SIYUAN_SEND_WINDOWS, {cmd: "resetTabsStyle", data: "addRegionStyle"});
             });
         }
 

@@ -50,11 +50,15 @@ func IsReadOnlyRole(role Role) bool {
 func GetGinContextRole(c *gin.Context) Role {
 	if role, exists := c.Get(RoleContextKey); exists {
 		return role.(Role)
-	} else {
-		return RoleVisitor
 	}
+
+	return RoleVisitor
 }
 
 func IsAdminRoleContext(c *gin.Context) bool {
 	return GetGinContextRole(c) == RoleAdministrator
+}
+
+func IsReadOnlyRoleContext(c *gin.Context) bool {
+	return IsReadOnlyRole(GetGinContextRole(c))
 }

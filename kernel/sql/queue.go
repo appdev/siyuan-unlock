@@ -23,31 +23,33 @@ import (
 	"path"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/88250/lute/parse"
 	"github.com/siyuan-note/eventbus"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/task"
+	"github.com/siyuan-note/siyuan/kernel/treenode"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
 var (
 	operationQueue []*dbQueueOperation
 	dbQueueLock    = sync.Mutex{}
+	dbQueueCond    = sync.NewCond(&dbQueueLock)
 	txLock         = sync.Mutex{}
 )
 
 type dbQueueOperation struct {
 	inQueueTime                   time.Time
-	action                        string      // upsert/delete/delete_id/rename/rename_sub_tree/delete_box/delete_box_refs/index/delete_ids/update_block_content/delete_assets
-	indexTree                     *parse.Tree // index
+	action                        string      // upsert/delete/delete_id/rename/move/delete_box/delete_box_refs/index/delete_ids/update_block_content/delete_assets
+	indexTree                     *parse.Tree // index/rename/move
 	upsertTree                    *parse.Tree // upsert/update_refs/delete_refs
 	removeTreeBox, removeTreePath string      // delete
 	removeTreeID                  string      // delete_id
 	removeTreeIDs                 []string    // delete_ids
 	box                           string      // delete_box/delete_box_refs/index
-	renameTree                    *parse.Tree // rename/rename_sub_tree
 	block                         *Block      // update_block_content
 	id                            string      // index_node
 	removeAssetHashes             []string    // delete_assets
@@ -57,25 +59,70 @@ func FlushTxJob() {
 	task.AppendTask(task.DatabaseIndexCommit, FlushQueue)
 }
 
+func WaitFlushTx() {
+	dbQueueLock.Lock()
+	defer dbQueueLock.Unlock()
+
+	var printLog, lastPrintLog bool
+	var i int
+
+	for len(operationQueue) > 0 || flushingTx.Load() {
+		if i == 0 {
+			// 第一次等待时使用较短的超时
+			dbQueueCond.Wait()
+		} else {
+			// 后续等待添加超时检测，用于打印警告日志
+			timer := time.AfterFunc(50*time.Millisecond, func() {
+				dbQueueCond.Broadcast()
+			})
+			dbQueueCond.Wait()
+			timer.Stop()
+		}
+
+		i++
+		if 200 < i && !printLog { // 10s 后打日志
+			logging.LogWarnf("database is writing: \n%s", logging.ShortStack())
+			printLog = true
+		}
+		if 1200 < i && !lastPrintLog { // 60s 后打日志
+			logging.LogWarnf("database is still writing")
+			lastPrintLog = true
+		}
+	}
+}
+
 func ClearQueue() {
 	dbQueueLock.Lock()
 	defer dbQueueLock.Unlock()
 	operationQueue = nil
 }
 
+var flushingTx = atomic.Bool{}
+
 func FlushQueue() {
+	initDatabaseLock.Lock()
+	defer initDatabaseLock.Unlock()
+
 	ops := getOperations()
 	total := len(ops)
-	if 1 > total {
+	if 1 > total && !flushingTx.Load() {
 		return
 	}
 
 	txLock.Lock()
-	defer txLock.Unlock()
+	flushingTx.Store(true)
+	defer func() {
+		flushingTx.Store(false)
+		txLock.Unlock()
+		// 通知等待的协程队列已刷新完成
+		dbQueueCond.Broadcast()
+	}()
 
 	start := time.Now()
 
-	context := map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
+	// logging.LogInfof("flushing database queue, total operations [%d]", total)
+
+	context := map[string]any{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
 	if 512 < len(ops) {
 		disableCache()
 		defer enableCache()
@@ -102,6 +149,7 @@ func FlushQueue() {
 		context["total"] = groupOpsTotal[op.action]
 		if err = execOp(op, tx, context); err != nil {
 			tx.Rollback()
+			closeTxPreparedStmts(tx)
 			logging.LogErrorf("queue operation [%s] failed: %s", op.action, err)
 			continue
 		}
@@ -120,7 +168,7 @@ func FlushQueue() {
 		debug.FreeOSMemory()
 	}
 
-	elapsed := time.Now().Sub(start).Milliseconds()
+	elapsed := time.Since(start).Milliseconds()
 	if 7000 < elapsed {
 		logging.LogInfof("database op tx [%dms]", elapsed)
 	}
@@ -131,7 +179,7 @@ func FlushQueue() {
 	eventbus.Publish(eventbus.EvtSQLIndexFlushed)
 }
 
-func execOp(op *dbQueueOperation, tx *sql.Tx, context map[string]interface{}) (err error) {
+func execOp(op *dbQueueOperation, tx *sql.Tx, context map[string]any) (err error) {
 	switch op.action {
 	case "index":
 		err = indexTree(tx, op.indexTree, context)
@@ -144,13 +192,14 @@ func execOp(op *dbQueueOperation, tx *sql.Tx, context map[string]interface{}) (e
 	case "delete_ids":
 		err = batchDeleteByRootIDs(tx, op.removeTreeIDs, context)
 	case "rename":
-		err = batchUpdateHPath(tx, op.renameTree, context)
+		err = batchUpdateHPath(tx, op.indexTree, context)
 		if err != nil {
 			break
 		}
-		err = updateRootContent(tx, path.Base(op.renameTree.HPath), op.renameTree.Root.IALAttr("updated"), op.renameTree.ID)
-	case "rename_sub_tree":
-		err = batchUpdatePath(tx, op.renameTree, context)
+
+		err = updateRootContent(tx, path.Base(op.indexTree.HPath), op.indexTree.Root.IALAttr("updated"), treenode.IALStr(op.indexTree.Root), op.indexTree.ID)
+	case "move":
+		err = batchUpdatePath(tx, op.indexTree, context)
 	case "delete_box":
 		err = deleteByBoxTx(tx, op.box)
 	case "delete_box_refs":
@@ -302,12 +351,12 @@ func RenameTreeQueue(tree *parse.Tree) {
 	defer dbQueueLock.Unlock()
 
 	newOp := &dbQueueOperation{
-		renameTree:  tree,
+		indexTree:   tree,
 		inQueueTime: time.Now(),
 		action:      "rename",
 	}
 	for i, op := range operationQueue {
-		if "rename" == op.action && op.renameTree.ID == tree.ID { // 相同树则覆盖
+		if "rename" == op.action && op.indexTree.ID == tree.ID { // 相同树则覆盖
 			operationQueue[i] = newOp
 			return
 		}
@@ -315,17 +364,17 @@ func RenameTreeQueue(tree *parse.Tree) {
 	appendOperation(newOp)
 }
 
-func RenameSubTreeQueue(tree *parse.Tree) {
+func MoveTreeQueue(tree *parse.Tree) {
 	dbQueueLock.Lock()
 	defer dbQueueLock.Unlock()
 
 	newOp := &dbQueueOperation{
-		renameTree:  tree,
+		indexTree:   tree,
 		inQueueTime: time.Now(),
-		action:      "rename_sub_tree",
+		action:      "move",
 	}
 	for i, op := range operationQueue {
-		if "rename_sub_tree" == op.action && op.renameTree.ID == tree.ID { // 相同树则覆盖
+		if "move" == op.action && op.indexTree.ID == tree.ID { // 相同树则覆盖
 			operationQueue[i] = newOp
 			return
 		}

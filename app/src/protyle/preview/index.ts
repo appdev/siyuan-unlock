@@ -20,6 +20,7 @@ import {speechRender} from "../render/speechRender";
 import {avRender} from "../render/av/render";
 import {getPadding} from "../ui/initUI";
 import {hasClosestByAttribute} from "../util/hasClosest";
+import {addScriptSync} from "../util/addScript";
 
 export class Preview {
     public element: HTMLElement;
@@ -98,7 +99,7 @@ export class Preview {
                             openBy(linkAddress, "folder");
                         } else if (event.shiftKey) {
                             openBy(linkAddress, "app");
-                        } else if (Constants.SIYUAN_ASSETS_EXTS.includes(pathPosix().extname((linkAddress.split("?page")[0])))) {
+                        } else if (Constants.SIYUAN_ASSETS_EXTS.includes(pathPosix().extname((linkAddress).split("?")[0]))) {
                             openAsset(protyle.app, linkAddress.split("?page")[0], parseInt(getSearch("page", linkAddress)));
                         }
                         /// #endif
@@ -158,6 +159,8 @@ export class Preview {
                         }
                     });
                 }
+                /// #else
+                window.siyuan.mobile.docks.outline?.setCurrentByPreview(nodeElement);
                 /// #endif
             }
         });
@@ -183,14 +186,14 @@ export class Preview {
         }
         this.mdTimeoutId = window.setTimeout(() => {
             fetchPost("/api/export/preview", {
-                id: protyle.block.parentID || protyle.options.blockId,
+                id: protyle.block.id || protyle.options.blockId || protyle.block.parentID,
             }, response => {
                 const oldScrollTop = protyle.preview.previewElement.scrollTop;
                 protyle.preview.previewElement.innerHTML = response.data.html;
                 processRender(protyle.preview.previewElement);
                 highlightRender(protyle.preview.previewElement);
                 avRender(protyle.preview.previewElement, protyle);
-                speechRender(protyle.preview.previewElement, protyle.options.lang);
+                speechRender(protyle.preview.previewElement, window.siyuan.config.appearance.lang);
                 protyle.preview.previewElement.scrollTop = oldScrollTop;
                 loadingElement.remove();
             });
@@ -214,7 +217,7 @@ export class Preview {
         });
     }
 
-    private copyToX(copyElement: HTMLElement, protyle: IProtyle, type?: string) {
+    private async copyToX(copyElement: HTMLElement, protyle: IProtyle, type?: string) {
         // fix math render
         if (type === "mp-wechat") {
             this.link2online(copyElement);
@@ -223,6 +226,41 @@ export class Preview {
             });
             copyElement.querySelectorAll("mjx-container > svg").forEach((item) => {
                 item.setAttribute("width", (parseInt(item.getAttribute("width")) * 8) + "px");
+            });
+            // 列表嵌套 https://github.com/siyuan-note/siyuan/issues/11276
+            copyElement.querySelectorAll("ul, ol").forEach(listItem => {
+                Array.from(listItem.children).forEach(liItem => {
+                    const nestedList = liItem.querySelector("ul, ol");
+                    if (nestedList) {
+                        liItem.parentNode.insertBefore(nestedList, liItem.nextSibling);
+                    }
+                });
+            });
+            // 处理任务列表（微信公众号不能显示input[type="checkbox"]）
+            copyElement.querySelectorAll("li.protyle-task").forEach((taskItem: HTMLElement) => {
+                const checkbox = taskItem.querySelector('input[type="checkbox"]') as HTMLInputElement;
+                if (checkbox) {
+                    checkbox.style.opacity = "0";
+                    if (checkbox.checked) {
+                        taskItem.style.setProperty("list-style-type", "'✅'", "important");
+                    } else {
+                        taskItem.style.setProperty("list-style-type", "'▢'", "important");
+                    }
+                }
+            });
+            if (typeof window.MathJax === "undefined") {
+                window.MathJax = {
+                    svg: {
+                        fontCache: "none"
+                    },
+                };
+            }
+            await addScriptSync(`${Constants.PROTYLE_CDN}/js/mathjax/tex-svg-full.js`, "protyleMathJaxScript");
+            await window.MathJax.startup.promise;
+            copyElement.querySelectorAll('[data-subtype="math"]').forEach(mathElement => {
+                const node = window.MathJax.tex2svg(Lute.UnEscapeHTMLStr(mathElement.getAttribute("data-content")).trim(), {display: mathElement.tagName === "DIV"});
+                node.querySelector("mjx-assistive-mml").remove();
+                mathElement.innerHTML = node.outerHTML;
             });
         } else if (type === "zhihu") {
             this.link2online(copyElement);
@@ -241,13 +279,17 @@ export class Preview {
             this.processZHTable(copyElement);
         } else if (type === "yuque") {
             fetchPost("/api/lute/copyStdMarkdown", {
-                id: protyle.block.rootID,
+                id: protyle.block.id || protyle.options.blockId || protyle.block.parentID,
+                assetsDestSpace2Underscore: true,
+                fillCSSVar: true,
+                adjustHeadingLevel: true,
             }, (response) => {
                 writeText(response.data);
                 showMessage(`${window.siyuan.languages.pasteToYuque}`);
             });
             return;
         }
+
         // 防止背景色被粘贴到公众号中
         copyElement.style.backgroundColor = "#fff";
         // 代码背景
@@ -255,6 +297,8 @@ export class Preview {
             item.style.backgroundImage = "none";
         });
         this.element.append(copyElement);
+        // 最后一个块是公式块时无法复制下来
+        copyElement.insertAdjacentHTML("beforeend", "<p>&zwj;</p>");
         let cloneRange;
         if (getSelection().rangeCount > 0) {
             cloneRange = getSelection().getRangeAt(0).cloneRange();

@@ -18,6 +18,7 @@ package server
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"mime"
@@ -36,7 +37,7 @@ import (
 	"github.com/emersion/go-webdav/carddav"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/memstore"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/mssola/useragent"
 	"github.com/olahol/melody"
@@ -46,6 +47,7 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/model"
 	"github.com/siyuan-note/siyuan/kernel/server/proxy"
 	"github.com/siyuan-note/siyuan/kernel/util"
+	"github.com/soheilhy/cmux"
 	"golang.org/x/net/webdav"
 )
 
@@ -61,8 +63,7 @@ const (
 )
 
 var (
-	// 这里用的是内存存储，意味着重启后所有 session 会丢失，需要重新登录
-	sessionStore = memstore.NewStore([]byte("ATN51UlxVq1Gcvdf"))
+	sessionStore cookie.Store
 
 	HttpMethods = []string{
 		http.MethodGet,
@@ -129,7 +130,7 @@ var (
 	}
 )
 
-func Serve(fastMode bool) {
+func Serve(fastMode bool, cookieKey string) {
 	gin.SetMode(gin.ReleaseMode)
 	ginServer := gin.New()
 	ginServer.UseH2C = true
@@ -143,6 +144,7 @@ func Serve(fastMode bool) {
 		gzip.Gzip(gzip.DefaultCompression, gzip.WithExcludedExtensions([]string{".pdf", ".mp3", ".wav", ".ogg", ".mov", ".weba", ".mkv", ".mp4", ".webm", ".flac"})),
 	)
 
+	sessionStore = cookie.NewStore([]byte(cookieKey))
 	sessionStore.Options(sessions.Options{
 		Path:   "/",
 		Secure: util.SSL,
@@ -197,6 +199,9 @@ func Serve(fastMode bool) {
 	}
 	util.ServerPort = port
 
+	model.Conf.ServerAddrs = util.GetServerAddrs()
+	model.Conf.Save()
+
 	util.ServerURL, err = url.Parse("http://127.0.0.1:" + port)
 	if err != nil {
 		logging.LogErrorf("parse server url failed: %s", err)
@@ -206,19 +211,60 @@ func Serve(fastMode bool) {
 	if !fastMode {
 		rewritePortJSON(pid, port)
 	}
-	logging.LogInfof("kernel [pid=%s] http server [%s] is booting", pid, host+":"+port)
+
+	// Prepare TLS if enabled
+	var certPath, keyPath string
+	useTLS := model.Conf.System.NetworkServeTLS && model.Conf.System.NetworkServe
+	if useTLS {
+		// Ensure TLS certificates exist (proxy will use them directly)
+		var tlsErr error
+		certPath, keyPath, tlsErr = util.GetOrCreateTLSCert()
+		if tlsErr != nil {
+			logging.LogErrorf("failed to get TLS certificates: %s", tlsErr)
+			if !fastMode {
+				os.Exit(logging.ExitCodeUnavailablePort)
+			}
+			return
+		}
+		logging.LogInfof("kernel [pid=%s] http server [%s] is booting (TLS will be enabled on fixed port proxy)", pid, host+":"+port)
+	} else {
+		logging.LogInfof("kernel [pid=%s] http server [%s] is booting", pid, host+":"+port)
+	}
 	util.HttpServing = true
 
 	go util.HookUILoaded()
 
 	go func() {
 		time.Sleep(1 * time.Second)
-		go proxy.InitFixedPortService(host)
+		go proxy.InitFixedPortService(host, useTLS, certPath, keyPath)
 		go proxy.InitPublishService()
 		// 反代服务器启动失败不影响核心服务器启动
 	}()
 
-	if err = http.Serve(ln, ginServer.Handler()); err != nil {
+	httpHandler := ginServer.Handler()
+	util.HttpServer = &http.Server{
+		Handler: httpHandler,
+	}
+
+	if useTLS && (util.FixedPort == util.ServerPort || util.IsPortOpen(util.FixedPort)) {
+		if err = util.ServeMultiplexed(ln, httpHandler, certPath, keyPath, util.HttpServer); err != nil {
+			if errors.Is(err, http.ErrServerClosed) || errors.Is(err, cmux.ErrListenerClosed) {
+				return
+			}
+
+			if !fastMode {
+				logging.LogErrorf("boot kernel failed: %s", err)
+				os.Exit(logging.ExitCodeUnavailablePort)
+			}
+		}
+		return
+	}
+
+	if err = util.HttpServer.Serve(ln); err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+
 		if !fastMode {
 			logging.LogErrorf("boot kernel failed: %s", err)
 			os.Exit(logging.ExitCodeUnavailablePort)
@@ -256,23 +302,74 @@ func rewritePortJSON(pid, port string) {
 func serveExport(ginServer *gin.Engine) {
 	// Potential data export disclosure security vulnerability https://github.com/siyuan-note/siyuan/issues/12213
 	exportGroup := ginServer.Group("/export/", model.CheckAuth)
-	exportGroup.Static("/", filepath.Join(util.TempDir, "export"))
+	exportBaseDir := filepath.Join(util.TempDir, "export")
+
+	// 应下载而不是查看导出的文件
+	exportGroup.GET("/*filepath", func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/export/temp/") {
+			c.File(filepath.Join(util.TempDir, c.Request.URL.Path))
+			return
+		}
+
+		filePath := strings.TrimPrefix(c.Request.URL.Path, "/export/")
+
+		decodedPath, err := url.PathUnescape(filePath)
+		if err != nil {
+			decodedPath = filePath
+		}
+
+		fullPath := filepath.Join(exportBaseDir, decodedPath)
+		if !gulu.File.IsSubPath(exportBaseDir, fullPath) {
+			c.Status(http.StatusUnauthorized)
+			return
+		}
+
+		if util.IsSensitivePath(fullPath) {
+			logging.LogErrorf("refuse to export sensitive file [%s]", c.Request.URL.Path)
+			c.Status(http.StatusForbidden)
+			return
+		}
+
+		fileInfo, err := os.Stat(fullPath)
+		if os.IsNotExist(err) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		if fileInfo.IsDir() {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		fileName := filepath.Base(decodedPath)
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+
+		c.File(fullPath)
+	})
 }
 
 func serveWidgets(ginServer *gin.Engine) {
-	ginServer.Static("/widgets/", filepath.Join(util.DataDir, "widgets"))
+	widgets := ginServer.Group("/widgets/", model.CheckAuth)
+	widgets.Static("", filepath.Join(util.DataDir, "widgets"))
 }
 
 func servePlugins(ginServer *gin.Engine) {
-	ginServer.Static("/plugins/", filepath.Join(util.DataDir, "plugins"))
+	plugins := ginServer.Group("/plugins/", model.CheckAuth)
+	plugins.Static("", filepath.Join(util.DataDir, "plugins"))
 }
 
 func serveEmojis(ginServer *gin.Engine) {
-	ginServer.Static("/emojis/", filepath.Join(util.DataDir, "emojis"))
+	emojis := ginServer.Group("/emojis/", model.CheckAuth)
+	emojis.Static("", filepath.Join(util.DataDir, "emojis"))
 }
 
 func serveTemplates(ginServer *gin.Engine) {
-	ginServer.Static("/templates/", filepath.Join(util.DataDir, "templates"))
+	templates := ginServer.Group("/templates/", model.CheckAuth)
+	templates.Static("", filepath.Join(util.DataDir, "templates"))
 }
 
 func servePublic(ginServer *gin.Engine) {
@@ -281,8 +378,15 @@ func servePublic(ginServer *gin.Engine) {
 }
 
 func serveSnippets(ginServer *gin.Engine) {
-	ginServer.Handle("GET", "/snippets/*filepath", func(c *gin.Context) {
+	ginServer.Handle("GET", "/snippets/*filepath", model.CheckAuth, func(c *gin.Context) {
 		filePath := strings.TrimPrefix(c.Request.URL.Path, "/snippets/")
+		if !model.IsAdminRoleContext(c) {
+			if "conf.json" == filePath {
+				c.Status(http.StatusUnauthorized)
+				return
+			}
+		}
+
 		ext := filepath.Ext(filePath)
 		name := strings.TrimSuffix(filePath, ext)
 		confSnippets, err := model.LoadSnippets()
@@ -346,6 +450,11 @@ func serveAppearance(ginServer *gin.Engine) {
 	}
 	siyuan.GET("/appearance/*filepath", func(c *gin.Context) {
 		filePath := filepath.Join(appearancePath, strings.TrimPrefix(c.Request.URL.Path, "/appearance/"))
+		if !gulu.File.IsSubPath(appearancePath, filePath) {
+			c.Status(http.StatusUnauthorized)
+			return
+		}
+
 		if strings.HasSuffix(c.Request.URL.Path, "/theme.js") {
 			if !gulu.File.IsExist(filePath) {
 				// 主题 js 不存在时生成空内容返回
@@ -365,7 +474,7 @@ func serveAppearance(ginServer *gin.Engine) {
 					util.ReportFileSysFatalError(err)
 					return
 				}
-				enUSMap := map[string]interface{}{}
+				enUSMap := map[string]any{}
 				if err = gulu.JSON.UnmarshalJSON(enUSData, &enUSMap); err != nil {
 					logging.LogErrorf("unmarshal en_US.json [%s] failed: %s", enUSFilePath, err)
 					util.ReportFileSysFatalError(err)
@@ -379,7 +488,7 @@ func serveAppearance(ginServer *gin.Engine) {
 						return
 					}
 
-					langMap := map[string]interface{}{}
+					langMap := map[string]any{}
 					if err = gulu.JSON.UnmarshalJSON(data, &langMap); err != nil {
 						logging.LogErrorf("unmarshal json [%s] failed: %s", filePath, err)
 						c.JSON(200, enUSMap)
@@ -400,7 +509,7 @@ func serveAppearance(ginServer *gin.Engine) {
 		c.File(filePath)
 	})
 
-	siyuan.Static("/stage/", filepath.Join(util.WorkingDir, "stage"))
+	siyuan.Static("/stage", filepath.Join(util.WorkingDir, "stage"))
 }
 
 func serveCheckAuth(ginServer *gin.Engine) {
@@ -425,12 +534,12 @@ func serveAuthPage(c *gin.Context) {
 	keymapHideWindow := "⌥M"
 	if nil != (*model.Conf.Keymap)["general"] {
 		switch (*model.Conf.Keymap)["general"].(type) {
-		case map[string]interface{}:
-			keymapGeneral := (*model.Conf.Keymap)["general"].(map[string]interface{})
+		case map[string]any:
+			keymapGeneral := (*model.Conf.Keymap)["general"].(map[string]any)
 			if nil != keymapGeneral["toggleWin"] {
 				switch keymapGeneral["toggleWin"].(type) {
-				case map[string]interface{}:
-					toggleWin := keymapGeneral["toggleWin"].(map[string]interface{})
+				case map[string]any:
+					toggleWin := keymapGeneral["toggleWin"].(map[string]any)
 					if nil != toggleWin["custom"] {
 						keymapHideWindow = toggleWin["custom"].(string)
 					}
@@ -441,7 +550,7 @@ func serveAuthPage(c *gin.Context) {
 			keymapHideWindow = "⌥M"
 		}
 	}
-	model := map[string]interface{}{
+	model := map[string]any{
 		"l0":                     model.Conf.Language(173),
 		"l1":                     model.Conf.Language(174),
 		"l2":                     template.HTML(model.Conf.Language(172)),
@@ -451,6 +560,9 @@ func serveAuthPage(c *gin.Context) {
 		"l6":                     model.Conf.Language(178),
 		"l7":                     template.HTML(model.Conf.Language(184)),
 		"l8":                     model.Conf.Language(95),
+		"l9":                     model.Conf.Language(83),
+		"l10":                    model.Conf.Language(257),
+		"l11":                    model.Conf.Language(282),
 		"appearanceMode":         model.Conf.Appearance.Mode,
 		"appearanceModeOS":       model.Conf.Appearance.ModeOS,
 		"workspace":              util.WorkspaceName,
@@ -474,6 +586,12 @@ func serveAssets(ginServer *gin.Engine) {
 
 	ginServer.GET("/assets/*path", model.CheckAuth, func(context *gin.Context) {
 		requestPath := context.Param("path")
+		if "/" == requestPath || "" == requestPath {
+			// 禁止访问根目录 Disable HTTP access to the /assets/ path https://github.com/siyuan-note/siyuan/issues/15257
+			context.Status(http.StatusForbidden)
+			return
+		}
+
 		relativePath := path.Join("assets", requestPath)
 		p, err := model.GetAssetAbsPath(relativePath)
 		if err != nil {
@@ -490,14 +608,63 @@ func serveAssets(ginServer *gin.Engine) {
 				return
 			}
 		}
+
+		if !model.IsAdminRoleContext(context) {
+			publishAccess := model.GetPublishAccess()
+			if !model.CheckAbsPathAccessableByPublishAccess(context, p, publishAccess) {
+				context.Status(http.StatusForbidden)
+				return
+			}
+		}
+
+		if serveThumbnail(context, p, requestPath) || serveSVG(context, p) {
+			return
+		}
+
+		// 返回原始文件
 		http.ServeFile(context.Writer, context.Request, p)
-		return
 	})
+
 	ginServer.GET("/history/*path", model.CheckAuth, model.CheckAdminRole, func(context *gin.Context) {
 		p := filepath.Join(util.HistoryDir, context.Param("path"))
 		http.ServeFile(context.Writer, context.Request, p)
-		return
 	})
+}
+
+func serveSVG(context *gin.Context, assetAbsPath string) bool {
+	if strings.HasSuffix(assetAbsPath, ".svg") {
+		data, err := os.ReadFile(assetAbsPath)
+		if err != nil {
+			logging.LogErrorf("read svg file failed: %s", err)
+			return false
+		}
+
+		if !model.Conf.Editor.AllowSVGScript {
+			data = []byte(util.SanitizeSVG(string(data)))
+		}
+
+		context.Data(200, "image/svg+xml", data)
+		return true
+	}
+	return false
+}
+
+func serveThumbnail(context *gin.Context, assetAbsPath, requestPath string) bool {
+	if style := context.Query("style"); style == "thumb" && model.NeedGenerateAssetsThumbnail(assetAbsPath) { // 请求缩略图
+		thumbnailPath := filepath.Join(util.TempDir, "thumbnails", "assets", requestPath)
+		if !gulu.File.IsExist(thumbnailPath) {
+			// 如果缩略图不存在，则生成缩略图
+			err := model.GenerateAssetsThumbnail(assetAbsPath, thumbnailPath)
+			if err != nil {
+				logging.LogErrorf("generate thumbnail failed: %s", err)
+				return false
+			}
+		}
+
+		http.ServeFile(context.Writer, context.Request, thumbnailPath)
+		return true
+	}
+	return false
 }
 
 func serveRepoDiff(ginServer *gin.Engine) {
@@ -505,7 +672,6 @@ func serveRepoDiff(ginServer *gin.Engine) {
 		requestPath := context.Param("path")
 		p := filepath.Join(util.TempDir, "repo", "diff", requestPath)
 		http.ServeFile(context.Writer, context.Request, p)
-		return
 	})
 }
 
@@ -529,6 +695,7 @@ func serveDebug(ginServer *gin.Engine) {
 }
 
 func serveWebSocket(ginServer *gin.Engine) {
+	util.WebSocketServer = melody.New()
 	util.WebSocketServer.Config.MaxMessageSize = 1024 * 1024 * 8
 
 	ginServer.GET("/ws", func(c *gin.Context) {
@@ -581,13 +748,20 @@ func serveWebSocket(ginServer *gin.Engine) {
 
 		if !authOk {
 			// 用于授权页保持连接，避免非常驻内存内核自动退出 https://github.com/siyuan-note/insider/issues/1099
-			authOk = strings.Contains(s.Request.RequestURI, "/ws?app=siyuan&id=auth")
+			authOk = strings.Contains(s.Request.RequestURI, "/ws?app=siyuan") && strings.Contains(s.Request.RequestURI, "&id=auth&type=auth")
 		}
 
 		if !authOk {
 			s.CloseWithMsg([]byte("  unauthenticated"))
 			logging.LogWarnf("closed an unauthenticated session [%s]", util.GetRemoteAddr(s.Request))
 			return
+		}
+
+		// 标记发布服务的连接
+		if token := model.ParseXAuthToken(s.Request); token != nil {
+			if model.IsPublishServiceToken(token) {
+				s.Set("isPublish", true)
+			}
 		}
 
 		util.AddPushChan(s)
@@ -615,7 +789,12 @@ func serveWebSocket(ginServer *gin.Engine) {
 	util.WebSocketServer.HandleMessage(func(s *melody.Session, msg []byte) {
 		start := time.Now()
 		logging.LogTracef("request [%s]", shortReqMsg(msg))
-		request := map[string]interface{}{}
+
+		if util.IsAuthSession(s) {
+			return
+		}
+
+		request := map[string]any{}
 		if err := gulu.JSON.UnmarshalJSON(msg, &request); err != nil {
 			result := util.NewResult()
 			result.Code = -1
@@ -635,7 +814,7 @@ func serveWebSocket(ginServer *gin.Engine) {
 
 		cmdStr := request["cmd"].(string)
 		cmdId := request["reqId"].(float64)
-		param := request["param"].(map[string]interface{})
+		param := request["param"].(map[string]any)
 		command := cmd.NewCommand(cmdStr, cmdId, param, s)
 		if nil == command {
 			result := util.NewResult()
@@ -802,7 +981,7 @@ func corsMiddleware() gin.HandlerFunc {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Allow-Headers", "origin, Content-Length, Content-Type, Authorization")
-		c.Header("Access-Control-Allow-Private-Network", "true")
+		c.Header("Access-Control-Allow-Private-Network", "false")
 
 		if strings.HasPrefix(c.Request.RequestURI, "/webdav") {
 			c.Header("Access-Control-Allow-Methods", allowWebDavMethods)
@@ -850,7 +1029,6 @@ func jwtMiddleware(c *gin.Context) {
 	}
 	c.Set(model.RoleContextKey, model.RoleVisitor)
 	c.Next()
-	return
 }
 
 func serveFixedStaticFiles(ginServer *gin.Engine) {

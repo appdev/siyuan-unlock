@@ -26,7 +26,7 @@ type System struct {
 	KernelVersion    string `json:"kernelVersion"`
 	OS               string `json:"os"`
 	OSPlatform       string `json:"osPlatform"`
-	Container        string `json:"container"` // docker, android, ios, std
+	Container        string `json:"container"` // docker, android, ios, harmony, std
 	IsMicrosoftStore bool   `json:"isMicrosoftStore"`
 	IsInsider        bool   `json:"isInsider"`
 
@@ -36,13 +36,13 @@ type System struct {
 	ConfDir      string `json:"confDir"`
 	DataDir      string `json:"dataDir"`
 
-	NetworkServe bool          `json:"networkServe"` // 是否开启网络伺服
-	NetworkProxy *NetworkProxy `json:"networkProxy"`
+	NetworkServe    bool          `json:"networkServe"`    // 是否开启网络伺服
+	NetworkServeTLS bool          `json:"networkServeTLS"` // 是否开启 HTTPS 网络伺服
+	NetworkProxy    *NetworkProxy `json:"networkProxy"`
 
-	DisableGoogleAnalytics bool `json:"disableGoogleAnalytics"`
-	DownloadInstallPkg     bool `json:"downloadInstallPkg"`
-	AutoLaunch2            int  `json:"autoLaunch2"`    // 0：不自动启动，1：自动启动，2：自动启动+隐藏主窗口
-	LockScreenMode         int  `json:"lockScreenMode"` // 0：手动，1：手动+跟随系统 https://github.com/siyuan-note/siyuan/issues/9087
+	DownloadInstallPkg bool `json:"downloadInstallPkg"`
+	AutoLaunch2        int  `json:"autoLaunch2"`    // 0：不自动启动，1：自动启动，2：自动启动+隐藏主窗口
+	LockScreenMode     int  `json:"lockScreenMode"` // 0：手动，1：手动+跟随系统 https://github.com/siyuan-note/siyuan/issues/9087
 
 	DisabledFeatures []string `json:"disabledFeatures"`
 

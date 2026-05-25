@@ -5,9 +5,10 @@ import {fetchPost} from "../../../util/fetch";
 import {escapeHtml} from "../../../util/escape";
 import {transaction} from "../../wysiwyg/transaction";
 import {unicode2Emoji} from "../../../emoji";
-import {getColIconByType} from "./col";
+import {getColIconByType, getColId} from "./col";
 import {showMessage} from "../../../dialog/message";
 import {getNameByOperator} from "./calc";
+import {getFieldsByData} from "./view";
 
 const updateCol = (options: {
     target: HTMLElement,
@@ -20,7 +21,7 @@ const updateCol = (options: {
         return;
     }
     options.target.querySelector(".b3-menu__accelerator").textContent = itemElement.querySelector(".b3-list-item__text").textContent;
-    const colData = options.data.view.columns.find((item) => {
+    const colData = getFieldsByData(options.data).find((item) => {
         if (item.id === options.colId) {
             if (!item.rollup) {
                 item.rollup = {};
@@ -80,7 +81,7 @@ const genSearchList = (element: Element, keyword: string, avId: string, isRelati
         showMessage(window.siyuan.languages.selectRelation);
         return;
     }
-    fetchPost(isRelation ? "/api/av/searchAttributeViewRelationKey" : "/api/av/searchAttributeViewNonRelationKey", {
+    fetchPost(isRelation ? "/api/av/searchAttributeViewRelationKey" : "/api/av/searchAttributeViewRollupDestKeys", {
         avID: avId,
         keyword
     }, (response) => {
@@ -166,14 +167,14 @@ export const getRollupHTML = (options: { data?: IAV, cellElements?: HTMLElement[
     if (options.colData) {
         colData = options.colData;
     } else {
-        options.data.view.columns.find((item) => {
-            if (item.id === options.cellElements[0].dataset.colId) {
+        getFieldsByData(options.data).find((item) => {
+            if (item.id === getColId(options.cellElements[0], options.data.viewType)) {
                 colData = item;
                 return true;
             }
         });
     }
-    return `<button class="b3-menu__item" data-type="goSearchRollupCol" data-old-value='${JSON.stringify(colData.rollup || {})}'>
+    return `<button class="b3-menu__item b3-menu__item--current" data-type="goSearchRollupCol" data-old-value='${JSON.stringify(colData.rollup || {})}'>
     <span class="b3-menu__label">${window.siyuan.languages.relation}</span>
     <span class="b3-menu__accelerator"></span>
     <svg class="b3-menu__icon b3-menu__icon--small"><use xlink:href="#iconRight"></use></svg>
@@ -201,7 +202,7 @@ export const bindRollupData = (options: {
         const goSearchRollupTargetElement = options.menuElement.querySelector('[data-type="goSearchRollupTarget"]') as HTMLElement;
         let targetKeyAVId = "";
         if (oldValue.relationKeyID) {
-            options.data.view.columns.find((item) => {
+            getFieldsByData(options.data).find((item) => {
                 if (item.id === oldValue.relationKeyID) {
                     goSearchRollupColElement.querySelector(".b3-menu__accelerator").textContent = item.name;
                     targetKeyAVId = item.relation.avID;

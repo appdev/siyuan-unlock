@@ -4,7 +4,6 @@ import {getAllTabs, getAllWnds} from "../layout/getAll";
 import {Editor} from "../editor";
 import {Asset} from "../asset";
 import {Constants} from "../constants";
-import { ipcRenderer } from "electron";
 
 export const setTabPosition = () => {
     if (!isWindow()) {
@@ -17,18 +16,17 @@ export const setTabPosition = () => {
         const rect = headerElement.getBoundingClientRect();
         const dragElement = headerElement.querySelector(".item--readonly .fn__flex-1") as HTMLElement;
         if (rect.top <= 0) {
+            dragElement.parentElement.parentElement.style.minWidth = "95px";
             dragElement.style.height = dragElement.parentElement.clientHeight + "px";
-            // @ts-ignore
-            dragElement.style.WebkitAppRegion = "drag";
+            (dragElement.style as CSSStyleDeclarationElectron).WebkitAppRegion = "drag";
         } else {
-            // @ts-ignore
-            dragElement.style.WebkitAppRegion = "";
+            dragElement.parentElement.parentElement.style.minWidth = "";
+            dragElement.style.height = "";
+            (dragElement.style as CSSStyleDeclarationElectron).WebkitAppRegion = "";
         }
         const headersLastElement = headerElement.lastElementChild as HTMLElement;
         if ("darwin" === window.siyuan.config.system.os) {
-            const isFullScreen = await ipcRenderer.invoke(Constants.SIYUAN_GET, {
-                cmd: "isFullScreen",
-            });
+            const isFullScreen = document.body.classList.contains("body--fullscreen");
             if (rect.top <= 0 && rect.left <= 0 && !isFullScreen) {
                 // 用 marginLeft 左侧底部无线条
                 item.headersElement.style.paddingLeft = "var(--b3-toolbar-left-mac)";

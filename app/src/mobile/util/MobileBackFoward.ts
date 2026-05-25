@@ -19,7 +19,7 @@ const forwardStack: IBackStack[] = [];
 const focusStack = (backStack: IBackStack) => {
     const protyle = getCurrentEditor().protyle;
     // 前进后快速后退会导致滚动错位 https://ld246.com/article/1734018624070
-    protyle.observerLoad.disconnect();
+    protyle.observerLoad?.disconnect();
 
     window.siyuan.storage[Constants.LOCAL_DOCINFO] = {
         id: backStack.id,
@@ -47,12 +47,12 @@ const focusStack = (backStack: IBackStack) => {
             id: backStack.id,
         }, (response) => {
             setTitle(response.data.name);
-            protyle.title.setTitle(response.data.name);
+            protyle.title.setTitle(response.data.name, response.data.ial[Constants.CUSTOM_SY_TITLE_EMPTY] === "true");
             protyle.background.render(response.data.ial, protyle.block.rootID);
             protyle.wysiwyg.renderCustom(response.data.ial);
         });
     }
-
+    const exitFocusElement = protyle.breadcrumb.element.parentElement.querySelector('[data-type="exit-focus"]');
     if (backStack.zoomId) {
         if (backStack.zoomId !== protyle.block.id) {
             fetchPost("/api/block/checkBlockExist", {id: backStack.id}, existResponse => {
@@ -70,6 +70,7 @@ const focusStack = (backStack: IBackStack) => {
         } else {
             protyle.contentElement.scrollTop = backStack.scrollTop;
         }
+        exitFocusElement.classList.remove("fn__none");
         return;
     }
 
@@ -102,6 +103,12 @@ const focusStack = (backStack: IBackStack) => {
         setTimeout(() => {
             protyle.contentElement.scrollTop = backStack.scrollTop;
         }, Constants.TIMEOUT_LOAD);
+
+        protyle.app.plugins.forEach(item => {
+            item.eventBus.emit("switch-protyle", {protyle});
+            item.eventBus.emit("loaded-protyle-static", {protyle});
+        });
+        exitFocusElement.classList.add("fn__none");
     });
 };
 
@@ -153,9 +160,13 @@ export const goBack = () => {
         closePanel();
         return;
     }
-    if (window.JSAndroid && window.siyuan.backStack.length < 1) {
+    if ((window.JSAndroid || window.JSHarmony) && window.siyuan.backStack.length < 1) {
         if (document.querySelector('#message [data-id="exitTip"]')) {
-            window.JSAndroid.returnDesktop();
+            if (window.JSAndroid) {
+                window.JSAndroid.returnDesktop();
+            } else if (window.JSHarmony) {
+                window.JSHarmony.returnDesktop();
+            }
         } else {
             showMessage(window.siyuan.languages.returnDesktop, 3000, "info", "exitTip");
         }

@@ -20,7 +20,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,7 +67,7 @@ func FlushHistoryQueue() {
 		groupOpsTotal[op.action]++
 	}
 
-	context := map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
+	context := map[string]any{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
 	groupOpsCurrent := map[string]int{}
 	for i, op := range ops {
 		if util.IsExiting.Load() {
@@ -83,6 +86,15 @@ func FlushHistoryQueue() {
 		if err = execHistoryOp(op, tx, context); err != nil {
 			tx.Rollback()
 			logging.LogErrorf("queue operation failed: %s", err)
+
+			if 0 < len(op.histories) {
+				dir := op.histories[0].Path[:strings.Index(op.histories[0].Path, "/")]
+				dirPath := filepath.Join(util.HistoryDir, dir)
+				if removeErr := os.RemoveAll(dirPath); nil != removeErr {
+					logging.LogErrorf("remove corrupted history dir [%s] failed: %s", dirPath, removeErr)
+				}
+			}
+
 			eventbus.Publish(util.EvtSQLHistoryRebuild)
 			return
 		}
@@ -101,18 +113,18 @@ func FlushHistoryQueue() {
 		debug.FreeOSMemory()
 	}
 
-	elapsed := time.Now().Sub(start).Milliseconds()
+	elapsed := time.Since(start).Milliseconds()
 	if 7000 < elapsed {
 		logging.LogInfof("database history op tx [%dms]", elapsed)
 	}
 }
 
-func execHistoryOp(op *historyDBQueueOperation, tx *sql.Tx, context map[string]interface{}) (err error) {
+func execHistoryOp(op *historyDBQueueOperation, tx *sql.Tx, context map[string]any) (err error) {
 	switch op.action {
 	case "index":
 		err = insertHistories(tx, op.histories, context)
 	case "deleteOutdated":
-		err = deleteOutdatedHistories(tx, op.before, context)
+		err = deleteOutdatedHistories(tx, op.before)
 	default:
 		msg := fmt.Sprintf("unknown history operation [%s]", op.action)
 		logging.LogErrorf(msg)
@@ -130,6 +142,10 @@ func DeleteOutdatedHistories(before int64) {
 }
 
 func IndexHistoriesQueue(histories []*History) {
+	if 1 > len(histories) {
+		return
+	}
+
 	historyDBQueueLock.Lock()
 	defer historyDBQueueLock.Unlock()
 

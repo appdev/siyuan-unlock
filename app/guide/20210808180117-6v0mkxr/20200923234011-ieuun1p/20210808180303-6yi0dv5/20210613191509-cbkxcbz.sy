@@ -1,11 +1,12 @@
 {
 	"ID": "20210613191509-cbkxcbz",
-	"Spec": "1",
+	"Spec": "2",
 	"Type": "NodeDocument",
 	"Properties": {
 		"id": "20210613191509-cbkxcbz",
 		"title": "Content Block Attribute",
-		"updated": "20210613191548"
+		"type": "doc",
+		"updated": "20251201102407"
 	},
 	"Children": [
 		{
@@ -213,7 +214,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20210613191548-65gd8yo",
-				"updated": "20210613191548"
+				"updated": "20251201102407"
 			},
 			"Children": [
 				{
@@ -223,34 +224,34 @@
 			]
 		},
 		{
-			"ID": "20210613191548-7p2bvoq",
+			"ID": "20251201102224-5uvilvm",
 			"Type": "NodeParagraph",
 			"Properties": {
-				"id": "20210613191548-7p2bvoq",
-				"updated": "20210613191746"
+				"id": "20251201102224-5uvilvm",
+				"updated": "20251201102407"
 			},
 			"Children": [
 				{
 					"Type": "NodeText",
-					"Data": "The user-defined attributes are set by the user through the "
+					"Data": "Custom attributes are set by the user through the "
 				},
 				{
 					"Type": "NodeTextMark",
-					"TextMarkType": "code",
+					"TextMarkType": "code kbd",
 					"TextMarkTextContent": "Block icon menu"
 				},
 				{
 					"Type": "NodeText",
-					"Data": " -"
+					"Data": "​ -"
 				},
 				{
 					"Type": "NodeTextMark",
-					"TextMarkType": "code",
+					"TextMarkType": "code kbd",
 					"TextMarkTextContent": "Attribute"
 				},
 				{
 					"Type": "NodeText",
-					"Data": ", and only English letters and Arabic numerals are allowed in the attribute name (such as "
+					"Data": "​, attribute names can only use lowercase English letters and Arabic numerals and must begin with a letter (e.g., "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -259,16 +260,16 @@
 				},
 				{
 					"Type": "NodeText",
-					"Data": ", "
+					"Data": "​, "
 				},
 				{
 					"Type": "NodeTextMark",
 					"TextMarkType": "code",
-					"TextMarkTextContent": "7days"
+					"TextMarkTextContent": "day1"
 				},
 				{
 					"Type": "NodeText",
-					"Data": "). After setting, SiYuan will automatically prefix the attribute name with "
+					"Data": "​). After setting, SiYuan will automatically add the prefix "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -277,7 +278,7 @@
 				},
 				{
 					"Type": "NodeText",
-					"Data": " to distinguish built-in attributes from custom attributes."
+					"Data": "​ to the attribute name to distinguish it from built-in attributes."
 				}
 			]
 		},

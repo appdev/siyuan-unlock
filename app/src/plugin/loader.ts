@@ -9,7 +9,7 @@ import {getFrontend, isMobile, isWindow} from "../util/functions";
 import {Constants} from "../constants";
 import {uninstall} from "./uninstall";
 import {setStorageVal} from "../protyle/util/compatibility";
-import { getAllEditor } from "../layout/getAll";
+import {getAllEditor} from "../layout/getAll";
 
 const requireFunc = (key: string) => {
     const modules = {
@@ -27,21 +27,20 @@ const runCode = (code: string, sourceURL: string) => {
     return window.eval("(function anonymous(require, module, exports){".concat(code, "\n})\n//# sourceURL=").concat(sourceURL, "\n"));
 };
 
-export const loadPlugins = async (app: App, names?: string[]) => {
+export const loadPlugins = async (app: App, names?: string[], init = true) => {
     const response = await fetchSyncPost("/api/petal/loadPetals", {frontend: getFrontend()});
-    let css = "";
-    // 为加快启动速度，不进行 await
-    response.data.forEach((item: IPluginData) => {
+    const pluginsStyle = getPluginsStyle();
+    for (let i = 0; i < response.data.length; i++) {
+        const item = response.data[i] as IPluginData;
         if (!names || (names && names.includes(item.name))) {
-            loadPluginJS(app, item);
+            if (init) {
+                // 初始化时为加快启动速度，已特殊处理，不进行 await
+                loadPluginJS(app, item);
+            } else {
+                await loadPluginJS(app, item);
+            }
+            insertPluginCSS(item, pluginsStyle);
         }
-        css += item.css || "" + "\n";
-    });
-    const pluginsStyle = document.getElementById("pluginsStyle");
-    if (pluginsStyle) {
-        pluginsStyle.innerHTML = css;
-    } else {
-        document.head.insertAdjacentHTML("beforeend", `<style id="pluginsStyle">${css}</style>`);
     }
 };
 
@@ -68,7 +67,7 @@ const loadPluginJS = async (app: App, item: IPluginData) => {
         displayName: item.displayName,
         name: item.name,
         i18n: item.i18n
-    });
+    }) as Plugin;
     app.plugins.push(plugin);
     try {
         await plugin.onload();
@@ -78,16 +77,34 @@ const loadPluginJS = async (app: App, item: IPluginData) => {
     return plugin;
 };
 
+const getPluginsStyle = () => {
+    let pluginsStyle = document.getElementById("pluginsStyle");
+    if (!pluginsStyle) {
+        pluginsStyle = document.createElement("style");
+        pluginsStyle.id = "pluginsStyle"; // 用于将内联样式插入到插件样式前的标识
+        document.head.append(pluginsStyle);
+    }
+    return pluginsStyle;
+};
+
+const insertPluginCSS = (item: IPluginData, pluginsStyle: HTMLElement) => {
+    if (!item.css) {
+        return;
+    }
+    const styleElement = document.createElement("style");
+    styleElement.id = "pluginsStyle" + item.name;
+    styleElement.textContent = item.css;
+    pluginsStyle.insertAdjacentElement("afterend", styleElement);
+};
+
 // 启用插件
 export const loadPlugin = async (app: App, item: IPluginData) => {
     const plugin = await loadPluginJS(app, item);
-    const styleElement = document.createElement("style");
-    styleElement.textContent = item.css;
-    document.head.append(styleElement);
+    insertPluginCSS(item, getPluginsStyle());
     afterLoadPlugin(plugin);
     saveLayout();
     getAllEditor().forEach(editor => {
-      editor.protyle.toolbar.update(editor.protyle);
+        editor.protyle.toolbar.update(editor.protyle);
     });
     return plugin;
 };
@@ -124,6 +141,9 @@ export const afterLoadPlugin = (plugin: Plugin) => {
 
     if (!isWindow() || isMobile()) {
         plugin.topBarIcons.forEach(element => {
+            if (document.contains(element)) {
+                return;
+            }
             if (isMobile()) {
                 if (!window.siyuan.storage[Constants.LOCAL_PLUGINTOPUNPIN].includes(element.id)) {
                     document.querySelector("#menuAbout").after(element);
@@ -132,15 +152,18 @@ export const afterLoadPlugin = (plugin: Plugin) => {
                 if (window.siyuan.storage[Constants.LOCAL_PLUGINTOPUNPIN].includes(element.id)) {
                     element.classList.add("fn__none");
                 }
-                document.querySelector("#" + (element.getAttribute("data-position") === "right" ? "barPlugins" : "drag")).before(element);
+                document.querySelector("#" + (element.getAttribute("data-location") === "right" ? "barPlugins" : "drag")).before(element);
             }
         });
     }
     /// #if !MOBILE
     resizeTopBar();
     plugin.statusBarIcons.forEach(element => {
+        if (document.contains(element)) {
+            return;
+        }
         const statusElement = document.getElementById("status");
-        if (element.getAttribute("data-position") === "right") {
+        if (element.getAttribute("data-location") === "right") {
             statusElement.insertAdjacentElement("beforeend", element);
         } else {
             statusElement.insertAdjacentElement("afterbegin", element);
@@ -162,7 +185,7 @@ export const afterLoadPlugin = (plugin: Plugin) => {
         updateDock(dockItem, index, plugin, "Bottom");
     });
     Object.keys(plugin.docks).forEach(key => {
-        if (window.siyuan.storage[Constants.LOCAL_PLUGIN_DOCKS][plugin.name]  && window.siyuan.storage[Constants.LOCAL_PLUGIN_DOCKS][plugin.name][key]) {
+        if (window.siyuan.storage[Constants.LOCAL_PLUGIN_DOCKS][plugin.name] && window.siyuan.storage[Constants.LOCAL_PLUGIN_DOCKS][plugin.name][key]) {
             plugin.docks[key].config = window.siyuan.storage[Constants.LOCAL_PLUGIN_DOCKS][plugin.name][key];
         }
         const dock = plugin.docks[key];
@@ -199,16 +222,42 @@ export const afterLoadPlugin = (plugin: Plugin) => {
     /// #endif
 };
 
-export const reloadPlugin = async (app: App, data: { upsertPlugins: string[], removePlugins: string[] }) => {
-    data.removePlugins.concat(data.upsertPlugins).forEach((item) => {
-        uninstall(app, item);
+export const reloadPlugin = async (app: App, data: {
+    uninstallPlugins?: string[],  // 插件卸载
+    unloadPlugins?: string[],     // 插件禁用
+    reloadPlugins?: string[],     // 插件启用，或插件代码变更
+    dataChangePlugins?: string[], // 插件存储数据变更
+} = {}) => {
+    const {uninstallPlugins = [], unloadPlugins = [], reloadPlugins = [], dataChangePlugins = []} = data;
+    // 禁用
+    unloadPlugins.forEach((item) => {
+        uninstall(app, item, true);
     });
-    loadPlugins(app, data.upsertPlugins).then(() => {
+    // 卸载
+    uninstallPlugins.forEach((item) => {
+        uninstall(app, item, false);
+    });
+    reloadPlugins.forEach((item) => {
+        uninstall(app, item, true);
+    });
+    loadPlugins(app, reloadPlugins, false).then(() => {
         app.plugins.forEach(item => {
-            if (data.upsertPlugins.includes(item.name)) {
+            if (reloadPlugins.includes(item.name)) {
                 afterLoadPlugin(item);
+                getAllEditor().forEach(editor => {
+                    editor.protyle.toolbar.update(editor.protyle);
+                });
             }
         });
+    });
+    app.plugins.forEach(item => {
+        if (dataChangePlugins.includes(item.name)) {
+            try {
+                item.onDataChanged();
+            } catch (e) {
+                console.error(`plugin ${item.name} onDataChanged error:`, e);
+            }
+        }
     });
     /// #if !MOBILE
     saveLayout();

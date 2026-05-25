@@ -212,8 +212,8 @@ func syncData(exit, byHand bool) {
 	}
 
 	if 1 == Conf.Sync.Mode && nil != webSocketConn && Conf.Sync.Perception && dataChanged {
-		// 如果处于自动同步模式且不是又 WS 触发的同步，则通知其他设备上的内核进行同步
-		request := map[string]interface{}{
+		// 如果处于自动同步模式且不是由 WS 触发的同步，则通知其他设备上的内核进行同步
+		request := map[string]any{
 			"cmd":    "synced",
 			"synced": Conf.Sync.Synced,
 		}
@@ -250,10 +250,14 @@ func checkSync(boot, exit, byHand bool) bool {
 	switch Conf.Sync.Provider {
 	case conf.ProviderSiYuan:
 		if !IsSubscriber() {
+			Conf.Sync.Enabled = false
+			Conf.Save()
 			return false
 		}
-	case conf.ProviderWebDAV, conf.ProviderS3:
+	case conf.ProviderWebDAV, conf.ProviderS3, conf.ProviderLocal:
 		if !IsPaidUser() {
+			Conf.Sync.Enabled = false
+			Conf.Save()
 			return false
 		}
 	}
@@ -292,23 +296,23 @@ func removeIndexes(removeFilePaths []string) (removeRootIDs []string) {
 			continue
 		}
 
-		id := util.GetTreeID(removeFile)
-		removeRootIDs = append(removeRootIDs, id)
-		block := treenode.GetBlockTree(id)
-		if nil != block {
-			msg := fmt.Sprintf(Conf.Language(39), block.RootID)
-			util.IncBootProgress(bootProgressPart, msg)
-			util.PushStatusBar(msg)
+		rootID := util.GetTreeID(removeFile)
+		removeRootIDs = append(removeRootIDs, rootID)
 
-			bts := treenode.GetBlockTreesByRootID(block.RootID)
-			for _, b := range bts {
-				cache.RemoveBlockIAL(b.ID)
-			}
-			cache.RemoveDocIAL(block.Path)
+		msg := fmt.Sprintf(Conf.Language(39), rootID)
+		util.IncBootProgress(bootProgressPart, msg)
+		util.PushStatusBar(msg)
 
-			treenode.RemoveBlockTreesByRootID(block.RootID)
-			sql.RemoveTreeQueue(block.RootID)
+		cache.RemoveTreeData(rootID)
+		sql.RemoveTreeQueue(rootID)
+		bts := treenode.GetBlockTreesByRootID(rootID)
+		for _, b := range bts {
+			cache.RemoveBlockIAL(b.ID)
 		}
+		if block := treenode.GetBlockTree(rootID); nil != block {
+			cache.RemoveDocIAL(block.Path)
+		}
+		treenode.RemoveBlockTreesByRootID(rootID)
 	}
 
 	if 1 > len(removeRootIDs) {
@@ -326,21 +330,21 @@ func upsertIndexes(upsertFilePaths []string) (upsertRootIDs []string) {
 		}
 
 		upsertFile = filepath.ToSlash(upsertFile)
-		if strings.HasPrefix(upsertFile, "/") {
-			upsertFile = upsertFile[1:]
-		}
-		idx := strings.Index(upsertFile, "/")
-		if 0 > idx {
+		upsertFile = strings.TrimPrefix(upsertFile, "/")
+
+		box, _, found := strings.Cut(upsertFile, "/")
+		if !found {
 			// .sy 直接出现在 data 文件夹下，没有出现在笔记本文件夹下的情况
 			continue
 		}
 
-		box := upsertFile[:idx]
 		p := strings.TrimPrefix(upsertFile, box)
 		msg := fmt.Sprintf(Conf.Language(40), util.GetTreeID(p))
 		util.IncBootProgress(bootProgressPart, msg)
 		util.PushStatusBar(msg)
 
+		rootID := util.GetTreeID(p)
+		cache.RemoveTreeData(rootID)
 		tree, err0 := filesys.LoadTree(box, p, luteEngine)
 		if nil != err0 {
 			continue
@@ -348,13 +352,13 @@ func upsertIndexes(upsertFilePaths []string) (upsertRootIDs []string) {
 		treenode.UpsertBlockTree(tree)
 		sql.UpsertTreeQueue(tree)
 
-		bts := treenode.GetBlockTreesByRootID(tree.ID)
+		bts := treenode.GetBlockTreesByRootID(rootID)
 		for _, b := range bts {
 			cache.RemoveBlockIAL(b.ID)
 		}
 		cache.RemoveDocIAL(tree.Path)
 
-		upsertRootIDs = append(upsertRootIDs, tree.Root.ID)
+		upsertRootIDs = append(upsertRootIDs, rootID)
 	}
 
 	if 1 > len(upsertRootIDs) {
@@ -380,13 +384,11 @@ func SetCloudSyncDir(name string) {
 func SetSyncGenerateConflictDoc(b bool) {
 	Conf.Sync.GenerateConflictDoc = b
 	Conf.Save()
-	return
 }
 
 func SetSyncEnable(b bool) {
 	Conf.Sync.Enabled = b
 	Conf.Save()
-	return
 }
 
 func SetSyncInterval(interval int) {
@@ -400,29 +402,27 @@ func SetSyncInterval(interval int) {
 	Conf.Sync.Interval = interval
 	Conf.Save()
 	planSyncAfter(time.Duration(interval) * time.Second)
-	return
 }
 
-func SetSyncPerception(b bool) {
+func SetSyncPerception(enabled bool) {
 	if util.ContainerDocker == util.Container {
-		b = false
+		enabled = false
 	}
 
-	Conf.Sync.Perception = b
+	Conf.Sync.Perception = enabled
 	Conf.Save()
 
-	if b {
+	if enabled {
 		connectSyncWebSocket()
-	} else {
-		closeSyncWebSocket()
+		return
 	}
-	return
+
+	closeSyncWebSocket()
 }
 
 func SetSyncMode(mode int) {
 	Conf.Sync.Mode = mode
 	Conf.Save()
-	return
 }
 
 func SetSyncProvider(provider int) (err error) {
@@ -440,11 +440,6 @@ func SetSyncProviderS3(s3 *conf.S3) (err error) {
 	s3.Region = strings.TrimSpace(s3.Region)
 	s3.Timeout = util.NormalizeTimeout(s3.Timeout)
 	s3.ConcurrentReqs = util.NormalizeConcurrentReqs(s3.ConcurrentReqs, conf.ProviderS3)
-
-	if !cloud.IsValidCloudDirName(s3.Bucket) {
-		util.PushErrMsg(Conf.Language(37), 5000)
-		return
-	}
 
 	Conf.Sync.S3 = s3
 	Conf.Save()
@@ -471,18 +466,59 @@ func SetSyncProviderWebDAV(webdav *conf.WebDAV) (err error) {
 	return
 }
 
+func SetSyncProviderLocal(local *conf.Local) (err error) {
+	local.Endpoint = strings.TrimSpace(local.Endpoint)
+	local.Endpoint = util.NormalizeLocalPath(local.Endpoint)
+
+	absPath, err := filepath.Abs(local.Endpoint)
+	if nil != err {
+		msg := fmt.Sprintf("get endpoint [%s] abs path failed: %s", local.Endpoint, err)
+		logging.LogErrorf(msg)
+		err = fmt.Errorf(Conf.Language(77), msg)
+		return
+	}
+	if !gulu.File.IsExist(absPath) {
+		msg := fmt.Sprintf("endpoint [%s] not exist", local.Endpoint)
+		logging.LogErrorf(msg)
+		err = fmt.Errorf(Conf.Language(77), msg)
+		return
+	}
+	if util.IsAbsPathInWorkspace(absPath) || filepath.Clean(absPath) == filepath.Clean(util.WorkspaceDir) {
+		msg := fmt.Sprintf("endpoint [%s] is in workspace", local.Endpoint)
+		logging.LogErrorf(msg)
+		err = fmt.Errorf(Conf.Language(77), msg)
+		return
+	}
+
+	if gulu.File.IsSubPath(absPath, util.WorkspaceDir) {
+		msg := fmt.Sprintf("endpoint [%s] is parent of workspace", local.Endpoint)
+		logging.LogErrorf(msg)
+		err = fmt.Errorf(Conf.Language(77), msg)
+		return
+	}
+
+	local.Timeout = util.NormalizeTimeout(local.Timeout)
+	local.ConcurrentReqs = util.NormalizeConcurrentReqs(local.ConcurrentReqs, conf.ProviderLocal)
+
+	Conf.Sync.Local = local
+	Conf.Save()
+	return
+}
+
 var (
 	syncLock  = sync.Mutex{}
 	isSyncing = atomic.Bool{}
 )
 
 func CreateCloudSyncDir(name string) (err error) {
-	if conf.ProviderSiYuan != Conf.Sync.Provider {
+	switch Conf.Sync.Provider {
+	case conf.ProviderSiYuan, conf.ProviderLocal:
+		break
+	default:
 		err = errors.New(Conf.Language(131))
 		return
 	}
 
-	name = strings.TrimSpace(name)
 	name = util.RemoveInvalid(name)
 	if !cloud.IsValidCloudDirName(name) {
 		return errors.New(Conf.Language(37))
@@ -502,16 +538,15 @@ func CreateCloudSyncDir(name string) (err error) {
 }
 
 func RemoveCloudSyncDir(name string) (err error) {
-	if conf.ProviderSiYuan != Conf.Sync.Provider {
+	switch Conf.Sync.Provider {
+	case conf.ProviderSiYuan, conf.ProviderLocal:
+		break
+	default:
 		err = errors.New(Conf.Language(131))
 		return
 	}
 
 	msgId := util.PushMsg(Conf.Language(116), 15000)
-
-	if "" == name {
-		return
-	}
 
 	repo, err := newRepository()
 	if err != nil {
@@ -574,6 +609,10 @@ func ListCloudSyncDir() (syncDirs []*Sync, hSize string, err error) {
 	if conf.ProviderSiYuan == Conf.Sync.Provider {
 		hSize = humanize.BytesCustomCeil(uint64(size), 2)
 	}
+	if conf.ProviderS3 == Conf.Sync.Provider {
+		Conf.Sync.CloudName = syncDirs[0].CloudName
+		Conf.Save()
+	}
 	return
 }
 
@@ -601,11 +640,15 @@ func formatRepoErrorMsg(err error) string {
 		msg = Conf.language(249)
 	} else if errors.Is(err, cloud.ErrCloudTooManyRequests) {
 		msg = Conf.language(250)
+	} else if errors.Is(err, cloud.ErrDecryptFailed) {
+		msg = Conf.Language(135)
 	} else {
 		logging.LogErrorf("sync failed caused by network: %s", msg)
 		msgLowerCase := strings.ToLower(msg)
 		if strings.Contains(msgLowerCase, "permission denied") || strings.Contains(msg, "access is denied") {
 			msg = Conf.Language(33)
+		} else if strings.Contains(msgLowerCase, "region was not a valid") {
+			msg = Conf.language(254)
 		} else if strings.Contains(msgLowerCase, "device or resource busy") || strings.Contains(msg, "is being used by another") {
 			msg = fmt.Sprintf(Conf.Language(85), err)
 		} else if strings.Contains(msgLowerCase, "cipher: message authentication failed") {
@@ -643,11 +686,15 @@ func getSyncIgnoreLines() (ret []string) {
 	dataStr = strings.ReplaceAll(dataStr, "\r\n", "\n")
 	ret = strings.Split(dataStr, "\n")
 
-	// 默认忽略帮助文档
+	// 忽略用户指南
 	ret = append(ret, "20210808180117-6v0mkxr/**/*")
 	ret = append(ret, "20210808180117-czj9bvb/**/*")
 	ret = append(ret, "20211226090932-5lcq56f/**/*")
 	ret = append(ret, "20240530133126-axarxgx/**/*")
+	// 忽略用户指南的数据库 JSON 文件
+	for _, avName := range getAllUserGuideAVJSONFiles() {
+		ret = append(ret, "/storage/av/"+avName)
+	}
 
 	ret = gulu.Str.RemoveDuplicatedElem(ret)
 	return
@@ -665,25 +712,25 @@ func planSyncAfter(d time.Duration) {
 }
 
 func isProviderOnline(byHand bool) (ret bool) {
-	checkURL := util.GetCloudSyncServer()
+	var checkURL string
 	skipTlsVerify := false
-	timeout := 3000
 	switch Conf.Sync.Provider {
 	case conf.ProviderSiYuan:
+		checkURL = util.GetCloudSyncServer()
 	case conf.ProviderS3:
 		checkURL = Conf.Sync.S3.Endpoint
 		skipTlsVerify = Conf.Sync.S3.SkipTlsVerify
-		timeout = Conf.Sync.S3.Timeout * 1000
 	case conf.ProviderWebDAV:
 		checkURL = Conf.Sync.WebDAV.Endpoint
 		skipTlsVerify = Conf.Sync.WebDAV.SkipTlsVerify
-		timeout = Conf.Sync.WebDAV.Timeout * 1000
+	case conf.ProviderLocal:
+		checkURL = "file://" + Conf.Sync.Local.Endpoint
 	default:
 		logging.LogWarnf("unknown provider: %d", Conf.Sync.Provider)
 		return false
 	}
 
-	if ret = util.IsOnline(checkURL, skipTlsVerify, timeout); !ret {
+	if ret = util.IsOnline(checkURL, skipTlsVerify, 7000); !ret {
 		if 1 > autoSyncErrCount || byHand {
 			util.PushErrMsg(Conf.Language(76)+" (Provider: "+conf.ProviderToStr(Conf.Sync.Provider)+")", 5000)
 		}
@@ -815,7 +862,7 @@ func connectSyncWebSocket() {
 			}
 
 			logging.LogInfof("sync websocket message: %v", result)
-			data := result.Data.(map[string]interface{})
+			data := result.Data.(map[string]any)
 			switch data["cmd"].(string) {
 			case "synced":
 				// Improve data synchronization perception https://github.com/siyuan-note/siyuan/issues/13000
@@ -824,8 +871,8 @@ func connectSyncWebSocket() {
 				onlineKernelsLock.Lock()
 
 				onlineKernels = []*OnlineKernel{}
-				for _, kernel := range data["kernels"].([]interface{}) {
-					kernelMap := kernel.(map[string]interface{})
+				for _, kernel := range data["kernels"].([]any) {
+					kernelMap := kernel.(map[string]any)
 					onlineKernels = append(onlineKernels, &OnlineKernel{
 						ID:       kernelMap["id"].(string),
 						Hostname: kernelMap["hostname"].(string),

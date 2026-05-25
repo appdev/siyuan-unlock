@@ -37,15 +37,20 @@ func getSnippet(c *gin.Context) {
 		return
 	}
 
-	typ := arg["type"].(string)                 // js/css/all
-	enabledArg := int(arg["enabled"].(float64)) // 0：禁用，1：启用，2：全部
-	enabled := true
-	if 0 == enabledArg {
-		enabled = false
-	}
+	var typ string         // js/css/all
+	var enabledArg float64 // 0：禁用，1：启用，2：全部
 	var keyword string
-	if nil != arg["keyword"] {
-		keyword = arg["keyword"].(string)
+	if !util.ParseJsonArgs(arg, ret,
+		util.BindJsonArg("type", &typ, true, true),
+		util.BindJsonArg("enabled", &enabledArg, true, false),
+		util.BindJsonArg("keyword", &keyword, false, false),
+	) {
+		return
+	}
+
+	enabled := true
+	if 0 == int(enabledArg) {
+		enabled = false
 	}
 
 	confSnippets, err := model.LoadSnippets()
@@ -55,17 +60,28 @@ func getSnippet(c *gin.Context) {
 		return
 	}
 
+	isPublish := model.IsReadOnlyRoleContext(c)
 	var snippets []*conf.Snippet
 	for _, s := range confSnippets {
-		if ("all" == typ || s.Type == typ) && (2 == enabledArg || s.Enabled == enabled) {
-			snippets = append(snippets, s)
+		if isPublish && s.DisabledInPublish {
+			continue
 		}
+		if "all" != typ && s.Type != typ {
+			continue
+		}
+		if 2 != enabledArg && s.Enabled != enabled {
+			continue
+		}
+
+		snippets = append(snippets, s)
 	}
 
+	keyword = strings.TrimSpace(keyword)
 	if "" != keyword {
+		keyword = strings.ToLower(keyword)
 		var snippetsFiltered []*conf.Snippet
 		for _, s := range snippets {
-			if strings.Contains(strings.ToLower(s.Name), strings.ToLower(keyword)) || strings.Contains(strings.ToLower(s.Content), strings.ToLower(keyword)) {
+			if strings.Contains(strings.ToLower(s.Name), keyword) || strings.Contains(strings.ToLower(s.Content), keyword) {
 				snippetsFiltered = append(snippetsFiltered, s)
 			}
 		}
@@ -76,7 +92,7 @@ func getSnippet(c *gin.Context) {
 		snippets = []*conf.Snippet{}
 	}
 
-	ret.Data = map[string]interface{}{
+	ret.Data = map[string]any{
 		"snippets": snippets,
 	}
 }
@@ -90,16 +106,19 @@ func setSnippet(c *gin.Context) {
 		return
 	}
 
-	snippetsArg := arg["snippets"].([]interface{})
+	snippetsArg := arg["snippets"].([]any)
 	var snippets []*conf.Snippet
 	for _, s := range snippetsArg {
-		m := s.(map[string]interface{})
+		m := s.(map[string]any)
 		snippet := &conf.Snippet{
 			ID:      m["id"].(string),
 			Name:    m["name"].(string),
 			Type:    m["type"].(string),
 			Content: m["content"].(string),
 			Enabled: m["enabled"].(bool),
+		}
+		if nil != m["disabledInPublish"] {
+			snippet.DisabledInPublish = m["disabledInPublish"].(bool)
 		}
 		if "" == snippet.ID {
 			snippet.ID = ast.NewNodeID()
@@ -124,7 +143,10 @@ func removeSnippet(c *gin.Context) {
 		return
 	}
 
-	id := arg["id"].(string)
+	var id string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("id", &id, true, true)) {
+		return
+	}
 	snippet, err := model.RemoveSnippet(id)
 	if err != nil {
 		ret.Code = -1

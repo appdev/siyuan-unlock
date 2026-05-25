@@ -34,6 +34,28 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
+func ResetNodeID(node *ast.Node) {
+	if nil == node {
+		return
+	}
+
+	node.ID = ast.NewNodeID()
+	node.SetIALAttr("id", node.ID)
+	resetUpdatedByID(node)
+}
+
+func resetUpdatedByID(node *ast.Node) {
+	created := util.TimeFromID(node.ID)
+	updated := node.IALAttr("updated")
+	if "" == updated {
+		updated = created
+	}
+	if updated < created {
+		updated = created
+	}
+	node.SetIALAttr("updated", updated)
+}
+
 func GetEmbedBlockRef(embedNode *ast.Node) (blockRefID string) {
 	if nil == embedNode || ast.NodeBlockQueryEmbed != embedNode.Type {
 		return
@@ -100,7 +122,7 @@ func IsBlockRef(n *ast.Node) bool {
 	if nil == n {
 		return false
 	}
-	return ast.NodeTextMark == n.Type && n.IsTextMarkType("block-ref")
+	return (ast.NodeTextMark == n.Type && n.IsTextMarkType("block-ref")) || ast.NodeBlockRef == n.Type
 }
 
 func IsBlockLink(n *ast.Node) bool {
@@ -176,10 +198,6 @@ func GetNodeSrcTokens(n *ast.Node) (ret string) {
 		src := n.Tokens[index+len("src=\""):]
 		if index = bytes.Index(src, []byte("\"")); 0 < index {
 			src = src[:bytes.Index(src, []byte("\""))]
-			if !util.IsAssetLinkDest(src) {
-				return
-			}
-
 			ret = strings.TrimSpace(string(src))
 			return
 		}
@@ -206,7 +224,7 @@ func FirstLeafBlock(node *ast.Node) (ret *ast.Node) {
 
 func CountBlockNodes(node *ast.Node) (ret int) {
 	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
-		if !entering || !n.IsBlock() || ast.NodeList == n.Type || ast.NodeBlockquote == n.Type || ast.NodeSuperBlock == n.Type {
+		if !entering || !n.IsBlock() || ast.NodeList == n.Type || ast.NodeBlockquote == n.Type || ast.NodeSuperBlock == n.Type || ast.NodeCallout == n.Type {
 			return ast.WalkContinue
 		}
 
@@ -308,21 +326,6 @@ func NextBlock(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func FirstChildBlock(node *ast.Node) (ret *ast.Node) {
-	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
-		if !entering {
-			return ast.WalkContinue
-		}
-
-		if n.IsBlock() {
-			ret = n
-			return ast.WalkStop
-		}
-		return ast.WalkContinue
-	})
-	return
-}
-
 func GetNodeInTree(tree *parse.Tree, id string) (ret *ast.Node) {
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering {
@@ -385,6 +388,7 @@ var typeAbbrMap = map[string]string{
 	"NodeThematicBreak":    "tb",
 	"NodeVideo":            "video",
 	"NodeAudio":            "audio",
+	"NodeCallout":          "callout",
 	// 行级元素
 	"NodeText":     "text",
 	"NodeImage":    "img",
@@ -440,6 +444,8 @@ func SubTypeAbbr(n *ast.Node) string {
 		if 6 == n.HeadingLevel {
 			return "h6"
 		}
+	case ast.NodeCallout:
+		return n.CalloutType
 	}
 	return ""
 }
@@ -448,6 +454,14 @@ var DynamicRefTexts = sync.Map{}
 
 func SetDynamicBlockRefText(blockRef *ast.Node, refText string) {
 	if !IsBlockRef(blockRef) {
+		return
+	}
+
+	if ast.NodeBlockRef == blockRef.Type {
+		if refID := blockRef.ChildByType(ast.NodeBlockRefID); nil != refID {
+			refID.InsertAfter(&ast.Node{Type: ast.NodeBlockRefDynamicText, Tokens: []byte(refText)})
+			refID.InsertAfter(&ast.Node{Type: ast.NodeBlockRefSpace})
+		}
 		return
 	}
 
@@ -471,4 +485,44 @@ func IsChartCodeBlockCode(code *ast.Node) bool {
 	language := gulu.Str.FromBytes(code.Previous.CodeBlockInfo)
 	language = strings.ReplaceAll(language, editor.Caret, "")
 	return render.NoHighlight(language)
+}
+
+func RefreshUpdated(node *ast.Node) {
+	updated := util.CurrentTimeSecondsStr()
+	node.SetIALAttr("updated", updated)
+	parents := ParentNodesWithHeadings(node)
+	for _, parent := range parents { // 更新所有父节点的更新时间字段
+		parent.SetIALAttr("updated", updated)
+	}
+}
+
+func CreatedUpdated(node *ast.Node) {
+	// 补全子节点的更新时间 Improve block update time filling https://github.com/siyuan-note/siyuan/issues/12182
+	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering || !n.IsBlock() || ast.NodeKramdownBlockIAL == n.Type {
+			return ast.WalkContinue
+		}
+
+		updated := n.IALAttr("updated")
+		if "" == updated && ast.IsNodeIDPattern(n.ID) {
+			created := util.TimeFromID(n.ID)
+			n.SetIALAttr("updated", created)
+		}
+		return ast.WalkContinue
+	})
+
+	created := util.TimeFromID(node.ID)
+	updated := node.IALAttr("updated")
+	if !util.IsTimeStr(updated) {
+		updated = created
+		node.SetIALAttr("updated", updated)
+	}
+	if updated < created {
+		updated = created
+	}
+	parents := ParentNodesWithHeadings(node)
+	for _, parent := range parents { // 更新所有父节点的更新时间字段
+		parent.SetIALAttr("updated", updated)
+		cache.PutBlockIAL(parent.ID, parse.IAL2Map(parent.KramdownIAL))
+	}
 }

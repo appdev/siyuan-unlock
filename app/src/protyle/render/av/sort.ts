@@ -3,6 +3,8 @@ import {getColIconByType} from "./col";
 import {transaction} from "../../wysiwyg/transaction";
 import {setPosition} from "../../../util/setPosition";
 import {unicode2Emoji} from "../../../emoji";
+import {getFieldsByData} from "./view";
+import {Constants} from "../../../constants";
 
 export const addSort = (options: {
     data: IAV,
@@ -13,8 +15,9 @@ export const addSort = (options: {
     protyle: IProtyle,
     blockID: string,
 }) => {
-    const menu = new Menu("av-add-sort");
-    options.data.view.columns.forEach((column) => {
+    const menu = new Menu(Constants.MENU_AV_ADD_SORT);
+    const fields = getFieldsByData(options.data);
+    fields.forEach((column) => {
         let hasSort = false;
 
         // 如果该列是行号类型列，不允许添加排序
@@ -28,7 +31,7 @@ export const addSort = (options: {
                 }
             });
         }
-        
+
         if (!hasSort) {
             menu.addItem({
                 label: column.name,
@@ -50,7 +53,7 @@ export const addSort = (options: {
                         data: oldSorts,
                         blockID: options.blockID,
                     }]);
-                    options.menuElement.innerHTML = getSortsHTML(options.data.view.columns, options.data.view.sorts);
+                    options.menuElement.innerHTML = getSortsHTML(fields, options.data.view.sorts);
                     bindSortsEvent(options.protyle, options.menuElement, options.data, options.blockID);
                     setPosition(options.menuElement, options.tabRect.right - options.menuElement.clientWidth, options.tabRect.bottom, options.tabRect.height);
                 }
@@ -107,7 +110,7 @@ export const getSortsHTML = (columns: IAVColumn[], sorts: IAVSort[]) => {
     sorts.forEach((item: IAVSort) => {
         html += `<button draggable="true" class="b3-menu__item" data-id="${item.column}">
     <svg class="b3-menu__icon fn__grab"><use xlink:href="#iconDrag"></use></svg>
-    <select class="b3-select" style="margin: 4px 0">
+    <select class="b3-select fn__flex-1" style="margin: 4px 0">
         ${genSortItem(item.column)}
     </select>
     <span class="fn__space"></span>
@@ -129,11 +132,11 @@ export const getSortsHTML = (columns: IAVColumn[], sorts: IAVSort[]) => {
 ${html}
 <button class="b3-menu__item${sorts.length === columns.length ? " fn__none" : ""}" data-type="addSort">
     <svg class="b3-menu__icon"><use xlink:href="#iconAdd"></use></svg>
-    <span class="b3-menu__label">${window.siyuan.languages.new}</span>
+    <span class="b3-menu__label">${window.siyuan.languages.addSort}</span>
 </button>
-<button class="b3-menu__item${html ? "" : " fn__none"}" data-type="removeSorts">
+<button class="b3-menu__item b3-menu__item--warning${html ? "" : " fn__none"}" data-type="removeSorts">
     <svg class="b3-menu__icon"><use xlink:href="#iconTrashcan"></use></svg>
-    <span class="b3-menu__label">${window.siyuan.languages.delete}</span>
+    <span class="b3-menu__label">${window.siyuan.languages.removeSorts}</span>
 </button>
 </div>`;
 };

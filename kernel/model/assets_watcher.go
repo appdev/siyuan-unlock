@@ -33,24 +33,31 @@ import (
 var assetsWatcher *fsnotify.Watcher
 
 func WatchAssets() {
-	if util.ContainerAndroid == util.Container || util.ContainerIOS == util.Container || util.ContainerHarmony == util.Container {
+	if !isFileWatcherAvailable() {
 		return
 	}
 
-	go func() {
-		watchAssets()
-	}()
+	go watchAssets()
 }
 
 func watchAssets() {
+	CloseWatchAssets()
 	assetsDir := filepath.Join(util.DataDir, "assets")
-	if nil != assetsWatcher {
-		assetsWatcher.Close()
-	}
 
 	var err error
-	if assetsWatcher, err = fsnotify.NewWatcher(); err != nil {
+	assetsWatcher, err = fsnotify.NewWatcher()
+	if err != nil {
 		logging.LogErrorf("add assets watcher for folder [%s] failed: %s", assetsDir, err)
+		return
+	}
+
+	if !gulu.File.IsDir(assetsDir) {
+		os.MkdirAll(assetsDir, 0755)
+	}
+
+	if err = assetsWatcher.Add(assetsDir); err != nil {
+		logging.LogErrorf("add assets watcher for folder [%s] failed: %s", assetsDir, err)
+		CloseWatchAssets()
 		return
 	}
 
@@ -73,12 +80,6 @@ func watchAssets() {
 
 				lastEvent = event
 				timer.Reset(time.Millisecond * 100)
-
-				if lastEvent.Op&fsnotify.Rename == fsnotify.Rename || lastEvent.Op&fsnotify.Write == fsnotify.Write {
-					IndexAssetContent(lastEvent.Name)
-				} else if lastEvent.Op&fsnotify.Remove == fsnotify.Remove {
-					RemoveIndexAssetContent(lastEvent.Name)
-				}
 			case err, ok := <-assetsWatcher.Errors:
 				if !ok {
 					return
@@ -94,26 +95,18 @@ func watchAssets() {
 				go cache.LoadAssets()
 
 				if lastEvent.Op&fsnotify.Remove == fsnotify.Remove {
-					RemoveIndexAssetContent(lastEvent.Name)
+					HandleAssetsRemoveEvent(lastEvent.Name)
 				} else {
-					IndexAssetContent(lastEvent.Name)
+					HandleAssetsChangeEvent(lastEvent.Name)
 				}
 			}
 		}
 	}()
-
-	if !gulu.File.IsDir(assetsDir) {
-		os.MkdirAll(assetsDir, 0755)
-	}
-
-	if err = assetsWatcher.Add(assetsDir); err != nil {
-		logging.LogErrorf("add assets watcher for folder [%s] failed: %s", assetsDir, err)
-	}
-	//logging.LogInfof("added file watcher [%s]", assetsDir)
 }
 
 func CloseWatchAssets() {
 	if nil != assetsWatcher {
 		assetsWatcher.Close()
+		assetsWatcher = nil
 	}
 }

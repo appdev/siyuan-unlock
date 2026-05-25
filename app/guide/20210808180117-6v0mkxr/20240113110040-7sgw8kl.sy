@@ -1,12 +1,13 @@
 {
 	"ID": "20240113110040-7sgw8kl",
-	"Spec": "1",
+	"Spec": "2",
 	"Type": "NodeDocument",
 	"Properties": {
 		"icon": "1f4f1",
 		"id": "20240113110040-7sgw8kl",
 		"title": "Mobile App",
-		"updated": "20240119205358"
+		"type": "doc",
+		"updated": "20260317195743"
 	},
 	"Children": [
 		{
@@ -15,7 +16,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20240113110114-xav9o1n",
-				"updated": "20240113110114"
+				"updated": "20250114214300"
 			},
 			"Children": [
 				{
@@ -29,12 +30,21 @@
 			"Type": "NodeParagraph",
 			"Properties": {
 				"id": "20240113110114-j6okyut",
-				"updated": "20240113110129"
+				"updated": "20250114214300"
 			},
 			"Children": [
 				{
 					"Type": "NodeText",
-					"Data": "SiYuan provides Android and iOS apps, which are already available in some mobile app stores. Please search for "
+					"Data": "SiYuan provides Android, iOS and HarmonyOS apps, and has been listed on some mobile app stores. Please search for "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "思源笔记"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​ or "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -53,7 +63,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20240113110114-rugjxcf",
-				"updated": "20240113110114"
+				"updated": "20250114213934"
 			},
 			"Children": [
 				{
@@ -82,7 +92,7 @@
 			"ListData": {},
 			"Properties": {
 				"id": "20240113110114-2r0390j",
-				"updated": "20240113110151"
+				"updated": "20250114213934"
 			},
 			"Children": [
 				{
@@ -136,6 +146,34 @@
 								{
 									"Type": "NodeText",
 									"Data": "Huawei"
+								}
+							]
+						}
+					]
+				},
+				{
+					"ID": "20250114213931-fxnfiur",
+					"Type": "NodeListItem",
+					"ListData": {
+						"BulletChar": 42,
+						"Marker": "Kg=="
+					},
+					"Properties": {
+						"id": "20250114213931-fxnfiur",
+						"updated": "20250114213934"
+					},
+					"Children": [
+						{
+							"ID": "20250114213931-76n4b06",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20250114213931-76n4b06",
+								"updated": "20250114213934"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "Honor"
 								}
 							]
 						}
@@ -370,7 +408,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20240113110114-3h7r74i",
-				"updated": "20240113110333"
+				"updated": "20250114215310"
 			},
 			"Children": [
 				{
@@ -513,6 +551,216 @@
 							]
 						}
 					]
+				}
+			]
+		},
+		{
+			"ID": "20260317195658-ar294xg",
+			"Type": "NodeHeading",
+			"HeadingLevel": 2,
+			"Properties": {
+				"id": "20260317195658-ar294xg",
+				"updated": "20260317195743"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "Custom Keep-Alive Notifications on Android"
+				}
+			]
+		},
+		{
+			"ID": "20260317195658-s3yjpnv",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20260317195658-s3yjpnv",
+				"updated": "20260317195658"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "If you wish to maximize SiYuan's ability to remain active in the background, please follow these steps:"
+				}
+			]
+		},
+		{
+			"ID": "20260317195658-hcngw3t",
+			"Type": "NodeList",
+			"ListData": {
+				"Typ": 1
+			},
+			"Properties": {
+				"id": "20260317195658-hcngw3t",
+				"updated": "20260317195743"
+			},
+			"Children": [
+				{
+					"ID": "20260317195658-4k2hume",
+					"Type": "NodeListItem",
+					"ListData": {
+						"Typ": 1,
+						"Delimiter": 46,
+						"Marker": "MS4=",
+						"Num": 1
+					},
+					"Properties": {
+						"id": "20260317195658-4k2hume",
+						"updated": "20260317195707"
+					},
+					"Children": [
+						{
+							"ID": "20260317195658-m2u3kcy",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20260317195658-m2u3kcy",
+								"updated": "20260317195707"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "Set the battery saver strategy to "
+								},
+								{
+									"Type": "NodeTextMark",
+									"TextMarkType": "code",
+									"TextMarkTextContent": "Unrestricted"
+								},
+								{
+									"Type": "NodeText",
+									"Data": "​"
+								}
+							]
+						}
+					]
+				},
+				{
+					"ID": "20260317195658-i3iboj4",
+					"Type": "NodeListItem",
+					"ListData": {
+						"Typ": 1,
+						"Delimiter": 46,
+						"Marker": "Mi4=",
+						"Num": 2
+					},
+					"Properties": {
+						"id": "20260317195658-i3iboj4",
+						"updated": "20260317195706"
+					},
+					"Children": [
+						{
+							"ID": "20260317195658-0esdnhw",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20260317195658-0esdnhw",
+								"updated": "20260317195706"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "Enable notifications"
+								}
+							]
+						}
+					]
+				},
+				{
+					"ID": "20260317195658-dvg9wtj",
+					"Type": "NodeListItem",
+					"ListData": {
+						"Typ": 1,
+						"Delimiter": 46,
+						"Marker": "My4=",
+						"Num": 3
+					},
+					"Properties": {
+						"id": "20260317195658-dvg9wtj",
+						"updated": "20260317195705"
+					},
+					"Children": [
+						{
+							"ID": "20260317195658-3da1b5m",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20260317195658-3da1b5m",
+								"updated": "20260317195705"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "On the desktop client, create a text file named "
+								},
+								{
+									"Type": "NodeTextMark",
+									"TextMarkType": "code",
+									"TextMarkTextContent": "android-notification-texts.txt"
+								},
+								{
+									"Type": "NodeText",
+									"Data": "​ within the "
+								},
+								{
+									"Type": "NodeTextMark",
+									"TextMarkType": "code",
+									"TextMarkTextContent": "workspace/data/assets/"
+								},
+								{
+									"Type": "NodeText",
+									"Data": "​ folder; each line in this file will serve as the text for a notification"
+								}
+							]
+						}
+					]
+				},
+				{
+					"ID": "20260317195658-mlb61zl",
+					"Type": "NodeListItem",
+					"ListData": {
+						"Typ": 1,
+						"Delimiter": 46,
+						"Marker": "NC4=",
+						"Num": 4
+					},
+					"Properties": {
+						"id": "20260317195658-mlb61zl",
+						"updated": "20260317195743"
+					},
+					"Children": [
+						{
+							"ID": "20260317195658-j9rp2em",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20260317195658-j9rp2em",
+								"updated": "20260317195743"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "Sync this file to your Android device via "
+								},
+								{
+									"Type": "NodeTextMark",
+									"TextMarkType": "block-ref",
+									"TextMarkBlockRefID": "20210721112206-mhr9wxi",
+									"TextMarkBlockRefSubtype": "s",
+									"TextMarkTextContent": "Data Sync"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"ID": "20260317195658-3rqfzal",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20260317195658-3rqfzal",
+				"updated": "20260317195658"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "Once the above steps are completed, SiYuan will send a notification every 45 seconds to help ensure it remains active in the background."
 				}
 			]
 		}

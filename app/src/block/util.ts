@@ -1,17 +1,18 @@
 import {focusByWbr, getEditorRange} from "../protyle/util/selection";
-import {hasClosestBlock} from "../protyle/util/hasClosest";
-import {getTopAloneElement} from "../protyle/wysiwyg/getBlock";
+import {hasClosestBlock, hasClosestByClassName} from "../protyle/util/hasClosest";
+import {getContenteditableElement, getParentBlock, getTopAloneElement} from "../protyle/wysiwyg/getBlock";
 import {genListItemElement, updateListOrder} from "../protyle/wysiwyg/list";
-import {transaction, updateTransaction} from "../protyle/wysiwyg/transaction";
+import {transaction, turnsIntoOneTransaction, updateTransaction} from "../protyle/wysiwyg/transaction";
 import {scrollCenter} from "../util/highlightById";
 import {Constants} from "../constants";
 import {hideElements} from "../protyle/ui/hideElements";
 import {blockRender} from "../protyle/render/blockRender";
-import {fetchPost} from "../util/fetch";
+import {fetchPost, fetchSyncPost} from "../util/fetch";
 import {openFileById} from "../editor/util";
 import {openMobileFileById} from "../mobile/editor";
+import {mathRender} from "../protyle/render/mathRender";
 
-export const cancelSB = (protyle: IProtyle, nodeElement: Element) => {
+export const cancelSB = async (protyle: IProtyle, nodeElement: Element, range?: Range) => {
     const doOperations: IOperation[] = [];
     const undoOperations: IOperation[] = [];
     let previousId = nodeElement.previousElementSibling ? nodeElement.previousElementSibling.getAttribute("data-node-id") : undefined;
@@ -21,12 +22,23 @@ export const cancelSB = (protyle: IProtyle, nodeElement: Element) => {
     const id = nodeElement.getAttribute("data-node-id");
     const sbElement = nodeElement.cloneNode() as HTMLElement;
     sbElement.innerHTML = nodeElement.lastElementChild.outerHTML;
+    let parentID = getParentBlock(nodeElement)?.getAttribute("data-node-id");
+    // 缩放和反链需要接口获取
+    if (!previousId && !parentID) {
+        if (protyle.block.showAll || protyle.options.backlinkData) {
+            const idData = await fetchSyncPost("/api/block/getBlockSiblingID", {id});
+            previousId = idData.data.previous;
+            parentID = idData.data.parent;
+        } else {
+            parentID = protyle.block.rootID;
+        }
+    }
     undoOperations.push({
         action: "insert",
         id,
         data: sbElement.outerHTML,
-        previousID: nodeElement.previousElementSibling ? nodeElement.previousElementSibling.getAttribute("data-node-id") : undefined,
-        parentID: nodeElement.parentElement.getAttribute("data-node-id") || protyle.block.parentID
+        previousID: previousId,
+        parentID,
     });
     Array.from(nodeElement.children).forEach((item, index) => {
         if (index === nodeElement.childElementCount - 1) {
@@ -34,19 +46,21 @@ export const cancelSB = (protyle: IProtyle, nodeElement: Element) => {
                 action: "delete",
                 id,
             });
+            if (range) {
+                getContenteditableElement(nodeElement).insertAdjacentHTML("afterbegin", "<wbr>");
+            }
             nodeElement.lastElementChild.remove();
-            // 超级块中的 html 块需要反转义再赋值 https://github.com/siyuan-note/siyuan/issues/13155
-            nodeElement.querySelectorAll("protyle-html").forEach(item => {
-                item.setAttribute("data-content" , item.getAttribute("data-content").replace(/&lt;/g, "<").replace(/&gt;/g, ">"));
-            });
-            nodeElement.outerHTML = nodeElement.innerHTML;
+            nodeElement.replaceWith(...nodeElement.children);
+            if (range) {
+                focusByWbr(protyle.wysiwyg.element, range);
+            }
             return;
         }
         doOperations.push({
             action: "move",
             id: item.getAttribute("data-node-id"),
             previousID: previousId,
-            parentID: nodeElement.parentElement.getAttribute("data-node-id") || protyle.block.parentID
+            parentID,
         });
         undoOperations.push({
             action: "move",
@@ -56,6 +70,7 @@ export const cancelSB = (protyle: IProtyle, nodeElement: Element) => {
         });
         previousId = item.getAttribute("data-node-id");
     });
+    mathRender(protyle.wysiwyg.element);
     // 超级块内嵌入块无面包屑，需重新渲染 https://github.com/siyuan-note/siyuan/issues/7574
     doOperations.forEach(item => {
         const element = protyle.wysiwyg.element.querySelector(`[data-node-id="${item.id}"]`);
@@ -114,17 +129,33 @@ export const insertEmptyBlock = (protyle: IProtyle, position: InsertPosition, id
         } else {
             blockElement = hasClosestBlock(range.startContainer) as HTMLElement;
             blockElement = getTopAloneElement(blockElement);
+            // https://github.com/siyuan-note/siyuan/issues/14720#issuecomment-2840665326
+            if (blockElement.classList.contains("list")) {
+                blockElement = hasClosestByClassName(range.startContainer, "li") as HTMLElement;
+            } else if (blockElement.classList.contains("bq") || blockElement.classList.contains("callout")) {
+                blockElement = hasClosestBlock(range.startContainer) as HTMLElement;
+            }
         }
     }
     if (!blockElement) {
         return;
     }
+    protyle.observerLoad?.disconnect();
     let newElement = genEmptyElement(false, true);
     let orderIndex = 1;
     if (blockElement.getAttribute("data-type") === "NodeListItem") {
         newElement = genListItemElement(blockElement, 0, true) as HTMLDivElement;
         orderIndex = parseInt(blockElement.parentElement.firstElementChild.getAttribute("data-marker"));
+    } else if (position === "beforebegin" && blockElement.previousElementSibling &&
+        blockElement.previousElementSibling.getAttribute("data-type") === "NodeHeading" &&
+        blockElement.previousElementSibling.getAttribute("fold") === "1") {
+        newElement = genHeadingElement(blockElement.previousElementSibling, false, true) as HTMLDivElement;
+    } else if (position === "afterend" && blockElement &&
+        blockElement.getAttribute("data-type") === "NodeHeading" &&
+        blockElement.getAttribute("fold") === "1") {
+        newElement = genHeadingElement(blockElement, false, true) as HTMLDivElement;
     }
+
     const parentOldHTML = blockElement.parentElement.outerHTML;
     const newId = newElement.getAttribute("data-node-id");
     blockElement.insertAdjacentElement(position, newElement);
@@ -154,6 +185,16 @@ export const insertEmptyBlock = (protyle: IProtyle, position: InsertPosition, id
             id: newId,
         }]);
     }
+    if (blockElement.parentElement.classList.contains("sb") &&
+        blockElement.parentElement.getAttribute("data-sb-layout") === "col") {
+        turnsIntoOneTransaction({
+            protyle,
+            selectsElement: position === "afterend" ? [blockElement, blockElement.nextElementSibling] : [blockElement.previousElementSibling, blockElement],
+            type: "BlocksMergeSuperBlock",
+            level: "row",
+            unfocus: true,
+        });
+    }
     focusByWbr(protyle.wysiwyg.element, range);
     scrollCenter(protyle);
 };
@@ -179,6 +220,17 @@ export const genEmptyElement = (zwsp = true, wbr = true, id?: string) => {
     element.classList.add("p");
     element.innerHTML = `<div contenteditable="true" spellcheck="${window.siyuan.config.editor.spellcheck}">${zwsp ? Constants.ZWSP : ""}${wbr ? "<wbr>" : ""}</div><div class="protyle-attr" contenteditable="false">${Constants.ZWSP}</div>`;
     return element;
+};
+
+export const genHeadingElement = (headElement: Element, getHTML = false, addWbr = false) => {
+    const html = `<div data-subtype="${headElement.getAttribute("data-subtype")}" data-node-id="${Lute.NewNodeID()}" data-type="NodeHeading" class="${headElement.className}"><div contenteditable="true" spellcheck="false">${addWbr ? "<wbr>" : ""}</div><div class="protyle-attr" contenteditable="false">${Constants.ZWSP}</div></div>`;
+    if (getHTML) {
+        return html;
+    } else {
+        const tempElement = document.createElement("template");
+        tempElement.innerHTML = html;
+        return tempElement.content.firstElementChild;
+    }
 };
 
 export const getLangByType = (type: string) => {

@@ -54,7 +54,7 @@ func ChatGPTWithAction(ids []string, action string) (ret string) {
 var cachedContextMsg []string
 
 func chatGPT(msg string, cloud bool) (ret string) {
-	if "Clear context" == strings.TrimSpace(msg) {
+	if "Clear context" == msg {
 		// AI clear context action https://github.com/siyuan-note/siyuan/issues/10255
 		cachedContextMsg = nil
 		return
@@ -109,7 +109,9 @@ func chatGPTContinueWrite(msg string, contextMsgs []string, cloud bool) (ret str
 
 	ret = buf.String()
 	ret = strings.TrimSpace(ret)
-	retContextMsgs = append(retContextMsgs, msg, ret)
+	if "" != ret {
+		retContextMsgs = append(retContextMsgs, msg, ret)
+	}
 	return
 }
 

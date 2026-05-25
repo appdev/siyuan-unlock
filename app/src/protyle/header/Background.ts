@@ -10,11 +10,10 @@ import {openGlobalSearch} from "../../search/util";
 /// #else
 import {popSearch} from "../../mobile/menu/search";
 /// #endif
-import {getEventName} from "../util/compatibility";
 import {Dialog} from "../../dialog";
 import {Constants} from "../../constants";
 import {assetMenu} from "../../menus/protyle";
-import {previewImage} from "../preview/image";
+import {previewImages} from "../preview/image";
 import {Menu} from "../../plugin/Menu";
 import {escapeHtml} from "../../util/escape";
 
@@ -110,12 +109,12 @@ export class Background {
         this.element.innerHTML = `<div class="protyle-background__img">
     <img src="${this.transparentData}">
     <div class="protyle-icons">
-        <span class="protyle-icon protyle-icon--first" style="position: relative;overflow: hidden"><input aria-label="${window.siyuan.languages.upload}" class="ariaLabel" data-position="right4bottom" type="file" style="position: absolute;height: 100%;top: 0;right: 0;opacity: .001;overflow: hidden;cursor: pointer;"><svg><use xlink:href="#iconUpload"></use></svg></span>
-        <span class="protyle-icon ariaLabel" data-position="right4bottom" data-type="link" aria-label="${window.siyuan.languages.link}"><svg><use xlink:href="#iconLink"></use></svg></span>
-        <span class="protyle-icon ariaLabel" data-position="right4bottom" data-type="asset" aria-label="${window.siyuan.languages.assets}"><svg><use xlink:href="#iconImage"></use></svg></span>
-        <span class="protyle-icon ariaLabel" data-position="right4bottom" data-type="show-random" aria-label="${window.siyuan.languages.builtIn}"><svg><use xlink:href="#iconRefresh"></use></svg></span>
-        <span class="protyle-icon ariaLabel fn__none" data-position="right4bottom" data-type="position" aria-label="${window.siyuan.languages.dragPosition}"><svg><use xlink:href="#iconMove"></use></svg></span>
-        <span class="protyle-icon protyle-icon--last ariaLabel" data-position="right4bottom" data-type="remove" aria-label="${window.siyuan.languages.remove}"><svg><use xlink:href="#iconTrashcan"></use></svg></span>
+        <span class="protyle-icon protyle-icon--first" style="position: relative;overflow: hidden"><input aria-label="${window.siyuan.languages.upload}" class="ariaLabel b3-form__upload" type="file"><svg><use xlink:href="#iconUpload"></use></svg></span>
+        <span class="protyle-icon ariaLabel" data-type="link" aria-label="${window.siyuan.languages.link}"><svg><use xlink:href="#iconLink"></use></svg></span>
+        <span class="protyle-icon ariaLabel" data-type="asset" aria-label="${window.siyuan.languages.assets}"><svg><use xlink:href="#iconImage"></use></svg></span>
+        <span class="protyle-icon ariaLabel" data-type="show-random" aria-label="${window.siyuan.languages.builtIn}"><svg><use xlink:href="#iconRefresh"></use></svg></span>
+        <span class="protyle-icon ariaLabel fn__none" data-type="position" aria-label="${window.siyuan.languages.dragPosition}"><svg><use xlink:href="#iconMove"></use></svg></span>
+        <span class="protyle-icon protyle-icon--last ariaLabel" data-type="remove" aria-label="${window.siyuan.languages.remove}"><svg><use xlink:href="#iconTrashcan"></use></svg></span>
     </div>
     <div class="protyle-icons fn__none"><span class="protyle-icon protyle-icon--text">${window.siyuan.languages.dragPosition}</span></div>
     <div class="protyle-icons fn__none" style="opacity: .86;">
@@ -205,10 +204,7 @@ export class Background {
                 });
             });
         });
-        this.element.addEventListener(getEventName(), (event) => {
-            if (protyle.disabled) {
-                return;
-            }
+        this.element.addEventListener("click", (event) => {
             let target = event.target as HTMLElement;
             hideElements(["gutter"], protyle);
 
@@ -217,14 +213,14 @@ export class Background {
                 if (target.tagName === "IMG" && target.parentElement.classList.contains("protyle-background__img")) {
                     const imgSrc = target.getAttribute("src");
                     if (event.detail > 1 && !imgSrc.startsWith("data:image/png;base64")) {
-                        previewImage(imgSrc);
+                        previewImages([imgSrc]);
                         event.preventDefault();
                         event.stopPropagation();
                     }
                     // 点击题头图菜单无法消失
                     window.siyuan.menus.menu.remove();
                     break;
-                } else if (type === "position") {
+                } else if (type === "position" && !protyle.disabled) {
                     const iconElements = this.element.firstElementChild.querySelectorAll(".protyle-icons");
                     iconElements[0].classList.add("fn__none");
                     iconElements[1].classList.remove("fn__none");
@@ -252,7 +248,7 @@ export class Background {
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "open-emoji") {
+                } else if (type === "open-emoji" && !protyle.disabled) {
                     const rect = this.iconElement.getBoundingClientRect();
                     openEmojiPanel(protyle.block.rootID, "doc", {
                         x: rect.left,
@@ -263,14 +259,14 @@ export class Background {
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "show-random") {
+                } else if (type === "show-random" && !protyle.disabled) {
                     let html = "";
                     bgs.forEach((item: string, index: number) => {
-                        html += `<div data-index="${index}" style="height: 128px;${item}" class="b3-card b3-card--wrap"></div>`;
+                        html += `<div data-index="${index}" style="height: 128px;${item}" class="b3-card"></div>`;
                     });
                     const dialog = new Dialog({
                         title: window.siyuan.languages.builtIn,
-                        content: `<div class="b3-cards">${html}</div>`,
+                        content: `<div class="b3-cards" style="padding: 16px">${html}</div>`,
                         width: isMobile() ? "92vw" : "912px",
                         height: isMobile() ? "80vh" : "70vh",
                     });
@@ -290,7 +286,7 @@ export class Background {
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "random") {
+                } else if (type === "random" && !protyle.disabled) {
                     this.ial["title-img"] = bgs[getRandom(0, bgs.length - 1)];
                     this.render(this.ial, protyle.block.rootID);
                     fetchPost("/api/attr/setBlockAttrs", {
@@ -300,7 +296,7 @@ export class Background {
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "asset") {
+                } else if (type === "asset" && !protyle.disabled) {
                     const rect = target.getBoundingClientRect();
                     assetMenu(protyle, {
                         x: target.parentElement.getBoundingClientRect().right,
@@ -320,7 +316,7 @@ export class Background {
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "remove") {
+                } else if (type === "remove" && !protyle.disabled) {
                     delete this.ial["title-img"];
                     this.render(this.ial, protyle.block.rootID);
                     fetchPost("/api/attr/setBlockAttrs", {
@@ -330,7 +326,7 @@ export class Background {
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "icon") {
+                } else if (type === "icon" && !protyle.disabled) {
                     const emoji = getRandomEmoji();
                     if (emoji) {
                         updateFileTreeEmoji(emoji, protyle.block.rootID);
@@ -354,12 +350,12 @@ export class Background {
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "tag") {
+                } else if (type === "tag" && !protyle.disabled) {
                     this.openTag(protyle, target);
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "link") {
+                } else if (type === "link" && !protyle.disabled) {
                     const dialog = new Dialog({
                         title: window.siyuan.languages.link,
                         width: isMobile() ? "92vw" : "520px",
@@ -407,7 +403,7 @@ export class Background {
                     event.preventDefault();
                     event.stopPropagation();
                     break;
-                } else if (type === "remove-tag") {
+                } else if (type === "remove-tag" && !protyle.disabled) {
                     target.parentElement.remove();
                     this.removeTag(protyle);
                     event.preventDefault();
@@ -419,11 +415,15 @@ export class Background {
         });
     }
 
-    private removeTag(protyle: IProtyle) {
+    private removeTag(protyle: IProtyle, cb?: () => void) {
         const tags = this.getTags();
         fetchPost("/api/attr/setBlockAttrs", {
             id: protyle.block.rootID,
             attrs: {"tags": tags.toString()}
+        }, () => {
+            if (cb) {
+                cb();
+            }
         });
         if (tags.length === 0) {
             delete this.ial.tags;
@@ -539,14 +539,13 @@ export class Background {
                     }
                     upDownHint(listElement, event);
                     if (event.key === "Enter") {
-                        const currentElement = listElement.querySelector(".b3-list-item--focus");
-                        if (currentElement) {
-                            this.addTags(currentElement.textContent.trim(), protyle);
-                        } else {
-                            this.addTags(inputElement.value.trim(), protyle);
-                        }
-                        inputElement.value = "";
-                        inputElement.dispatchEvent(new CustomEvent("input"));
+                        const currentElement = listElement.querySelector(".b3-list-item--focus") as HTMLElement;
+                        this.addTags(currentElement ?
+                            (currentElement.dataset.type === "new" ? currentElement.querySelector("mark").textContent.trim() : currentElement.textContent.trim()) :
+                            inputElement.value.trim(), protyle, () => {
+                            inputElement.value = "";
+                            inputElement.dispatchEvent(new CustomEvent("input"));
+                        });
                     } else if (event.key === "Escape") {
                         window.siyuan.menus.menu.remove();
                     }
@@ -554,13 +553,13 @@ export class Background {
                 inputElement.addEventListener("input", (event) => {
                     event.stopPropagation();
                     fetchPost("/api/search/searchTag", {
-                        k: inputElement.value,
+                        k: inputElement.value.trim(),
                     }, (response) => {
                         let searchHTML = "";
                         let hasKey = false;
                         const currentTags = this.getTags();
-                        response.data.tags.forEach((item: string) => {
-                            searchHTML += `<div class="b3-list-item b3-list-item--narrow">
+                        response.data.tags.forEach((item: string, index: number) => {
+                            searchHTML += `<div class="b3-list-item b3-list-item--narrow${index === 0 ? " b3-list-item--focus" : ""}">
     <div class="fn__flex-1">${item}</div>
     ${currentTags.includes(Lute.UnEscapeHTMLStr(item.replace(/<mark>/g, "").replace(/<\/mark>/g, ""))) ? '<svg class="b3-menu__checked"><use xlink:href="#iconSelect"></use></svg>' : ""}
 </div>`;
@@ -569,10 +568,9 @@ export class Background {
                             }
                         });
                         if (!hasKey && response.data.k) {
-                            searchHTML = `<div class="b3-list-item b3-list-item--narrow"><mark>${escapeHtml(response.data.k)}</mark></div>` + searchHTML;
+                            searchHTML = `<div data-type="new" class="b3-list-item b3-list-item--narrow${searchHTML ? "" : " b3-list-item--focus"}"><div class="fn__flex-1">${window.siyuan.languages.new} <mark>${escapeHtml(response.data.k)}</mark></div></div>` + searchHTML;
                         }
                         listElement.innerHTML = searchHTML;
-                        listElement.firstElementChild.classList.add("b3-list-item--focus");
                     });
                 });
                 listElement.addEventListener("click", (event) => {
@@ -581,15 +579,25 @@ export class Background {
                     if (!listItemElement) {
                         return;
                     }
-                    this.addTags(listItemElement.textContent.trim(), protyle);
-                    inputElement.dispatchEvent(new CustomEvent("input"));
+                    this.addTags(listItemElement.dataset.type === "new" ? listItemElement.querySelector("mark").textContent.trim() : listItemElement.textContent.trim(),
+                        protyle, () => {
+                            inputElement.value = "";
+                            inputElement.dispatchEvent(new CustomEvent("input"));
+                            inputElement.focus();
+                        });
                 });
             }
         });
-        menu.element.querySelector(".b3-menu__items").setAttribute("style", "overflow: initial");
+        const itemsElement = menu.element.querySelector(".b3-menu__items");
+        itemsElement.setAttribute("style", "overflow: initial");
+        /// #if MOBILE
+        menu.fullscreen();
+        itemsElement.firstElementChild.setAttribute("style", "padding: 0 8px;height: 100%;");
+        /// #else
         const rect = target.getBoundingClientRect();
         menu.open({x: rect.left, y: rect.top + rect.height});
         menu.element.querySelector("input").focus();
+        /// #endif
     }
 
     private getTags(removeTag?: string) {
@@ -604,16 +612,18 @@ export class Background {
         return tags;
     }
 
-    private addTags(tag: string, protyle: IProtyle) {
+    private addTags(tag: string, protyle: IProtyle, cb: () => void) {
         const tags = this.getTags(tag);
         if (tags.includes(tag)) {
-            this.removeTag(protyle);
+            this.removeTag(protyle, cb);
             return;
         }
         tags.push(tag);
         fetchPost("/api/attr/setBlockAttrs", {
             id: protyle.block.rootID,
             attrs: {"tags": tags.toString()}
+        }, () => {
+            cb();
         });
         this.ial.tags = tags.toString();
         this.render(this.ial, protyle.block.rootID);

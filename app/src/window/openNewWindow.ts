@@ -15,7 +15,8 @@ interface windowOptions {
         y: number,
     },
     width?: number,
-    height?: number
+    height?: number,
+    alwaysOnTop?: boolean,
 }
 
 export const openNewWindow = (tab: Tab, options: windowOptions = {}) => {
@@ -26,6 +27,7 @@ export const openNewWindow = (tab: Tab, options: windowOptions = {}) => {
         position: options.position,
         width: options.width,
         height: options.height,
+        alwaysOnTop: !!options.alwaysOnTop,
         // 需要 encode， 否则 https://github.com/siyuan-note/siyuan/issues/9343
         url: `${window.location.protocol}//${window.location.host}/stage/build/app/window.html?v=${Constants.SIYUAN_VERSION}&json=${encodeURIComponent(JSON.stringify([json]))}`
     });
@@ -67,6 +69,7 @@ export const openNewWindowById = async (id: string | string[], options: windowOp
         position: options.position,
         width: options.width,
         height: options.height,
+        alwaysOnTop: !!options.alwaysOnTop,
         url: `${window.location.protocol}//${window.location.host}/stage/build/app/window.html?v=${Constants.SIYUAN_VERSION}&json=${encodeURIComponent(JSON.stringify(json))}`
     });
     /// #endif
@@ -74,7 +77,7 @@ export const openNewWindowById = async (id: string | string[], options: windowOp
 
 export const openAssetNewWindow = (assetPath: string, options: windowOptions = {}) => {
     /// #if !BROWSER
-    const suffix = pathPosix().extname(assetPath.split("?page")[0]);
+    const suffix = pathPosix().extname(assetPath).split("?")[0];
     if (Constants.SIYUAN_ASSETS_EXTS.includes(suffix)) {
         let docIcon = "iconPDF";
         if (Constants.SIYUAN_ASSETS_IMAGE.includes(suffix)) {
@@ -101,6 +104,7 @@ export const openAssetNewWindow = (assetPath: string, options: windowOptions = {
             position: options.position,
             width: options.width,
             height: options.height,
+            alwaysOnTop: !!options.alwaysOnTop,
             url: `${window.location.protocol}//${window.location.host}/stage/build/app/window.html?v=${Constants.SIYUAN_VERSION}&json=${encodeURIComponent(JSON.stringify(json))}`
         });
     }
