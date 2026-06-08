@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
     <link rel="apple-touch-icon" href="../../icon.png">
-    <style id="editorAttr" type="text/css"></style>
     <script src="../../protyle/js/pdf/pdf.min.mjs?v=4.7.85" type="module"></script>
 </head>
 <body class="fn__flex-column">
@@ -32,5 +31,6 @@
     <div class="b3-menu__items"></div>
 </div>
 <div id="message" class="b3-snackbars"></div>
+<div id="tooltip" class="tooltip fn__none"></div>
 </body>
 </html>

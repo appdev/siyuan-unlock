@@ -37,7 +37,10 @@ func getNotebookInfo(c *gin.Context) {
 		return
 	}
 
-	boxID := arg["notebook"].(string)
+	var boxID string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("notebook", &boxID, true, true)) {
+		return
+	}
 	if util.InvalidIDPattern(boxID, ret) {
 		return
 	}
@@ -50,7 +53,7 @@ func getNotebookInfo(c *gin.Context) {
 	}
 
 	boxInfo := box.GetInfo()
-	ret.Data = map[string]interface{}{
+	ret.Data = map[string]any{
 		"boxInfo": boxInfo,
 	}
 }
@@ -64,8 +67,13 @@ func setNotebookIcon(c *gin.Context) {
 		return
 	}
 
-	boxID := arg["notebook"].(string)
-	icon := arg["icon"].(string)
+	var boxID, icon string
+	if !util.ParseJsonArgs(arg, ret,
+		util.BindJsonArg("notebook", &boxID, true, true),
+		util.BindJsonArg("icon", &icon, true, false),
+	) {
+		return
+	}
 	model.SetBoxIcon(boxID, icon)
 }
 
@@ -78,7 +86,7 @@ func changeSortNotebook(c *gin.Context) {
 		return
 	}
 
-	idsArg := arg["notebooks"].([]interface{})
+	idsArg := arg["notebooks"].([]any)
 	var ids []string
 	for _, p := range idsArg {
 		ids = append(ids, p.(string))
@@ -95,22 +103,26 @@ func renameNotebook(c *gin.Context) {
 		return
 	}
 
-	notebook := arg["notebook"].(string)
+	var notebook, name string
+	if !util.ParseJsonArgs(arg, ret,
+		util.BindJsonArg("notebook", &notebook, true, true),
+		util.BindJsonArg("name", &name, true, false),
+	) {
+		return
+	}
 	if util.InvalidIDPattern(notebook, ret) {
 		return
 	}
-
-	name := arg["name"].(string)
 	err := model.RenameBox(notebook, name)
 	if err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
-		ret.Data = map[string]interface{}{"closeTimeout": 5000}
+		ret.Data = map[string]any{"closeTimeout": 5000}
 		return
 	}
 
 	evt := util.NewCmdResult("renamenotebook", 0, util.PushModeBroadcast)
-	evt.Data = map[string]interface{}{
+	evt.Data = map[string]any{
 		"box":  notebook,
 		"name": name,
 	}
@@ -126,7 +138,10 @@ func removeNotebook(c *gin.Context) {
 		return
 	}
 
-	notebook := arg["notebook"].(string)
+	var notebook string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("notebook", &notebook, true, true)) {
+		return
+	}
 	if util.InvalidIDPattern(notebook, ret) {
 		return
 	}
@@ -134,7 +149,7 @@ func removeNotebook(c *gin.Context) {
 	if util.ReadOnly && !model.IsUserGuide(notebook) {
 		ret.Code = -1
 		ret.Msg = model.Conf.Language(34)
-		ret.Data = map[string]interface{}{"closeTimeout": 5000}
+		ret.Data = map[string]any{"closeTimeout": 5000}
 		return
 	}
 
@@ -145,11 +160,10 @@ func removeNotebook(c *gin.Context) {
 		return
 	}
 
-	evt := util.NewCmdResult("unmount", 0, util.PushModeBroadcast)
-	evt.Data = map[string]interface{}{
+	evt := util.NewCmdResult("removeBox", 0, util.PushModeBroadcast)
+	evt.Data = map[string]any{
 		"box": notebook,
 	}
-	evt.Callback = arg["callback"]
 	util.PushEvent(evt)
 }
 
@@ -162,7 +176,10 @@ func createNotebook(c *gin.Context) {
 		return
 	}
 
-	name := arg["name"].(string)
+	var name string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("name", &name, true, false)) {
+		return
+	}
 	id, err := model.CreateBox(name)
 	if err != nil {
 		ret.Code = -1
@@ -184,12 +201,12 @@ func createNotebook(c *gin.Context) {
 		return
 	}
 
-	ret.Data = map[string]interface{}{
+	ret.Data = map[string]any{
 		"notebook": box,
 	}
 
 	evt := util.NewCmdResult("createnotebook", 0, util.PushModeBroadcast)
-	evt.Data = map[string]interface{}{
+	evt.Data = map[string]any{
 		"box":     box,
 		"existed": existed,
 	}
@@ -205,7 +222,10 @@ func openNotebook(c *gin.Context) {
 		return
 	}
 
-	notebook := arg["notebook"].(string)
+	var notebook string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("notebook", &notebook, true, true)) {
+		return
+	}
 	if util.InvalidIDPattern(notebook, ret) {
 		return
 	}
@@ -214,7 +234,7 @@ func openNotebook(c *gin.Context) {
 	if util.ReadOnly && !isUserGuide {
 		ret.Code = -1
 		ret.Msg = model.Conf.Language(34)
-		ret.Data = map[string]interface{}{"closeTimeout": 5000}
+		ret.Data = map[string]any{"closeTimeout": 5000}
 		return
 	}
 
@@ -224,7 +244,7 @@ func openNotebook(c *gin.Context) {
 		// Opening the user guide is no longer supported on iOS https://github.com/siyuan-note/siyuan/issues/11492
 		ret.Code = -1
 		ret.Msg = model.Conf.Language(215)
-		ret.Data = map[string]interface{}{"closeTimeout": 7000}
+		ret.Data = map[string]any{"closeTimeout": 7000}
 		return
 	}
 
@@ -245,11 +265,10 @@ func openNotebook(c *gin.Context) {
 	}
 
 	evt := util.NewCmdResult("mount", 0, util.PushModeBroadcast)
-	evt.Data = map[string]interface{}{
+	evt.Data = map[string]any{
 		"box":     box,
 		"existed": existed,
 	}
-	evt.Callback = arg["callback"]
 	util.PushEvent(evt)
 
 	if isUserGuide {
@@ -272,7 +291,7 @@ func openNotebook(c *gin.Context) {
 				}
 				startID = guideStartID[notebook]
 				if treenode.ExistBlockTree(startID) {
-					util.BroadcastByTypeAndApp("main", app, "openFileById", 0, "", map[string]interface{}{
+					util.BroadcastByTypeAndApp("main", app, "openFileById", 0, "", map[string]any{
 						"id": startID,
 					})
 					break
@@ -319,7 +338,7 @@ func getNotebookConf(c *gin.Context) {
 		return
 	}
 
-	ret.Data = map[string]interface{}{
+	ret.Data = map[string]any{
 		"box":  box.ID,
 		"name": box.Name,
 		"conf": box.GetConf(),
@@ -361,14 +380,14 @@ func setNotebookConf(c *gin.Context) {
 		return
 	}
 
-	boxConf.RefCreateSavePath = strings.TrimSpace(boxConf.RefCreateSavePath)
+	boxConf.RefCreateSavePath = util.TrimSpaceInPath(boxConf.RefCreateSavePath)
 	if "" != boxConf.RefCreateSavePath {
 		if !strings.HasSuffix(boxConf.RefCreateSavePath, "/") {
 			boxConf.RefCreateSavePath += "/"
 		}
 	}
 
-	boxConf.DailyNoteSavePath = strings.TrimSpace(boxConf.DailyNoteSavePath)
+	boxConf.DailyNoteSavePath = util.TrimSpaceInPath(boxConf.DailyNoteSavePath)
 	if "" != boxConf.DailyNoteSavePath {
 		if !strings.HasPrefix(boxConf.DailyNoteSavePath, "/") {
 			boxConf.DailyNoteSavePath = "/" + boxConf.DailyNoteSavePath
@@ -380,7 +399,7 @@ func setNotebookConf(c *gin.Context) {
 		return
 	}
 
-	boxConf.DailyNoteTemplatePath = strings.TrimSpace(boxConf.DailyNoteTemplatePath)
+	boxConf.DailyNoteTemplatePath = util.TrimSpaceInPath(boxConf.DailyNoteTemplatePath)
 	if "" != boxConf.DailyNoteTemplatePath {
 		if !strings.HasSuffix(boxConf.DailyNoteTemplatePath, ".md") {
 			boxConf.DailyNoteTemplatePath += ".md"
@@ -390,7 +409,7 @@ func setNotebookConf(c *gin.Context) {
 		}
 	}
 
-	boxConf.DocCreateSavePath = strings.TrimSpace(boxConf.DocCreateSavePath)
+	boxConf.DocCreateSavePath = util.TrimSpaceInPath(boxConf.DocCreateSavePath)
 
 	box.SaveConf(boxConf)
 	ret.Data = boxConf
@@ -403,7 +422,7 @@ func lsNotebooks(c *gin.Context) {
 	flashcard := false
 
 	// 兼容旧版接口，不能直接使用 util.JsonArg()
-	arg := map[string]interface{}{}
+	arg := map[string]any{}
 	if err := c.ShouldBindJSON(&arg); err == nil {
 		if arg["flashcard"] != nil {
 			flashcard = arg["flashcard"].(bool)
@@ -419,9 +438,34 @@ func lsNotebooks(c *gin.Context) {
 		if err != nil {
 			return
 		}
+		if model.IsReadOnlyRoleContext(c) {
+			publishAccess := model.GetPublishAccess()
+			tempNotebooks := []*model.Box{}
+			for _, notebook := range notebooks {
+				// 筛除关闭的笔记本
+				if notebook.Closed {
+					continue
+				}
+				// 筛除发布不可见的笔记本
+				invisible := false
+				for _, item := range publishAccess {
+					if item.ID == notebook.ID {
+						if !item.Visible {
+							invisible = true
+						}
+						break
+					}
+				}
+				if invisible {
+					continue
+				}
+				tempNotebooks = append(tempNotebooks, notebook)
+			}
+			notebooks = tempNotebooks
+		}
 	}
 
-	ret.Data = map[string]interface{}{
+	ret.Data = map[string]any{
 		"notebooks": notebooks,
 	}
 }

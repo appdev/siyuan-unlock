@@ -19,7 +19,6 @@ package task
 import (
 	"context"
 	"reflect"
-	"slices"
 	"sync"
 	"time"
 
@@ -36,26 +35,26 @@ var (
 type Task struct {
 	Action  string
 	Handler reflect.Value
-	Args    []interface{}
+	Args    []any
 	Created time.Time
 	Async   bool // 为 true 说明是异步任务，不会阻塞任务队列，满足 Delay 条件后立即执行
 	Delay   time.Duration
 	Timeout time.Duration
 }
 
-func AppendTask(action string, handler interface{}, args ...interface{}) {
+func AppendTask(action string, handler any, args ...any) {
 	appendTaskWithDelayTimeout(action, false, 0, 24*time.Hour, handler, args...)
 }
 
-func AppendAsyncTaskWithDelay(action string, delay time.Duration, handler interface{}, args ...interface{}) {
+func AppendAsyncTaskWithDelay(action string, delay time.Duration, handler any, args ...any) {
 	appendTaskWithDelayTimeout(action, true, delay, 24*time.Hour, handler, args...)
 }
 
-func AppendTaskWithTimeout(action string, timeout time.Duration, handler interface{}, args ...interface{}) {
+func AppendTaskWithTimeout(action string, timeout time.Duration, handler any, args ...any) {
 	appendTaskWithDelayTimeout(action, false, 0, timeout, handler, args...)
 }
 
-func appendTaskWithDelayTimeout(action string, async bool, delay, timeout time.Duration, handler interface{}, args ...interface{}) {
+func appendTaskWithDelayTimeout(action string, async bool, delay, timeout time.Duration, handler any, args ...any) {
 	if util.IsExiting.Load() {
 		//logging.LogWarnf("task queue is paused, action [%s] will be ignored", action)
 		return
@@ -91,7 +90,7 @@ func containTask(task *Task, tasks []*Task) bool {
 			}
 
 			for i, arg := range t.Args {
-				if !reflect.DeepEqual(arg, task.Args[i]) {
+				if !areArgsEqual(arg, task.Args[i]) {
 					return false
 				}
 			}
@@ -99,6 +98,89 @@ func containTask(task *Task, tasks []*Task) bool {
 		}
 	}
 	return false
+}
+
+// areArgsEqual 比较两个参数是否相等
+func areArgsEqual(a, b any) bool {
+
+	// 如果两个参数都为 nil
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// 快速处理常见的基本类型
+	switch av := a.(type) {
+	case string:
+		if bv, ok := b.(string); ok {
+			return av == bv
+		}
+	case int:
+		if bv, ok := b.(int); ok {
+			return av == bv
+		}
+	case int64:
+		if bv, ok := b.(int64); ok {
+			return av == bv
+		}
+	case int32:
+		if bv, ok := b.(int32); ok {
+			return av == bv
+		}
+	case bool:
+		if bv, ok := b.(bool); ok {
+			return av == bv
+		}
+	case float64:
+		if bv, ok := b.(float64); ok {
+			return av == bv
+		}
+	case float32:
+		if bv, ok := b.(float32); ok {
+			return av == bv
+		}
+	case uint:
+		if bv, ok := b.(uint); ok {
+			return av == bv
+		}
+	case uint64:
+		if bv, ok := b.(uint64); ok {
+			return av == bv
+		}
+	case uint32:
+		if bv, ok := b.(uint32); ok {
+			return av == bv
+		}
+	case []string:
+		if bv, ok := b.([]string); ok {
+			if len(av) != len(bv) {
+				return false
+			}
+			for i := range av {
+				if av[i] != bv[i] {
+					return false
+				}
+			}
+			return true
+		}
+	case []int:
+		if bv, ok := b.([]int); ok {
+			if len(av) != len(bv) {
+				return false
+			}
+			for i := range av {
+				if av[i] != bv[i] {
+					return false
+				}
+			}
+			return true
+		}
+	}
+
+	// 未处理的复杂类型，回退到 reflect.DeepEqual
+	return reflect.DeepEqual(a, b)
 }
 
 func getCurrentTasks() (ret []*Task) {
@@ -118,13 +200,13 @@ func getCurrentTasks() (ret []*Task) {
 }
 
 const (
-	RepoCheckout                    = "task.repo.checkout"                 // 从快照中检出
-	RepoAutoPurge                   = "task.repo.autoPurge"                // 自动清理数据仓库
-	DatabaseIndexFull               = "task.database.index.full"           // 重建索引
-	DatabaseIndex                   = "task.database.index"                // 数据库索引
-	DatabaseIndexCommit             = "task.database.index.commit"         // 数据库索引提交
-	DatabaseIndexRef                = "task.database.index.ref"            // 数据库索引引用
-	DatabaseIndexFix                = "task.database.index.fix"            // 数据库索引订正
+	RepoCheckout        = "task.repo.checkout"         // 从快照中检出
+	RepoAutoPurge       = "task.repo.autoPurge"        // 自动清理数据仓库
+	DatabaseIndexFull   = "task.database.index.full"   // 重建索引
+	DatabaseIndex       = "task.database.index"        // 数据库索引
+	DatabaseIndexCommit = "task.database.index.commit" // 数据库索引提交
+	DatabaseIndexRef    = "task.database.index.ref"    // 数据库索引引用
+
 	OCRImage                        = "task.ocr.image"                     // 图片 OCR 提取文本
 	HistoryGenerateFile             = "task.history.generateFile"          // 生成文件历史
 	HistoryDatabaseIndexFull        = "task.history.database.index.full"   // 历史数据库重建索引
@@ -136,6 +218,8 @@ const (
 	CacheVirtualBlockRef            = "task.cache.virtualBlockRef"         // 缓存虚拟块引用
 	ReloadAttributeView             = "task.reload.attributeView"          // 重新加载属性视图
 	ReloadProtyle                   = "task.reload.protyle"                // 重新加载编辑器
+	ReloadTag                       = "task.reload.tag"                    // 重新加载标签面板
+	ReloadFiletree                  = "task.reload.filetree"               // 重新加载文档树面板
 	SetRefDynamicText               = "task.ref.setDynamicText"            // 设置引用的动态锚文本
 	SetDefRefCount                  = "task.def.setRefCount"               // 设置定义的引用计数
 	UpdateIDs                       = "task.update.ids"                    // 更新 ID
@@ -156,6 +240,8 @@ var uniqueActions = []string{
 	AssetContentDatabaseIndexCommit,
 	ReloadAttributeView,
 	ReloadProtyle,
+	ReloadTag,
+	ReloadFiletree,
 	SetRefDynamicText,
 	SetDefRefCount,
 	UpdateIDs,
@@ -172,18 +258,22 @@ func ContainIndexTask() bool {
 }
 
 func StatusJob() {
-	var items []map[string]interface{}
+	var items []map[string]any
 	count := map[string]int{}
 	actionLangs := util.TaskActionLangs[util.Lang]
 
 	queueLock.Lock()
 	for _, task := range taskQueue {
 		action := task.Action
-		if c := count[action]; 2 < c {
+		if c := count[action]; 7 < c {
 			logging.LogWarnf("too many tasks [%s], ignore show its status", action)
 			continue
 		}
 		count[action]++
+
+		if skipPushTaskAction(action) {
+			continue
+		}
 
 		if nil != actionLangs {
 			if label := actionLangs[task.Action]; nil != label {
@@ -193,25 +283,40 @@ func StatusJob() {
 			}
 		}
 
-		item := map[string]interface{}{"action": action}
+		item := map[string]any{"action": action}
 		items = append(items, item)
 	}
 	defer queueLock.Unlock()
 
 	currentTaskLock.Lock()
-	if nil != currentTask && nil != actionLangs {
+	if nil != currentTask && nil != actionLangs && !skipPushTaskAction(currentTask.Action) {
 		if label := actionLangs[currentTask.Action]; nil != label {
-			items = append([]map[string]interface{}{{"action": label.(string)}}, items...)
+			items = append([]map[string]any{{"action": label.(string)}}, items...)
 		}
 	}
 	currentTaskLock.Unlock()
 
 	if 1 > len(items) {
-		items = []map[string]interface{}{}
+		items = []map[string]any{}
 	}
-	data := map[string]interface{}{}
+	data := map[string]any{}
 	data["tasks"] = items
 	util.PushBackgroundTask(data)
+}
+
+func skipPushTaskAction(action string) bool {
+	switch action {
+	case DatabaseIndexCommit:
+		return util.StatusBarCfg.MsgTaskDatabaseIndexCommitDisabled
+	case HistoryDatabaseIndexCommit:
+		return util.StatusBarCfg.MsgTaskHistoryDatabaseIndexCommitDisabled
+	case AssetContentDatabaseIndexCommit:
+		return util.StatusBarCfg.MsgTaskAssetDatabaseIndexCommitDisabled
+	case HistoryGenerateFile:
+		return util.StatusBarCfg.MsgTaskHistoryGenerateFileDisabled
+	default:
+		return false
+	}
 }
 
 func ExecTaskJob() {
@@ -274,31 +379,30 @@ func popAsyncTasks() (ret []*Task) {
 		return
 	}
 
-	var popedIndexes []int
-	for i, task := range taskQueue {
-		if !task.Async {
-			continue
-		}
+	// writeIdx 指向下一个要写入的位置
+	writeIdx := 0
+	for readIdx := 0; readIdx < len(taskQueue); readIdx++ {
+		task := taskQueue[readIdx]
 
-		if time.Since(task.Created) <= task.Delay {
-			continue
-		}
-
-		if task.Async {
+		// 判断是否应该弹出此任务
+		shouldPop := task.Async && time.Since(task.Created) > task.Delay
+		if shouldPop {
 			ret = append(ret, task)
-			popedIndexes = append(popedIndexes, i)
+			// 不写入 taskQueue，相当于删除
+		} else {
+			// 保留此任务，移动到 writeIdx 位置
+			if writeIdx != readIdx {
+				taskQueue[writeIdx] = task
+			}
+			writeIdx++
 		}
 	}
 
-	if 0 < len(popedIndexes) {
-		var newQueue []*Task
-		for i, task := range taskQueue {
-			if !slices.Contains(popedIndexes, i) {
-				newQueue = append(newQueue, task)
-			}
-		}
-		taskQueue = newQueue
+	// 清理队列尾部的引用，防止内存泄漏
+	for i := writeIdx; i < len(taskQueue); i++ {
+		taskQueue[i] = nil
 	}
+	taskQueue = taskQueue[:writeIdx]
 	return
 }
 

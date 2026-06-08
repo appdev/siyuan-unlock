@@ -5,7 +5,7 @@ import {setPanelFocus} from "../util";
 import {getDockByType} from "../tabUtil";
 import {fetchPost} from "../../util/fetch";
 import {Constants} from "../../constants";
-import {updateHotkeyTip} from "../../protyle/util/compatibility";
+import {updateHotkeyAfterTip} from "../../protyle/util/compatibility";
 import {openFileById} from "../../editor/util";
 import {Protyle} from "../../protyle";
 import {MenuItem} from "../../menus/Menu";
@@ -24,8 +24,8 @@ export class Backlink extends Model {
     public editors: Protyle[] = [];
     public status: {
         [key: string]: {
-            sort: string,
-            mSort: string,
+            sort: number,
+            mSort: number,
             scrollTop: number,
             mScrollTop: number,
             backlinkOpenIds: string[],
@@ -44,6 +44,7 @@ export class Backlink extends Model {
         super({
             app: options.app,
             id: options.tab.id,
+            type: "backlink",
             callback() {
                 if (this.type === "local") {
                     fetchPost("/api/block/checkBlockExist", {id: this.blockId}, existResponse => {
@@ -61,7 +62,8 @@ export class Backlink extends Model {
                                 this.parent.updateTitle(data.data.title);
                             }
                             break;
-                        case "unmount":
+                        case "closeBox":
+                        case "removeBox":
                             if (this.notebookId === data.data.box && this.type === "local") {
                                 this.parent.parent.removeTab(this.parent.id);
                             }
@@ -79,43 +81,43 @@ export class Backlink extends Model {
         this.rootId = options.rootId;
         this.type = options.type;
         this.element = options.tab.panelElement;
-        this.element.classList.add("fn__flex-column", "file-tree", "sy__backlink");
+        this.element.classList.add("fn__flex-column", "file-tree", "sy__backlink", "dockPanel");
+        const backlinkSort = window.siyuan.config.editor.backlinkSort;
+        const backmentionSort = window.siyuan.config.editor.backmentionSort;
         this.element.innerHTML = `<div class="block__icons">
-    <div class="block__logo">
+    <div class="block__logo fn__flex-1">
         <svg class="block__logoicon"><use xlink:href="#iconLink"></use></svg>${window.siyuan.languages.backlinks}
     </div>
     <span class="counter listCount" style="margin-left: 0"></span>
-    <span class="fn__flex-1"></span>
     <span class="fn__space"></span>
     <input class="b3-text-field search__label fn__none fn__size200" placeholder="${window.siyuan.languages.filterKeywordEnter}" />
-    <span data-type="search" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.filter}"><svg><use xlink:href='#iconFilter'></use></svg></span>
+    <span data-type="search" class="block__icon ariaLabel" data-position="north" aria-label="${window.siyuan.languages.filter}"><svg><use xlink:href='#iconFilter'></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="refresh" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.refresh}"><svg><use xlink:href='#iconRefresh'></use></svg></span>
+    <span data-type="refresh" class="block__icon ariaLabel" data-position="north" aria-label="${window.siyuan.languages.refresh}"><svg><use xlink:href='#iconRefresh'></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="sort" data-sort="3" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.sort}"><svg><use xlink:href='#iconSort'></use></svg></span>
+    <span data-type="sort" data-sort="${backlinkSort}" class="block__icon ariaLabel" data-position="north" aria-label="${window.siyuan.languages.sort}"><svg><use xlink:href='#iconSort'></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="expand" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.expand} ${updateHotkeyTip(window.siyuan.config.keymap.editor.general.expand.custom)}">
+    <span data-type="expand" class="block__icon ariaLabel" data-position="north" aria-label="${window.siyuan.languages.expand}${updateHotkeyAfterTip(window.siyuan.config.keymap.editor.general.expand.custom)}">
         <svg><use xlink:href="#iconExpand"></use></svg>
     </span>
     <span class="fn__space"></span>
-    <span data-type="collapse" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.collapse} ${updateHotkeyTip(window.siyuan.config.keymap.editor.general.collapse.custom)}">
+    <span data-type="collapse" class="block__icon ariaLabel" data-position="north" aria-label="${window.siyuan.languages.collapse}${updateHotkeyAfterTip(window.siyuan.config.keymap.editor.general.collapse.custom)}">
         <svg><use xlink:href="#iconContract"></use></svg>
     </span>
     <span class="${this.type === "local" ? "fn__none " : ""}fn__space"></span>
-    <span data-type="min" class="${this.type === "local" ? "fn__none " : ""}block__icon b3-tooltips b3-tooltips__sw" aria-label="${window.siyuan.languages.min} ${updateHotkeyTip(window.siyuan.config.keymap.general.closeTab.custom)}"><svg><use xlink:href='#iconMin'></use></svg></span>
+    <span data-type="min" class="${this.type === "local" ? "fn__none " : ""}block__icon ariaLabel" data-position="north" aria-label="${window.siyuan.languages.min}${updateHotkeyAfterTip(window.siyuan.config.keymap.general.closeTab.custom)}"><svg><use xlink:href='#iconMin'></use></svg></span>
 </div>
 <div class="backlinkList fn__flex-1"></div>
 <div class="block__icons">
-    <div class="block__logo">
+    <div class="block__logo fn__flex-1 fn__pointer" data-type="mention">
         <svg class="block__logoicon"><use xlink:href="#iconLink"></use></svg>${window.siyuan.languages.mentions}
     </div>
     <span class="counter listMCount" style="margin-left: 0;"></span>
-    <span class="fn__flex-1"></span>
     <span class="fn__space"></span>
     <input class="b3-text-field search__label fn__none fn__size200" placeholder="${window.siyuan.languages.filterKeywordEnter}" />
     <span data-type="search" class="block__icon b3-tooltips b3-tooltips__nw" aria-label="${window.siyuan.languages.filter}"><svg><use xlink:href='#iconFilter'></use></svg></span>
     <span class="fn__space"></span>
-    <span data-type="mSort" data-sort="3" class="block__icon b3-tooltips b3-tooltips__nw" aria-label="${window.siyuan.languages.sort}"><svg><use xlink:href='#iconSort'></use></svg></span>
+    <span data-type="mSort" data-sort="${backmentionSort}" class="block__icon b3-tooltips b3-tooltips__nw" aria-label="${window.siyuan.languages.sort}"><svg><use xlink:href='#iconSort'></use></svg></span>
     <span class="fn__space"></span>
     <span data-type="mExpand" class="block__icon b3-tooltips b3-tooltips__nw" aria-label="${window.siyuan.languages.expand}">
         <svg><use xlink:href="#iconExpand"></use></svg>
@@ -148,14 +150,6 @@ export class Backlink extends Model {
             item.addEventListener("keydown", (event: KeyboardEvent) => {
                 if (!event.isComposing && event.key === "Enter") {
                     this.searchBacklinks();
-                }
-            });
-            item.addEventListener("input", (event: KeyboardEvent) => {
-                const inputElement = event.target as HTMLInputElement;
-                if (inputElement.value === "") {
-                    inputElement.classList.remove("search__input--block");
-                } else {
-                    inputElement.classList.add("search__input--block");
                 }
             });
         });
@@ -278,11 +272,13 @@ export class Backlink extends Model {
             this.setFocus();
             let target = event.target as HTMLElement;
             while (target && !target.isEqualNode(this.element)) {
-                if (target.classList.contains("block__icon") && target.parentElement.parentElement.isSameNode(this.element)) {
+                if ((target.classList.contains("block__icon") || target.classList.contains("block__logo")) &&
+                    target.parentElement.parentElement === this.element) {
                     const type = target.getAttribute("data-type");
                     switch (type) {
                         case "refresh":
                             this.refresh();
+                            event.stopPropagation();
                             break;
                         case "mExpand":
                             Array.from(this.mTree.element.firstElementChild.children).forEach((item: HTMLElement) => {
@@ -290,6 +286,7 @@ export class Backlink extends Model {
                                     this.toggleItem(item, true);
                                 }
                             });
+                            event.stopPropagation();
                             break;
                         case "mCollapse":
                             this.mTree.element.querySelectorAll(".protyle").forEach(item => {
@@ -298,13 +295,16 @@ export class Backlink extends Model {
                             this.mTree.element.querySelectorAll(".b3-list-item__arrow").forEach(item => {
                                 item.classList.remove("b3-list-item__arrow--open");
                             });
+                            event.stopPropagation();
                             break;
                         case "min":
-                            getDockByType("backlink").toggleModel("backlink");
+                            getDockByType("backlink").toggleModel("backlink", false, true);
+                            event.stopPropagation();
                             break;
                         case "search":
                             target.previousElementSibling.classList.remove("fn__none");
                             (target.previousElementSibling as HTMLInputElement).select();
+                            event.stopPropagation();
                             break;
                         case "sort":
                         case "mSort":
@@ -313,33 +313,12 @@ export class Backlink extends Model {
                             event.stopPropagation();
                             break;
                         case "layout":
-                            if (this.mTree.element.style.flex) {
-                                if (this.mTree.element.style.height === "0px") {
-                                    this.tree.element.classList.remove("fn__none");
-                                    this.mTree.element.removeAttribute("style");
-                                    target.setAttribute("aria-label", window.siyuan.languages.up);
-                                    target.querySelector("use").setAttribute("xlink:href", "#iconUp");
-                                } else {
-                                    this.tree.element.classList.remove("fn__none");
-                                    this.mTree.element.removeAttribute("style");
-                                    target.setAttribute("aria-label", window.siyuan.languages.down);
-                                    target.querySelector("use").setAttribute("xlink:href", "#iconDown");
-                                }
-                            } else {
-                                if (target.getAttribute("aria-label") === window.siyuan.languages.down) {
-                                    this.tree.element.classList.remove("fn__none");
-                                    this.mTree.element.setAttribute("style", "flex:none;height:0px");
-                                    target.setAttribute("aria-label", window.siyuan.languages.up);
-                                    target.querySelector("use").setAttribute("xlink:href", "#iconUp");
-                                } else {
-                                    this.tree.element.classList.add("fn__none");
-                                    this.mTree.element.setAttribute("style", `flex:none;height:${this.element.clientHeight - this.tree.element.previousElementSibling.clientHeight * 2}px`);
-                                    target.setAttribute("aria-label", window.siyuan.languages.down);
-                                    target.querySelector("use").setAttribute("xlink:href", "#iconDown");
-                                }
-                            }
-                            this.tree.element.dispatchEvent(new CustomEvent("scroll"));
-                            this.mTree.element.dispatchEvent(new CustomEvent("scroll"));
+                            this.setLayout(target);
+                            event.stopPropagation();
+                            break;
+                        case "mention":
+                            this.setLayout(target.parentElement.querySelector('[data-type="layout"]'));
+                            event.stopPropagation();
                             break;
                     }
                 }
@@ -348,6 +327,36 @@ export class Backlink extends Model {
         });
 
         this.searchBacklinks(true);
+    }
+
+    private setLayout(element: HTMLElement) {
+        if (this.mTree.element.style.flex) {
+            if (this.mTree.element.style.height === "0px") {
+                this.tree.element.classList.remove("fn__none");
+                this.mTree.element.removeAttribute("style");
+                element.setAttribute("aria-label", window.siyuan.languages.up);
+                element.querySelector("use").setAttribute("xlink:href", "#iconUp");
+            } else {
+                this.tree.element.classList.remove("fn__none");
+                this.mTree.element.removeAttribute("style");
+                element.setAttribute("aria-label", window.siyuan.languages.down);
+                element.querySelector("use").setAttribute("xlink:href", "#iconDown");
+            }
+        } else {
+            if (element.getAttribute("aria-label") === window.siyuan.languages.down) {
+                this.tree.element.classList.remove("fn__none");
+                this.mTree.element.setAttribute("style", "flex:none;height:0px");
+                element.setAttribute("aria-label", window.siyuan.languages.up);
+                element.querySelector("use").setAttribute("xlink:href", "#iconUp");
+            } else {
+                this.tree.element.classList.add("fn__none");
+                this.mTree.element.setAttribute("style", `flex:none;height:${this.element.clientHeight - this.tree.element.previousElementSibling.clientHeight * 2}px`);
+                element.setAttribute("aria-label", window.siyuan.languages.down);
+                element.querySelector("use").setAttribute("xlink:href", "#iconDown");
+            }
+        }
+        this.tree.element.dispatchEvent(new CustomEvent("scroll"));
+        this.mTree.element.dispatchEvent(new CustomEvent("scroll"));
     }
 
     private setFocus() {
@@ -361,6 +370,14 @@ export class Backlink extends Model {
     private showSortMenu(type: string, sort: string) {
         const clickEvent = (currentSort: string) => {
             (type === "sort" ? this.tree : this.mTree).element.previousElementSibling.querySelector(`[data-type="${type}"]`).setAttribute("data-sort", currentSort);
+            // 保存排序状态到配置
+            const sortValue = parseInt(currentSort);
+            if (type === "sort") {
+                window.siyuan.config.editor.backlinkSort = sortValue;
+            } else {
+                window.siyuan.config.editor.backmentionSort = sortValue;
+            }
+            fetchPost("/api/setting/setEditor", window.siyuan.config.editor);
             this.searchBacklinks();
         };
         window.siyuan.menus.menu.remove();
@@ -433,7 +450,7 @@ export class Backlink extends Model {
         if (svgElement.classList.contains("b3-list-item__arrow--open")) {
             svgElement.classList.remove("b3-list-item__arrow--open");
             this.editors.find((item, index) => {
-                if (item.protyle.block.rootID === docId && liElement.nextElementSibling && item.protyle.element.isSameNode(liElement.nextElementSibling)) {
+                if (item.protyle.block.rootID === docId && liElement.nextElementSibling && item.protyle.element === liElement.nextElementSibling) {
                     item.destroy();
                     this.editors.splice(index, 1);
                     liElement.nextElementSibling.remove();
@@ -458,6 +475,9 @@ export class Backlink extends Model {
                 liElement.after(editorElement);
                 const editor = new Protyle(this.app, editorElement, {
                     blockId: docId,
+                    click: {
+                        preventInsetEmptyBlock: true
+                    },
                     backlinkData: isMention ? response.data.backmentions : response.data.backlinks,
                     render: {
                         background: false,
@@ -494,8 +514,8 @@ export class Backlink extends Model {
         }
         element.classList.add("fn__rotate");
         fetchPost("/api/ref/getBacklink2", {
-            sort: this.tree.element.previousElementSibling.querySelector('[data-type="sort"]').getAttribute("data-sort"),
-            mSort: this.mTree.element.previousElementSibling.querySelector('[data-type="mSort"]').getAttribute("data-sort"),
+            sort: parseInt(this.tree.element.previousElementSibling.querySelector('[data-type="sort"]').getAttribute("data-sort")).toString(),
+            mSort: parseInt(this.mTree.element.previousElementSibling.querySelector('[data-type="mSort"]').getAttribute("data-sort")).toString(),
             k: this.inputsElement[0].value,
             mk: this.inputsElement[1].value,
             id: this.blockId,
@@ -509,8 +529,8 @@ export class Backlink extends Model {
 
     public saveStatus() {
         this.status[this.blockId] = {
-            sort: this.tree.element.previousElementSibling.querySelector('[data-type="sort"]').getAttribute("data-sort"),
-            mSort: this.mTree.element.previousElementSibling.querySelector('[data-type="mSort"]').getAttribute("data-sort"),
+            sort: parseInt(this.tree.element.previousElementSibling.querySelector('[data-type="sort"]').getAttribute("data-sort")),
+            mSort: parseInt(this.mTree.element.previousElementSibling.querySelector('[data-type="mSort"]').getAttribute("data-sort")),
             scrollTop: this.tree.element.scrollTop,
             mScrollTop: this.mTree.element.scrollTop,
             backlinkOpenIds: [],
@@ -587,8 +607,8 @@ export class Backlink extends Model {
 
         if (!this.status[this.blockId]) {
             this.status[this.blockId] = {
-                sort: "3",
-                mSort: "3",
+                sort: window.siyuan.config.editor.backlinkSort,
+                mSort: window.siyuan.config.editor.backmentionSort,
                 scrollTop: 0,
                 mScrollTop: 0,
                 backlinkOpenIds: [],
@@ -658,8 +678,8 @@ export class Backlink extends Model {
             layoutElement.setAttribute("aria-label", window.siyuan.languages.down);
             layoutElement.querySelector("use").setAttribute("xlink:href", "#iconDown");
         }
-        this.tree.element.previousElementSibling.querySelector('[data-type="sort"]').setAttribute("data-sort", this.status[this.blockId].sort);
-        this.mTree.element.previousElementSibling.querySelector('[data-type="mSort"]').setAttribute("data-sort", this.status[this.blockId].mSort);
+        this.tree.element.previousElementSibling.querySelector('[data-type="sort"]').setAttribute("data-sort", this.status[this.blockId].sort.toString());
+        this.mTree.element.previousElementSibling.querySelector('[data-type="mSort"]').setAttribute("data-sort", this.status[this.blockId].mSort.toString());
 
         setTimeout(() => {
             this.tree.element.scrollTop = this.status[this.blockId].scrollTop;

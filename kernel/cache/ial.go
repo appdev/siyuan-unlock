@@ -17,14 +17,13 @@
 package cache
 
 import (
-	"strings"
+	"maps"
 
-	"github.com/88250/lute/editor"
 	"github.com/dgraph-io/ristretto"
 )
 
-var docIALCache, _ = ristretto.NewCache[string, map[string]string](&ristretto.Config[string, map[string]string]{
-	NumCounters: 1024 * 100,
+var docIALCache, _ = ristretto.NewCache(&ristretto.Config{
+	NumCounters: 100000,
 	MaxCost:     1024 * 1024 * 200,
 	BufferItems: 64,
 })
@@ -40,9 +39,7 @@ func GetDocIAL(p string) (ret map[string]string) {
 	}
 
 	ret = map[string]string{}
-	for k, v := range ial {
-		ret[k] = strings.ReplaceAll(v, editor.IALValEscNewLine, "\n")
-	}
+	maps.Copy(ret, ial.(map[string]string))
 	return
 }
 
@@ -54,13 +51,14 @@ func ClearDocsIAL() {
 	docIALCache.Clear()
 }
 
-var blockIALCache, _ = ristretto.NewCache[string, map[string]string](&ristretto.Config[string, map[string]string]{
-	NumCounters: 1024 * 1000,
+var blockIALCache, _ = ristretto.NewCache(&ristretto.Config{
+	NumCounters: 100000,
 	MaxCost:     1024 * 1024 * 200,
 	BufferItems: 64,
 })
 
 func PutBlockIAL(id string, ial map[string]string) {
+	// 这里存入的属性值都是反转义过的，用的是 parse.IAL2Map()，而不是 parse.IAL2MapUnEsc()
 	blockIALCache.Set(id, ial, 128)
 }
 
@@ -69,7 +67,7 @@ func GetBlockIAL(id string) (ret map[string]string) {
 	if nil == ial {
 		return
 	}
-	return ial
+	return ial.(map[string]string)
 }
 
 func RemoveBlockIAL(id string) {

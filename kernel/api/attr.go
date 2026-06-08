@@ -17,6 +17,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/88250/gulu"
@@ -43,7 +44,7 @@ func batchGetBlockAttrs(c *gin.Context) {
 		return
 	}
 
-	ids := arg["ids"].([]interface{})
+	ids := arg["ids"].([]any)
 	var idList []string
 	for _, id := range ids {
 		idList = append(idList, id.(string))
@@ -83,7 +84,7 @@ func setBlockAttrs(c *gin.Context) {
 		return
 	}
 
-	attrs := arg["attrs"].(map[string]interface{})
+	attrs := arg["attrs"].(map[string]any)
 	if 1 == len(attrs) && "" != attrs["scroll"] {
 		// 不记录用户指南滚动位置
 		if b := treenode.GetBlockTree(id); nil != b && (model.IsUserGuide(b.BoxID)) {
@@ -96,7 +97,13 @@ func setBlockAttrs(c *gin.Context) {
 		if nil == value { // API `setBlockAttrs` 中如果存在属性值设置为 `null` 时移除该属性 https://github.com/siyuan-note/siyuan/issues/5577
 			nameValues[name] = ""
 		} else {
-			nameValues[name] = value.(string)
+			strValue, ok := value.(string)
+			if !ok {
+				ret.Code = -1
+				ret.Msg = fmt.Sprintf("the value of attr [%s] must be a string", name)
+				return
+			}
+			nameValues[name] = strValue
 		}
 	}
 	err := model.SetBlockAttrs(id, nameValues)
@@ -116,26 +123,32 @@ func batchSetBlockAttrs(c *gin.Context) {
 		return
 	}
 
-	blockAttrsArg := arg["blockAttrs"].([]interface{})
-	var blockAttrs []map[string]interface{}
+	blockAttrsArg := arg["blockAttrs"].([]any)
+	var blockAttrs []map[string]any
 	for _, blockAttrArg := range blockAttrsArg {
-		blockAttr := blockAttrArg.(map[string]interface{})
+		blockAttr := blockAttrArg.(map[string]any)
 		id := blockAttr["id"].(string)
 		if util.InvalidIDPattern(id, ret) {
 			return
 		}
 
-		attrs := blockAttr["attrs"].(map[string]interface{})
+		attrs := blockAttr["attrs"].(map[string]any)
 		nameValues := map[string]string{}
 		for name, value := range attrs {
 			if nil == value {
 				nameValues[name] = ""
 			} else {
-				nameValues[name] = value.(string)
+				strValue, ok := value.(string)
+				if !ok {
+					ret.Code = -1
+					ret.Msg = fmt.Sprintf("the value of attr [%s] must be a string", name)
+					return
+				}
+				nameValues[name] = strValue
 			}
 		}
 
-		blockAttrs = append(blockAttrs, map[string]interface{}{
+		blockAttrs = append(blockAttrs, map[string]any{
 			"id":    id,
 			"attrs": nameValues,
 		})
@@ -159,10 +172,20 @@ func resetBlockAttrs(c *gin.Context) {
 	}
 
 	id := arg["id"].(string)
-	attrs := arg["attrs"].(map[string]interface{})
+	attrs := arg["attrs"].(map[string]any)
 	nameValues := map[string]string{}
 	for name, value := range attrs {
-		nameValues[name] = value.(string)
+		if nil == value {
+			// 接口会先清空所有属性，nil 值可忽略
+			continue
+		}
+		strValue, ok := value.(string)
+		if !ok {
+			ret.Code = -1
+			ret.Msg = fmt.Sprintf("the value of attr [%s] must be a string", name)
+			return
+		}
+		nameValues[name] = strValue
 	}
 	err := model.ResetBlockAttrs(id, nameValues)
 	if err != nil {

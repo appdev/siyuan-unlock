@@ -4,9 +4,9 @@ import {fetchPost} from "../util/fetch";
 import {isMobile, isWindow} from "../util/functions";
 /// #if !MOBILE
 import {Custom} from "../layout/dock/Custom";
-import {getAllModels} from "../layout/getAll";
+import {getAllEditor, getAllModels} from "../layout/getAll";
 import {Tab} from "../layout/Tab";
-import {setPanelFocus} from "../layout/util";
+import {resizeTopBar, setPanelFocus} from "../layout/util";
 import {getDockByType} from "../layout/tabUtil";
 ///#else
 import {MobileCustom} from "../mobile/dock/MobileCustom";
@@ -16,6 +16,9 @@ import {BlockPanel} from "../block/Panel";
 import {Setting} from "./Setting";
 import {clearOBG} from "../layout/dock/util";
 import {Constants} from "../constants";
+import {uninstall} from "./uninstall";
+import {afterLoadPlugin, loadPlugins} from "./loader";
+import {normalizeStoragePath} from "../util/pathName";
 
 export class Plugin {
     private app: App;
@@ -28,7 +31,7 @@ export class Plugin {
         filter: string[],
         html: string,
         id: string,
-        callback: (protyle: import("../protyle").Protyle) => void
+        callback: (protyle: import("../protyle").Protyle, nodeElement: HTMLElement) => void
     }[] = [];
     // TODO
     public customBlockRenders: {
@@ -78,8 +81,11 @@ export class Plugin {
         });
 
         this.updateProtyleToolbar([]).forEach(toolbarItem => {
-            if (typeof toolbarItem === "string" || Constants.INLINE_TYPE.concat("|").includes(toolbarItem.name) || !toolbarItem.hotkey) {
+            if (typeof toolbarItem === "string" || Constants.INLINE_TYPE.concat("|").includes(toolbarItem.name)) {
                 return;
+            }
+            if (typeof toolbarItem.hotkey !== "string") {
+                toolbarItem.hotkey = "";
             }
             if (!window.siyuan.config.keymap.plugin) {
                 window.siyuan.config.keymap.plugin = {};
@@ -97,11 +103,13 @@ export class Plugin {
                     default: toolbarItem.hotkey,
                     custom: toolbarItem.hotkey,
                 };
+            } else {
+                window.siyuan.config.keymap.plugin[options.name][toolbarItem.name].default = toolbarItem.hotkey;
             }
         });
     }
 
-    public onload() {
+    public onload(): Promise<void> | void {
         // 加载
     }
 
@@ -113,6 +121,18 @@ export class Plugin {
         // 卸载
     }
 
+    public onDataChanged() {
+        // 存储数据变更
+        // 兼容 3.4.1 以前同步数据使用重载插件的问题
+        uninstall(this.app, this.name, true);
+        loadPlugins(this.app, [this.name], false).then(() => {
+            afterLoadPlugin(this);
+            getAllEditor().forEach(editor => {
+                editor.protyle.toolbar.update(editor.protyle);
+            });
+        });
+    }
+
     public async updateCards(options: ICardData) {
         return options;
     }
@@ -122,6 +142,9 @@ export class Plugin {
     }
 
     public addCommand(command: ICommand) {
+        if (typeof command.hotkey !== "string") {
+            command.hotkey = "";
+        }
         if (!window.siyuan.config.keymap.plugin) {
             window.siyuan.config.keymap.plugin = {};
         }
@@ -155,16 +178,28 @@ export class Plugin {
     }
 
     public addIcons(svg: string) {
-        document.body.insertAdjacentHTML("afterbegin", `<svg data-name="${this.name}" style="position: absolute; width: 0; height: 0; overflow: hidden;" xmlns="http://www.w3.org/2000/svg">
+        const svgElement = document.querySelector(`svg[data-name="${this.name}"] defs`);
+        if (svgElement) {
+            svgElement.insertAdjacentHTML("afterbegin", svg);
+        } else {
+            const lastSvgElement = document.querySelector("body > svg:last-of-type");
+            if (lastSvgElement) {
+                lastSvgElement.insertAdjacentHTML("afterend", `<svg data-name="${this.name}" style="position: absolute; width: 0; height: 0; overflow: hidden;" xmlns="http://www.w3.org/2000/svg">
 <defs>${svg}</defs></svg>`);
+            } else {
+                document.body.insertAdjacentHTML("afterbegin", `<svg data-name="${this.name}" style="position: absolute; width: 0; height: 0; overflow: hidden;" xmlns="http://www.w3.org/2000/svg">
+<defs>${svg}</defs></svg>`);
+            }
+        }
     }
 
     public addTopBar(options: {
         icon: string,
         title: string,
-        position?: "right" | "left",
+        position?: "south" | "left",
         callback: (evt: MouseEvent) => void
     }) {
+        options.icon = options.icon.trim();
         if (!options.icon.startsWith("icon") && !options.icon.startsWith("<svg")) {
             console.error(`plugin ${this.name} addTopBar error: icon must be svg id or svg tag`);
             return;
@@ -182,7 +217,18 @@ export class Plugin {
             iconElement.setAttribute("aria-label", options.title);
             iconElement.innerHTML = options.icon.startsWith("icon") ? `<svg><use xlink:href="#${options.icon}"></use></svg>` : options.icon;
             iconElement.addEventListener("click", options.callback);
-            iconElement.setAttribute("data-position", options.position || "right");
+            iconElement.setAttribute("data-location", options.position || "right");
+            resizeTopBar();
+        }
+        if (isMobile() && window.siyuan.storage) {
+            if (!window.siyuan.storage[Constants.LOCAL_PLUGINTOPUNPIN].includes(iconElement.id)) {
+                document.querySelector("#menuAbout")?.after(iconElement);
+            }
+        } else if (!isWindow() && window.siyuan.storage) {
+            if (window.siyuan.storage[Constants.LOCAL_PLUGINTOPUNPIN].includes(iconElement.id)) {
+                iconElement.classList.add("fn__none");
+            }
+            document.querySelector("#" + (iconElement.getAttribute("data-location") === "right" ? "barPlugins" : "drag"))?.before(iconElement);
         }
         this.topBarIcons.push(iconElement);
         return iconElement;
@@ -193,8 +239,16 @@ export class Plugin {
         position?: "right" | "left",
     }) {
         /// #if !MOBILE
-        options.element.setAttribute("data-position", options.position || "right");
+        options.element.setAttribute("data-location", options.position || "right");
         this.statusBarIcons.push(options.element);
+        const statusElement = document.getElementById("status");
+        if (statusElement) {
+            if (options.element.getAttribute("data-location") === "right") {
+                statusElement.insertAdjacentElement("beforeend", options.element);
+            } else {
+                statusElement.insertAdjacentElement("afterbegin", options.element);
+            }
+        }
         return options.element;
         /// #endif
     }
@@ -203,33 +257,52 @@ export class Plugin {
         if (!this.setting) {
             return;
         }
-        this.setting.open(this.name);
+        this.setting.open(this.displayName || this.name);
     }
 
-    public loadData(storageName: string) {
+    public loadData(storageName: string): Promise<any> {
         if (typeof this.data[storageName] === "undefined") {
             this.data[storageName] = "";
         }
         return new Promise((resolve) => {
-            fetchPost("/api/file/getFile", {path: `/data/storage/petal/${this.name}/${storageName}`}, (response) => {
-                if (response.code !== 404) {
-                    this.data[storageName] = response;
-                }
+            fetchPost("/api/file/getFile", {
+                path: `/data/storage/petal/${this.name}/${normalizeStoragePath(storageName)}`
+            }, (response) => {
+                this.data[storageName] = response;
+                resolve(this.data[storageName]);
+            }, null, () => {
                 resolve(this.data[storageName]);
             });
         });
     }
 
-    public saveData(storageName: string, data: any) {
-        return new Promise((resolve) => {
-            const pathString = `/data/storage/petal/${this.name}/${storageName}`;
+    public saveData(storageName: string, data: any): Promise<any | IWebSocketData> {
+        if (window.siyuan.config.readonly || window.siyuan.isPublish) {
+            return Promise.reject({
+                code: 403,
+                msg: "Readonly mode or publish mode",
+                data: null
+            });
+        }
+        return new Promise((resolve, reject) => {
+            const pathString = `/data/storage/petal/${this.name}/${normalizeStoragePath(storageName)}`;
             let file: File;
-            if (typeof data === "object") {
-                file = new File([new Blob([JSON.stringify(data)], {
-                    type: "application/json"
-                })], pathString.split("/").pop());
-            } else {
-                file = new File([new Blob([data])], pathString.split("/").pop());
+            try {
+                const fileName = pathString.split("/").pop();
+                if (typeof data === "object") {
+                    file = new File([new Blob([JSON.stringify(data)], {
+                        type: "application/json"
+                    })], fileName);
+                } else {
+                    file = new File([new Blob([data])], fileName);
+                }
+            } catch (e) {
+                reject({
+                    code: 400,
+                    msg: e instanceof Error ? e.message : String(e),
+                    data: null
+                });
+                return;
             }
             const formData = new FormData();
             formData.append("path", pathString);
@@ -242,12 +315,19 @@ export class Plugin {
         });
     }
 
-    public removeData(storageName: string) {
+    public removeData(storageName: string): Promise<IWebSocketData> {
+        if (window.siyuan.config.readonly || window.siyuan.isPublish) {
+            return Promise.reject({
+                code: 403,
+                msg: "Readonly mode or publish mode",
+                data: null
+            } as IWebSocketData);
+        }
         return new Promise((resolve) => {
             if (!this.data) {
                 this.data = {};
             }
-            fetchPost("/api/file/removeFile", {path: `/data/storage/petal/${this.name}/${storageName}`}, (response) => {
+            fetchPost("/api/file/removeFile", {path: `/data/storage/petal/${this.name}/${normalizeStoragePath(storageName)}`}, (response) => {
                 delete this.data[storageName];
                 resolve(response);
             });
@@ -347,7 +427,7 @@ export class Plugin {
                         getDockByType(type2).toggleModel(type2);
                     }
                 });
-                customObj.element.classList.add("sy__" + type2);
+                customObj.element.classList.add("sy__" + type2, "dockPanel");
                 return customObj;
             }
             /// #endif
@@ -355,45 +435,40 @@ export class Plugin {
         if (!window.siyuan.config.keymap.plugin) {
             window.siyuan.config.keymap.plugin = {};
         }
-        if (options.config.hotkey) {
-            if (!window.siyuan.config.keymap.plugin[this.name]) {
-                window.siyuan.config.keymap.plugin[this.name] = {
-                    [type2]: {
-                        default: options.config.hotkey,
-                        custom: options.config.hotkey,
-                    }
-                };
-            } else if (!window.siyuan.config.keymap.plugin[this.name][type2]) {
-                window.siyuan.config.keymap.plugin[this.name][type2] = {
-                    default: options.config.hotkey,
-                    custom: options.config.hotkey,
-                };
-            } else if (window.siyuan.config.keymap.plugin[this.name][type2]) {
-                if (typeof window.siyuan.config.keymap.plugin[this.name][type2].custom !== "string") {
-                    window.siyuan.config.keymap.plugin[this.name][type2].custom = options.config.hotkey;
-                }
-                window.siyuan.config.keymap.plugin[this.name][type2]["default"] = options.config.hotkey;
+        if (!window.siyuan.config.keymap.plugin[this.name]) {
+            window.siyuan.config.keymap.plugin[this.name] = {};
+        }
+        const hotkey = typeof options.config.hotkey === "string" ? options.config.hotkey : "";
+        if (!window.siyuan.config.keymap.plugin[this.name][type2]) {
+            window.siyuan.config.keymap.plugin[this.name][type2] = {
+                default: hotkey,
+                custom: hotkey,
+            };
+        } else {
+            if (typeof window.siyuan.config.keymap.plugin[this.name][type2].custom !== "string") {
+                window.siyuan.config.keymap.plugin[this.name][type2].custom = hotkey;
             }
+            window.siyuan.config.keymap.plugin[this.name][type2]["default"] = hotkey;
         }
         return this.docks[type2];
     }
 
     public addFloatLayer = (options: {
-        ids: string[],
-        defIds?: string[],
+        refDefs: IRefDefs[],
         x?: number,
         y?: number,
         targetElement?: HTMLElement,
+        originalRefBlockIDs?: IObject,
         isBacklink: boolean,
     }) => {
         window.siyuan.blockPanels.push(new BlockPanel({
             app: this.app,
+            originalRefBlockIDs: options.originalRefBlockIDs,
             targetElement: options.targetElement,
             isBacklink: options.isBacklink,
             x: options.x,
             y: options.y,
-            nodeIds: options.ids,
-            defIds: options.defIds,
+            refDefs: options.refDefs,
         }));
     };
 

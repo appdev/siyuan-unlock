@@ -29,6 +29,7 @@ import (
 	"github.com/88250/gulu"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/parse"
+	"github.com/open-spaced-repetition/go-fsrs/v3"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/riff"
@@ -386,6 +387,12 @@ func getCardsBlocks(cards []riff.Card, page, pageSize int) (blocks []*Block, tot
 	sort.Slice(cards, func(i, j int) bool {
 		due1 := cards[i].(*riff.FSRSCard).C.Due
 		due2 := cards[j].(*riff.FSRSCard).C.Due
+		if due1.IsZero() || due2.IsZero() {
+			// Improve flashcard management sorting https://github.com/siyuan-note/siyuan/issues/14686
+			cid1 := cards[i].ID()
+			cid2 := cards[j].ID()
+			return cid1 < cid2
+		}
 		return due1.Before(due2)
 	})
 
@@ -432,6 +439,21 @@ func getCardsBlocks(cards []riff.Card, page, pageSize int) (blocks []*Block, tot
 		b.RiffCard = getRiffCard(cards[i].(*riff.FSRSCard).C)
 	}
 	return
+}
+
+func getRiffCard(card *fsrs.Card) *RiffCard {
+	due := card.Due
+	if due.IsZero() {
+		due = time.Now()
+	}
+
+	return &RiffCard{
+		Due:        due,
+		Reps:       card.Reps,
+		Lapses:     card.Lapses,
+		State:      card.State,
+		LastReview: card.LastReview,
+	}
 }
 
 var (
@@ -782,7 +804,7 @@ func (tx *Transaction) removeBlocksDeckAttr(blockIDs []string, deckID string) (e
 
 		oldAttrs := parse.IAL2Map(node.KramdownIAL)
 
-		deckAttrs := node.IALAttr("custom-riff-decks")
+		deckAttrs := node.IALAttr(NodeAttrRiffDecks)
 		var deckIDs []string
 		if "" != deckID {
 			availableDeckIDs := getDeckIDs()
@@ -798,17 +820,15 @@ func (tx *Transaction) removeBlocksDeckAttr(blockIDs []string, deckID string) (e
 		val = strings.TrimPrefix(val, ",")
 		val = strings.TrimSuffix(val, ",")
 		if "" == val {
-			node.RemoveIALAttr("custom-riff-decks")
+			node.RemoveIALAttr(NodeAttrRiffDecks)
 		} else {
-			node.SetIALAttr("custom-riff-decks", val)
+			node.SetIALAttr(NodeAttrRiffDecks, val)
 		}
 
-		if err = tx.writeTree(tree); err != nil {
-			return
-		}
+		tx.writeTree(tree)
 
 		cache.PutBlockIAL(blockID, parse.IAL2Map(node.KramdownIAL))
-		pushBroadcastAttrTransactions(oldAttrs, node)
+		pushBlockAttrs(oldAttrs, node)
 	}
 
 	return
@@ -890,21 +910,19 @@ func (tx *Transaction) doAddFlashcards(operation *Operation) (ret *TxErr) {
 
 		oldAttrs := parse.IAL2Map(node.KramdownIAL)
 
-		deckAttrs := node.IALAttr("custom-riff-decks")
+		deckAttrs := node.IALAttr(NodeAttrRiffDecks)
 		deckIDs := strings.Split(deckAttrs, ",")
 		deckIDs = append(deckIDs, deckID)
 		deckIDs = gulu.Str.RemoveDuplicatedElem(deckIDs)
 		val := strings.Join(deckIDs, ",")
 		val = strings.TrimPrefix(val, ",")
 		val = strings.TrimSuffix(val, ",")
-		node.SetIALAttr("custom-riff-decks", val)
+		node.SetIALAttr(NodeAttrRiffDecks, val)
 
-		if err := tx.writeTree(tree); err != nil {
-			return &TxErr{code: TxErrCodeWriteTree, msg: err.Error(), id: deckID}
-		}
+		tx.writeTree(tree)
 
 		cache.PutBlockIAL(blockID, parse.IAL2Map(node.KramdownIAL))
-		pushBroadcastAttrTransactions(oldAttrs, node)
+		pushBlockAttrs(oldAttrs, node)
 	}
 
 	deck := Decks[deckID]
@@ -920,8 +938,7 @@ func (tx *Transaction) doAddFlashcards(operation *Operation) (ret *TxErr) {
 			continue
 		}
 
-		cardID := ast.NewNodeID()
-		deck.AddCard(cardID, blockID)
+		deck.AddCard(ast.NewNodeID(), blockID)
 	}
 
 	if err := deck.Save(); err != nil {
@@ -1088,7 +1105,7 @@ func getDeckDueCards(deck *riff.Deck, reviewedCardIDs, blockIDs []string, newCar
 	}
 	var toCheckBlockIDs []string
 	var tmp []riff.Card
-	for bID, _ := range toChecks {
+	for bID := range toChecks {
 		toCheckBlockIDs = append(toCheckBlockIDs, bID)
 	}
 	checkResult := treenode.ExistBlockTrees(toCheckBlockIDs)
@@ -1178,3 +1195,7 @@ func getDeckDueCards(deck *riff.Deck, reviewedCardIDs, blockIDs []string, newCar
 	}
 	return
 }
+
+const (
+	NodeAttrRiffDecks = "custom-riff-decks"
+)

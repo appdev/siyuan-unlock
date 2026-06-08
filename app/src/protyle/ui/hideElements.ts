@@ -1,12 +1,13 @@
 import {getAllEditor} from "../../layout/getAll";
+import {isIPhone} from "../util/compatibility";
 
 // "gutter", "toolbar", "select", "hint", "util", "dialog", "gutterOnly"
 export const hideElements = (panels: string[], protyle?: IProtyle, focusHide = false) => {
     if (!protyle) {
         if (panels.includes("dialog")) {
-            for (let i = 0; i < window.siyuan.dialogs.length; i++) {
+            const dialogLength = window.siyuan.dialogs.length;
+            for (let i = 0; i < dialogLength; i++) {
                 window.siyuan.dialogs[i].destroy();
-                i--;
             }
         }
         return;
@@ -25,7 +26,9 @@ export const hideElements = (panels: string[], protyle?: IProtyle, focusHide = f
     }
     //  不能 remove("protyle-wysiwyg--hl") 否则打开页签的时候 "cb-get-hl" 高亮会被移除
     if (protyle.gutter && panels.includes("gutterOnly")) {
-        protyle.gutter.element.classList.add("fn__none");
+        if (!isIPhone()) {
+            protyle.gutter.element.classList.add("fn__none");
+        }
         protyle.gutter.element.innerHTML = "";
     }
     if (protyle.toolbar && panels.includes("toolbar")) {
@@ -62,10 +65,13 @@ export const hideAllElements = (types: string[]) => {
     if (types.includes("util")) {
         getAllEditor().forEach(item => {
             if (item.protyle.toolbar) {
-                item.protyle.toolbar.subElement.classList.add("fn__none");
-                if (item.protyle.toolbar.subElementCloseCB) {
-                    item.protyle.toolbar.subElementCloseCB();
-                    item.protyle.toolbar.subElementCloseCB = undefined;
+                const pinElement = item.protyle.toolbar.subElement.querySelector('[data-type="pin"]');
+                if (!pinElement || (pinElement && pinElement.getAttribute("aria-label") === window.siyuan.languages.pin)) {
+                    item.protyle.toolbar.subElement.classList.add("fn__none");
+                    if (item.protyle.toolbar.subElementCloseCB) {
+                        item.protyle.toolbar.subElementCloseCB();
+                        item.protyle.toolbar.subElementCloseCB = undefined;
+                    }
                 }
             }
         });

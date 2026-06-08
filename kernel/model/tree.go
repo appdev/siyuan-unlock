@@ -18,6 +18,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -28,10 +29,12 @@ import (
 	"github.com/88250/lute"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/parse"
+	"github.com/siyuan-note/dataparser"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/av"
 	"github.com/siyuan-note/siyuan/kernel/filesys"
+	"github.com/siyuan-note/siyuan/kernel/search"
 	"github.com/siyuan-note/siyuan/kernel/sql"
 	"github.com/siyuan-note/siyuan/kernel/task"
 	"github.com/siyuan-note/siyuan/kernel/treenode"
@@ -42,7 +45,7 @@ import (
 func resetTree(tree *parse.Tree, titleSuffix string, removeAvBinding bool) {
 	tree.ID = ast.NewNodeID()
 	tree.Root.ID = tree.ID
-
+	title := tree.Root.IALAttr("title")
 	if "" != titleSuffix {
 		if t, parseErr := time.Parse("20060102150405", util.TimeFromID(tree.ID)); nil == parseErr {
 			titleSuffix += " " + t.Format("2006-01-02 15:04:05")
@@ -51,9 +54,12 @@ func resetTree(tree *parse.Tree, titleSuffix string, removeAvBinding bool) {
 		}
 		titleSuffix = "(" + titleSuffix + ")"
 		titleSuffix = " " + titleSuffix
+		if Conf.language(16) == title {
+			titleSuffix = ""
+		}
 	}
 	tree.Root.SetIALAttr("id", tree.ID)
-	tree.Root.SetIALAttr("title", tree.Root.IALAttr("title")+titleSuffix)
+	tree.Root.SetIALAttr("title", title+titleSuffix)
 	tree.Root.RemoveIALAttr("scroll")
 	p := path.Join(path.Dir(tree.Path), tree.ID) + ".sy"
 	tree.Path = p
@@ -162,7 +168,7 @@ func loadTree(localPath string, luteEngine *lute.Lute) (ret *parse.Tree, err err
 		return
 	}
 
-	ret, err = filesys.ParseJSONWithoutFix(data, luteEngine.ParseOptions)
+	ret, err = dataparser.ParseJSONWithoutFix(data, luteEngine.ParseOptions)
 	if err != nil {
 		logging.LogErrorf("parse json to tree [%s] failed: %s", localPath, err)
 		return
@@ -175,11 +181,11 @@ var (
 	ErrBlockNotFound = errors.New("block not found")
 	ErrTreeNotFound  = errors.New("tree not found")
 	ErrIndexing      = errors.New("indexing")
+	ErrBoxUnindexed  = errors.New("notebook unindexed")
+	ErrInvalidID     = errors.New("invalid id")
 )
 
 func LoadTreeByBlockIDWithReindex(id string) (ret *parse.Tree, err error) {
-	// 仅提供给 getBlockInfo 接口使用
-
 	if "" == id {
 		logging.LogWarnf("block id is empty")
 		return nil, ErrTreeNotFound
@@ -192,14 +198,14 @@ func LoadTreeByBlockIDWithReindex(id string) (ret *parse.Tree, err error) {
 			return
 		}
 
-		// 尝试从文件系统加载
-		searchTreeInFilesystem(id)
+		// 尝试从文件系统加载并建立索引
+		err = indexTreeInFilesystem(id)
 		bt = treenode.GetBlockTree(id)
 		if nil == bt {
 			if "dev" == util.Mode {
 				logging.LogWarnf("block tree not found [id=%s], stack: [%s]", id, logging.ShortStack())
 			}
-			return nil, ErrTreeNotFound
+			return
 		}
 	}
 
@@ -237,68 +243,104 @@ func LoadTreeByBlockID(id string) (ret *parse.Tree, err error) {
 
 func loadTreeByBlockTree(bt *treenode.BlockTree) (ret *parse.Tree, err error) {
 	luteEngine := util.NewLute()
-	ret, err = filesys.LoadTree(bt.BoxID, bt.Path, luteEngine)
+	ret, needFix, err := filesys.LoadTreeWithFix(bt.BoxID, bt.Path, luteEngine)
+	if nil != err {
+		return
+	}
+	if needFix {
+		treenode.UpsertBlockTree(ret)
+		sql.IndexTreeQueue(ret)
+	}
 	return
 }
 
 var searchTreeLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 
-func searchTreeInFilesystem(rootID string) {
+func indexTreeInFilesystem(blockID string) error {
 	if !searchTreeLimiter.Allow() {
-		return
+		return ErrIndexing
 	}
 
 	msdID := util.PushMsg(Conf.language(45), 7000)
 	defer util.PushClearMsg(msdID)
 
-	logging.LogWarnf("searching tree on filesystem [rootID=%s]", rootID)
-	var treePath string
-	filelock.Walk(util.DataDir, func(path string, d fs.DirEntry, err error) error {
-		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	logging.LogWarnf("searching tree on filesystem [id=%s]", blockID)
 
-		if !strings.HasSuffix(d.Name(), ".sy") {
-			return nil
-		}
-
-		baseName := filepath.Base(path)
-		if rootID+".sy" != baseName {
-			return nil
-		}
-
-		treePath = path
-		return filepath.SkipAll
-	})
-
-	if "" == treePath {
-		logging.LogErrorf("tree not found on filesystem [rootID=%s]", rootID)
-		return
+	unindexedTreePath := findUnindexedTreePathInAllBoxes(blockID)
+	if "" == unindexedTreePath {
+		logging.LogInfof("tree not found on filesystem [id=%s]", blockID)
+		return ErrTreeNotFound
 	}
 
-	boxID := strings.TrimPrefix(treePath, util.DataDir)
+	boxID := strings.TrimPrefix(unindexedTreePath, util.DataDir)
 	boxID = boxID[1:]
 	boxID = boxID[:strings.Index(boxID, string(os.PathSeparator))]
-	treePath = strings.TrimPrefix(treePath, util.DataDir)
-	treePath = strings.TrimPrefix(treePath, string(os.PathSeparator))
-	treePath = strings.TrimPrefix(treePath, boxID)
-	treePath = filepath.ToSlash(treePath)
+	unindexedTreePath = strings.TrimPrefix(unindexedTreePath, util.DataDir)
+	unindexedTreePath = strings.TrimPrefix(unindexedTreePath, string(os.PathSeparator))
+	unindexedTreePath = strings.TrimPrefix(unindexedTreePath, boxID)
+	unindexedTreePath = filepath.ToSlash(unindexedTreePath)
 	if nil == Conf.Box(boxID) {
+		for _, b := range Conf.GetClosedBoxes() {
+			if b.ID == boxID {
+				logging.LogInfof("box [%s] is closed", boxID)
+				util.PushErrMsg(fmt.Sprintf(Conf.language(197), b.Name), 7000)
+				return ErrBoxUnindexed
+			}
+		}
+
 		logging.LogInfof("box [%s] not found", boxID)
-		// 如果笔记本不存在或者已经关闭，则不处理 https://github.com/siyuan-note/siyuan/issues/11149
-		return
+		// 如果笔记本不存在则不处理 https://github.com/siyuan-note/siyuan/issues/11149
+		return ErrTreeNotFound
 	}
 
-	tree, err := filesys.LoadTree(boxID, treePath, util.NewLute())
+	tree, err := filesys.LoadTree(boxID, unindexedTreePath, util.NewLute())
 	if err != nil {
-		logging.LogErrorf("load tree [%s] failed: %s", treePath, err)
-		return
+		logging.LogErrorf("load tree [%s] failed: %s", unindexedTreePath, err)
+		return err
 	}
 
 	treenode.UpsertBlockTree(tree)
 	sql.IndexTreeQueue(tree)
-	logging.LogInfof("reindexed tree by filesystem [rootID=%s]", rootID)
+	logging.LogInfof("reindexed tree by filesystem [blockID=%s]", blockID)
+	return nil
+}
+
+func loadParentTree(tree *parse.Tree) (ret *parse.Tree) {
+	if nil == tree {
+		return
+	}
+
+	boxDir := filepath.Join(util.DataDir, tree.Box)
+	parentDir := path.Dir(tree.Path)
+	if parentDir == boxDir || parentDir == "/" {
+		return
+	}
+
+	luteEngine := lute.New()
+	parentPath := parentDir + ".sy"
+	ret, _ = filesys.LoadTree(tree.Box, parentPath, luteEngine)
+	return
+}
+
+func findUnindexedTreePathInAllBoxes(id string) (ret string) {
+	boxes := Conf.GetBoxes()
+	for _, box := range boxes {
+		root := filepath.Join(util.DataDir, box.ID)
+		paths := search.FindAllMatchedPaths(root, []string{id})
+		var rootIDs []string
+		rootIDPaths := map[string]string{}
+		for _, p := range paths {
+			rootID := util.GetTreeID(p)
+			rootIDs = append(rootIDs, rootID)
+			rootIDPaths[rootID] = p
+		}
+
+		result := treenode.ExistBlockTrees(rootIDs)
+		for rootID, exist := range result {
+			if !exist {
+				return rootIDPaths[rootID]
+			}
+		}
+	}
+	return
 }

@@ -19,6 +19,7 @@ package sql
 import (
 	"bytes"
 	"database/sql"
+	"errors"
 	"math"
 	"regexp"
 	"sort"
@@ -49,9 +50,9 @@ func QueryEmptyContentEmbedBlocks() (ret []*Block) {
 	return
 }
 
-func queryBlockHashes(rootID string) (ret map[string]string) {
+func queryBlockHashes(tx *sql.Tx, rootID string) (ret map[string]string) {
 	stmt := "SELECT id, hash FROM blocks WHERE root_id = ?"
-	rows, err := query(stmt, rootID)
+	rows, err := queryTx(tx, stmt, rootID)
 	if err != nil {
 		logging.LogErrorf("sql query [%s] failed: %s", stmt, err)
 		return
@@ -69,8 +70,8 @@ func queryBlockHashes(rootID string) (ret map[string]string) {
 	return
 }
 
-func QueryRootBlockByCondition(condition string) (ret []*Block) {
-	sqlStmt := "SELECT *, length(hpath) - length(replace(hpath, '/', '')) AS lv FROM blocks WHERE type = 'd' AND " + condition + " ORDER BY box DESC,lv ASC LIMIT 128"
+func QueryRootBlockByCondition(condition string, limit int) (ret []*Block) {
+	sqlStmt := "SELECT *, length(hpath) - length(replace(hpath, '/', '')) AS lv FROM blocks WHERE type = 'd' AND " + condition + " ORDER BY box DESC,lv ASC LIMIT " + strconv.Itoa(limit)
 	rows, err := query(sqlStmt)
 	if err != nil {
 		logging.LogErrorf("sql query [%s] failed: %s", sqlStmt, err)
@@ -317,22 +318,6 @@ func QueryBlockNamesByRootID(rootID string) (ret []string) {
 	return
 }
 
-func QueryBookmarkBlocksByKeyword(bookmark string) (ret []*Block) {
-	sqlStmt := "SELECT * FROM blocks WHERE ial LIKE ?"
-	rows, err := query(sqlStmt, "%bookmark=%")
-	if err != nil {
-		logging.LogErrorf("sql query [%s] failed: %s", sqlStmt, err)
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		if block := scanBlockRows(rows); nil != block {
-			ret = append(ret, block)
-		}
-	}
-	return
-}
-
 func QueryBookmarkBlocks() (ret []*Block) {
 	sqlStmt := "SELECT * FROM blocks WHERE ial LIKE ?"
 	rows, err := query(sqlStmt, "%bookmark=%")
@@ -374,11 +359,12 @@ func QueryBookmarkLabels() (ret []string) {
 	return
 }
 
-func QueryNoLimit(stmt string) (ret []map[string]interface{}, err error) {
+func QueryNoLimit(stmt string) (ret []map[string]any, err error) {
 	return queryRawStmt(stmt, math.MaxInt)
 }
 
-func Query(stmt string, limit int) (ret []map[string]interface{}, err error) {
+func Query(stmt string, limit int) (ret []map[string]any, err error) {
+	originalStmt := stmt
 	// Kernel API `/api/query/sql` support `||` operator https://github.com/siyuan-note/siyuan/issues/9662
 	// 这里为了支持 || 操作符，使用了另一个 sql 解析器，但是这个解析器无法处理 UNION https://github.com/siyuan-note/siyuan/issues/8226
 	// 考虑到 UNION 的使用场景不多，这里还是以支持 || 操作符为主
@@ -423,11 +409,14 @@ func Query(stmt string, limit int) (ret []map[string]interface{}, err error) {
 		}
 	}
 
-	ret = []map[string]interface{}{}
+	ret = []map[string]any{}
 	rows, err := query(stmt)
 	if err != nil {
-		logging.LogWarnf("sql query [%s] failed: %s", stmt, err)
-		return
+		rows, err = query(originalStmt + " LIMIT " + strconv.Itoa(limit))
+		if err != nil {
+			logging.LogWarnf("sql query [%s] failed: %s", stmt, err)
+			return
+		}
 	}
 	defer rows.Close()
 
@@ -437,8 +426,8 @@ func Query(stmt string, limit int) (ret []map[string]interface{}, err error) {
 	}
 
 	for rows.Next() {
-		columns := make([]interface{}, len(cols))
-		columnPointers := make([]interface{}, len(cols))
+		columns := make([]any, len(cols))
+		columnPointers := make([]any, len(cols))
 		for i := range columns {
 			columnPointers[i] = &columns[i]
 		}
@@ -447,9 +436,9 @@ func Query(stmt string, limit int) (ret []map[string]interface{}, err error) {
 			return
 		}
 
-		m := make(map[string]interface{})
+		m := make(map[string]any)
 		for i, colName := range cols {
-			val := columnPointers[i].(*interface{})
+			val := columnPointers[i].(*any)
 			m[colName] = *val
 		}
 		ret = append(ret, m)
@@ -457,7 +446,7 @@ func Query(stmt string, limit int) (ret []map[string]interface{}, err error) {
 	return
 }
 
-func ToBlocks(result []map[string]interface{}) (ret []*Block) {
+func ToBlocks(result []map[string]any) (ret []*Block) {
 	for _, row := range result {
 		b := &Block{
 			ID:       row["id"].(string),
@@ -512,7 +501,7 @@ func getLimitClause(parsedStmt sqlparser.Statement, limit int) (ret *sqlparser.L
 	return
 }
 
-func queryRawStmt(stmt string, limit int) (ret []map[string]interface{}, err error) {
+func queryRawStmt(stmt string, limit int) (ret []map[string]any, err error) {
 	rows, err := query(stmt)
 	if err != nil {
 		if strings.Contains(err.Error(), "syntax error") {
@@ -528,10 +517,10 @@ func queryRawStmt(stmt string, limit int) (ret []map[string]interface{}, err err
 	}
 
 	noLimit := !containsLimitClause(stmt)
-	var count, errCount int
+	var count int
 	for rows.Next() {
-		columns := make([]interface{}, len(cols))
-		columnPointers := make([]interface{}, len(cols))
+		columns := make([]any, len(cols))
+		columnPointers := make([]any, len(cols))
 		for i := range columns {
 			columnPointers[i] = &columns[i]
 		}
@@ -540,15 +529,15 @@ func queryRawStmt(stmt string, limit int) (ret []map[string]interface{}, err err
 			return
 		}
 
-		m := make(map[string]interface{})
+		m := make(map[string]any)
 		for i, colName := range cols {
-			val := columnPointers[i].(*interface{})
+			val := columnPointers[i].(*any)
 			m[colName] = *val
 		}
 
 		ret = append(ret, m)
 		count++
-		if (noLimit && limit < count) || 0 < errCount {
+		if noLimit && limit < count {
 			break
 		}
 	}
@@ -598,6 +587,38 @@ func SelectBlocksRawStmt(stmt string, page, limit int) (ret []*Block) {
 		}
 
 		stmt = sqlparser.String(slct)
+	case *sqlparser.Union:
+		union := parsedStmt.(*sqlparser.Union)
+		if nil == union.Limit {
+			union.Limit = &sqlparser.Limit{
+				Rowcount: &sqlparser.SQLVal{
+					Type: sqlparser.IntVal,
+					Val:  []byte(strconv.Itoa(limit)),
+				},
+			}
+			union.Limit.Offset = &sqlparser.SQLVal{
+				Type: sqlparser.IntVal,
+				Val:  []byte(strconv.Itoa((page - 1) * limit)),
+			}
+		} else {
+			if nil != union.Limit.Rowcount && 0 < len(union.Limit.Rowcount.(*sqlparser.SQLVal).Val) {
+				limit, _ = strconv.Atoi(string(union.Limit.Rowcount.(*sqlparser.SQLVal).Val))
+				if 0 >= limit {
+					limit = 32
+				}
+			}
+
+			union.Limit.Rowcount = &sqlparser.SQLVal{
+				Type: sqlparser.IntVal,
+				Val:  []byte(strconv.Itoa(limit)),
+			}
+			union.Limit.Offset = &sqlparser.SQLVal{
+				Type: sqlparser.IntVal,
+				Val:  []byte(strconv.Itoa((page - 1) * limit)),
+			}
+		}
+
+		stmt = sqlparser.String(union)
 	default:
 		return
 	}
@@ -716,7 +737,7 @@ func scanBlockRows(rows *sql.Rows) (ret *Block) {
 func scanBlockRow(row *sql.Row) (ret *Block) {
 	var block Block
 	if err := row.Scan(&block.ID, &block.ParentID, &block.RootID, &block.Hash, &block.Box, &block.Path, &block.HPath, &block.Name, &block.Alias, &block.Memo, &block.Tag, &block.Content, &block.FContent, &block.Markdown, &block.Length, &block.Type, &block.SubType, &block.IAL, &block.Sort, &block.Created, &block.Updated); err != nil {
-		if sql.ErrNoRows != err {
+		if !errors.Is(err, sql.ErrNoRows) {
 			logging.LogErrorf("query scan field failed: %s\n%s", err, logging.ShortStack())
 		}
 		return
@@ -860,7 +881,7 @@ func GetBlocks(ids []string) (ret []*Block) {
 	length := len(notHitIDs)
 	stmtBuilder := bytes.Buffer{}
 	stmtBuilder.WriteString("SELECT * FROM blocks WHERE id IN (")
-	var args []interface{}
+	var args []any
 	for i, id := range notHitIDs {
 		args = append(args, id)
 		stmtBuilder.WriteByte('?')

@@ -36,21 +36,21 @@ export const appearanceMenu = (protyle: IProtyle, nodeElements?: Element[]) => {
         "var(--b3-font-color5)", "var(--b3-font-color6)", "var(--b3-font-color7)", "var(--b3-font-color8)",
         "var(--b3-font-color9)", "var(--b3-font-color10)", "var(--b3-font-color11)", "var(--b3-font-color12)",
         "var(--b3-font-color13)"].forEach((item) => {
-        colorHTML += `<button ${item ? `class="color__square" style="color:${item}"` : `class="color__square ariaLabel" data-position="3bottom" aria-label="${window.siyuan.languages.default}"`} data-type="color">A</button>`;
+        colorHTML += `<button ${item ? `class="color__square" style="color:${item}"` : `class="color__square ariaLabel" data-position="3south" aria-label="${window.siyuan.languages.default}"`} data-type="color">A</button>`;
     });
     let bgHTML = "";
     ["", "var(--b3-font-background1)", "var(--b3-font-background2)", "var(--b3-font-background3)", "var(--b3-font-background4)",
         "var(--b3-font-background5)", "var(--b3-font-background6)", "var(--b3-font-background7)", "var(--b3-font-background8)",
         "var(--b3-font-background9)", "var(--b3-font-background10)", "var(--b3-font-background11)", "var(--b3-font-background12)",
         "var(--b3-font-background13)"].forEach((item) => {
-        bgHTML += `<button ${item ? `class="color__square" style="background-color:${item}"` : `class="color__square ariaLabel" data-position="3bottom" aria-label="${window.siyuan.languages.default}"`} data-type="backgroundColor"></button>`;
+        bgHTML += `<button ${item ? `class="color__square" style="background-color:${item}"` : `class="color__square ariaLabel" data-position="3south" aria-label="${window.siyuan.languages.default}"`} data-type="backgroundColor"></button>`;
     });
 
     const element = document.createElement("div");
     element.classList.add("protyle-font");
     let disableFont = false;
     nodeElements?.find((item: HTMLElement) => {
-        if (item.classList.contains("list") || item.classList.contains("li")) {
+        if (item.classList.contains("li")) {
             disableFont = true;
             return true;
         }
@@ -58,21 +58,21 @@ export const appearanceMenu = (protyle: IProtyle, nodeElements?: Element[]) => {
     let lastColorHTML = "";
     const lastFonts = window.siyuan.storage[Constants.LOCAL_FONTSTYLES];
     if (lastFonts.length > 0) {
-        lastColorHTML = `<div class="fn__flex">
+        lastColorHTML = `<div data-id="lastUsed" class="fn__flex">
     ${window.siyuan.languages.lastUsed}
     <span class="fn__space"></span>
-    <kbd class="fn__kbd fn__flex-center">${updateHotkeyTip(window.siyuan.config.keymap.editor.insert.lastUsed.custom)}</kbd>
+    <kbd class="fn__kbd fn__flex-center${window.siyuan.config.keymap.editor.insert.lastUsed.custom ? "" : " fn__none"}">${updateHotkeyTip(window.siyuan.config.keymap.editor.insert.lastUsed.custom)}</kbd>
 </div>
 <div class="fn__hr--small"></div>
-<div class="fn__flex fn__flex-wrap" style="align-items: center">`;
+<div data-id="lastUsedWrap" class="fn__flex fn__flex-wrap" style="align-items: center">`;
         lastFonts.forEach((item: string) => {
             const lastFontStatus = item.split(Constants.ZWSP);
             switch (lastFontStatus[0]) {
                 case "color":
-                    lastColorHTML += `<button class="color__square ariaLabel" data-position="3bottom" aria-label="${window.siyuan.languages.colorFont}${lastFontStatus[1] ? "" : " " + window.siyuan.languages.default}" ${lastFontStatus[1] ? `style="color:${lastFontStatus[1]}"` : ""} data-type="${lastFontStatus[0]}">A</button>`;
+                    lastColorHTML += `<button class="color__square ariaLabel" data-position="3south" aria-label="${window.siyuan.languages.colorFont}${lastFontStatus[1] ? "" : " " + window.siyuan.languages.default}" ${lastFontStatus[1] ? `style="color:${lastFontStatus[1]}"` : ""} data-type="${lastFontStatus[0]}">A</button>`;
                     break;
                 case "backgroundColor":
-                    lastColorHTML += `<button class="color__square ariaLabel" data-position="3bottom" aria-label="${window.siyuan.languages.colorPrimary}${lastFontStatus[1] ? "" : " " + window.siyuan.languages.default}" ${lastFontStatus[1] ? `style="background-color:${lastFontStatus[1]}"` : ""} data-type="${lastFontStatus[0]}"></button>`;
+                    lastColorHTML += `<button class="color__square ariaLabel" data-position="3south" aria-label="${window.siyuan.languages.colorPrimary}${lastFontStatus[1] ? "" : " " + window.siyuan.languages.default}" ${lastFontStatus[1] ? `style="background-color:${lastFontStatus[1]}"` : ""} data-type="${lastFontStatus[0]}"></button>`;
                     break;
                 case "style2":
                     lastColorHTML += `<button data-type="${lastFontStatus[0]}" class="protyle-font__style" style="-webkit-text-stroke: 0.2px var(--b3-theme-on-background);-webkit-text-fill-color : transparent;">${window.siyuan.languages.hollow}</button>`;
@@ -86,7 +86,7 @@ export const appearanceMenu = (protyle: IProtyle, nodeElements?: Element[]) => {
                     }
                     break;
                 case "style1":
-                    lastColorHTML += `<button class="color__square ariaLabel" data-position="3bottom" aria-label="${window.siyuan.languages.color}${lastFontStatus[1] ? "" : " " + window.siyuan.languages.default}" ${lastFontStatus[1] ? `style="background-color:${lastFontStatus[1]};color:${lastFontStatus[2]}"` : ""} data-type="${lastFontStatus[0]}">A</button>`;
+                    lastColorHTML += `<button class="color__square ariaLabel" data-position="3south" aria-label="${window.siyuan.languages.color}${lastFontStatus[1] ? "" : " " + window.siyuan.languages.default}" ${lastFontStatus[1] ? `style="background-color:${lastFontStatus[1]};color:${lastFontStatus[2]}"` : ""} data-type="${lastFontStatus[0]}">A</button>`;
                     break;
                 case "clear":
                     lastColorHTML += `<button style="height: 26px;display: flex;align-items: center;padding: 0 5px;" data-type="${lastFontStatus[0]}" class="protyle-font__style ariaLabel" aria-label="${window.siyuan.languages.clearFontStyle}"><svg class="svg--mid"><use xlink:href="#iconTrashcan"></use></svg></button>`;
@@ -96,7 +96,7 @@ export const appearanceMenu = (protyle: IProtyle, nodeElements?: Element[]) => {
         lastColorHTML += "</div>";
     }
     let textElement: HTMLElement;
-    let fontSize = "16px";
+    let fontSize = window.siyuan.config.editor.fontSize + "px";
     if (nodeElements && nodeElements.length > 0) {
         textElement = nodeElements[0] as HTMLElement;
     } else {
@@ -106,61 +106,60 @@ export const appearanceMenu = (protyle: IProtyle, nodeElements?: Element[]) => {
         }
     }
     if (textElement) {
-        fontSize = textElement.style.fontSize || "16px";
+        fontSize = textElement.style.fontSize || window.siyuan.config.editor.fontSize + "px";
     }
     element.innerHTML = `${lastColorHTML}
 <div class="fn__hr"></div>
-<div>${window.siyuan.languages.color}</div>
+<div data-id="color">${window.siyuan.languages.color}</div>
 <div class="fn__hr--small"></div>
-<div class="fn__flex fn__flex-wrap">
-    <button class="color__square ariaLabel" data-position="3bottom" data-type="style1" aria-label="${window.siyuan.languages.default}">A</button>
+<div data-id="colorWrap" class="fn__flex fn__flex-wrap">
+    <button class="color__square ariaLabel" data-position="3south" data-type="style1" aria-label="${window.siyuan.languages.default}">A</button>
     <button class="color__square" data-type="style1" style="color: var(--b3-card-error-color);background-color: var(--b3-card-error-background);">A</button>
     <button class="color__square" data-type="style1" style="color: var(--b3-card-warning-color);background-color: var(--b3-card-warning-background);">A</button>
     <button class="color__square" data-type="style1" style="color: var(--b3-card-info-color);background-color: var(--b3-card-info-background);">A</button>
     <button class="color__square" data-type="style1" style="color: var(--b3-card-success-color);background-color: var(--b3-card-success-background);">A</button>
 </div>
 <div class="fn__hr"></div>
-<div>${window.siyuan.languages.colorFont}</div>
+<div data-id="colorFont">${window.siyuan.languages.colorFont}</div>
 <div class="fn__hr--small"></div>
-<div class="fn__flex fn__flex-wrap">
+<div data-id="colorFontWrap" class="fn__flex fn__flex-wrap">
     ${colorHTML}
 </div>
 <div class="fn__hr"></div>
-<div>${window.siyuan.languages.colorPrimary}</div>
+<div data-id="colorPrimary">${window.siyuan.languages.colorPrimary}</div>
 <div class="fn__hr--small"></div>
-<div class="fn__flex fn__flex-wrap">
+<div data-id="colorPrimaryWrap" class="fn__flex fn__flex-wrap">
     ${bgHTML}
 </div>
 <div class="fn__hr"></div>
-<div>${window.siyuan.languages.fontStyle}</div>
+<div data-id="fontStyle">${window.siyuan.languages.fontStyle}</div>
 <div class="fn__hr--small"></div>
-<div class="fn__flex">
+<div data-id="fontStyleWrap" class="fn__flex">
     <button data-type="style2" class="protyle-font__style" style="-webkit-text-stroke: 0.2px var(--b3-theme-on-background);-webkit-text-fill-color : transparent;">${window.siyuan.languages.hollow}</button>
     <button data-type="style4" class="protyle-font__style" style="text-shadow: 1px 1px var(--b3-theme-surface-lighter), 2px 2px var(--b3-theme-surface-lighter), 3px 3px var(--b3-theme-surface-lighter), 4px 4px var(--b3-theme-surface-lighter)">${window.siyuan.languages.shadow}</button>
 </div>
 <div class="fn__hr${disableFont ? " fn__none" : ""}"></div>
-<div class="${disableFont ? " fn__none" : ""}">${window.siyuan.languages.fontSize}</div>
-<div class="fn__hr--small${disableFont ? " fn__none" : ""}"></div>
-<div class="fn__flex${disableFont ? " fn__none" : ""}">
-    <div class="fn__space--small"></div>
-    <select class="b3-select fn__block">
-        <option ${fontSize === "12px" ? "selected" : ""} value="12px">12px</option>
-        <option ${fontSize === "13px" ? "selected" : ""} value="13px">13px</option>
-        <option ${fontSize === "14px" ? "selected" : ""} value="14px">14px</option>
-        <option ${fontSize === "15px" ? "selected" : ""} value="15px">15px</option>
-        <option ${fontSize === "16px" ? "selected" : ""} value="16px">16px</option>
-        <option ${fontSize === "19px" ? "selected" : ""} value="19px">19px</option>
-        <option ${fontSize === "22px" ? "selected" : ""} value="22px">22px</option>
-        <option ${fontSize === "24px" ? "selected" : ""} value="24px">24px</option>
-        <option ${fontSize === "29px" ? "selected" : ""} value="29px">29px</option>
-        <option ${fontSize === "32px" ? "selected" : ""} value="32px">32px</option>
-        <option ${fontSize === "40px" ? "selected" : ""} value="40px">40px</option>
-        <option ${fontSize === "48px" ? "selected" : ""} value="48px">48px</option>
-    </select>
-    <div class="fn__space--small"></div>
+<div data-id="fontSize" class="fn__flex${disableFont ? " fn__none" : ""}">
+    ${window.siyuan.languages.fontSize}
+    <span class="fn__flex-1"></span>
+    <label class="fn__flex">
+        ${window.siyuan.languages.relativeFontSize}
+        <span class="fn__space"></span>
+        <input class="b3-switch fn__flex-center" ${fontSize.endsWith("em") ? "checked" : ""} type="checkbox">
+        <span class="fn__space--small"></span>
+    </label>
+</div>
+<div data-id="fontSizeWrap" class="${disableFont ? " fn__none" : ""}">
+    <div class="fn__hr"></div>
+    <div class="b3-tooltips b3-tooltips__n fn__flex${fontSize.endsWith("em") ? " fn__none" : ""}" aria-label="${fontSize}">   
+        <input class="b3-slider fn__block" id="fontSizePX" max="72" min="9" step="1" type="range" value="${parseInt(fontSize)}">
+    </div>
+    <div class="b3-tooltips b3-tooltips__n fn__flex${fontSize.endsWith("em") ? "" : " fn__none"}" aria-label="${parseFloat(fontSize) * 100}%">   
+        <input class="b3-slider fn__block" id="fontSizeEM" max="4.5" min="0.56" step="0.01" type="range" value="${parseFloat(fontSize)}">
+    </div>
 </div>
 <div class="fn__hr--b"></div>
-<div class="fn__flex">
+<div data-id="clearFontStyle" class="fn__flex">
     <div class="fn__space--small"></div>
     <button class="b3-button b3-button--remove fn__block" data-type="clear">
         <svg><use xlink:href="#iconTrashcan"></use></svg>${window.siyuan.languages.clearFontStyle}
@@ -188,8 +187,40 @@ export const appearanceMenu = (protyle: IProtyle, nodeElements?: Element[]) => {
             target = target.parentElement;
         }
     });
-    element.querySelector("select").addEventListener("change", function (event: Event) {
-        fontEvent(protyle, nodeElements, "fontSize", (event.target as HTMLSelectElement).value);
+    const switchElement = element.querySelector(".b3-switch") as HTMLInputElement;
+    const fontSizePXElement = element.querySelector("#fontSizePX") as HTMLInputElement;
+    const fontSizeEMElement = element.querySelector("#fontSizeEM") as HTMLInputElement;
+    switchElement.addEventListener("change", function () {
+        if (switchElement.checked) {
+            // px -> em
+            const em = parseFloat((parseInt(fontSizePXElement.value) / 16).toFixed(2));
+            fontSizeEMElement.parentElement.setAttribute("aria-label", (em * 100).toString() + "%");
+            fontSizeEMElement.value = em.toString();
+
+            fontSizePXElement.parentElement.classList.add("fn__none");
+            fontSizeEMElement.parentElement.classList.remove("fn__none");
+            fontEvent(protyle, nodeElements, "fontSize", fontSizeEMElement.value + "em");
+        } else {
+            const px = Math.round(parseFloat(fontSizeEMElement.value) * 16);
+            fontSizePXElement.parentElement.setAttribute("aria-label", px + "px");
+            fontSizePXElement.value = px.toString();
+
+            fontSizePXElement.parentElement.classList.remove("fn__none");
+            fontSizeEMElement.parentElement.classList.add("fn__none");
+            fontEvent(protyle, nodeElements, "fontSize", fontSizePXElement.value + "px");
+        }
+    });
+    fontSizePXElement.addEventListener("change", function () {
+        fontEvent(protyle, nodeElements, "fontSize", fontSizePXElement.value + "px");
+    });
+    fontSizeEMElement.addEventListener("change", function () {
+        fontEvent(protyle, nodeElements, "fontSize", fontSizeEMElement.value + "em");
+    });
+    fontSizePXElement.addEventListener("input", function () {
+        fontSizePXElement.parentElement.setAttribute("aria-label", fontSizePXElement.value + "px");
+    });
+    fontSizeEMElement.addEventListener("input", function () {
+        fontSizeEMElement.parentElement.setAttribute("aria-label", (parseFloat(fontSizeEMElement.value) * 100).toFixed(0) + "%");
     });
     return element;
 };
@@ -260,10 +291,15 @@ export const setFontStyle = (textElement: HTMLElement, textOption: ITextOption) 
     const setBlockRef = (blockRefOption: string) => {
         const blockRefData = blockRefOption.split(Constants.ZWSP);
         // 标签等元素中包含 ZWSP，需移除后拼接 https://github.com/siyuan-note/siyuan/issues/6466
-        textElement.setAttribute("data-id", blockRefData.splice(0, 1)[0]);
+        const id = blockRefData.splice(0, 1)[0];
+        textElement.setAttribute("data-id", id);
         textElement.setAttribute("data-subtype", blockRefData.splice(0, 1)[0]);
         textElement.removeAttribute("data-href");
-        textElement.innerText = blockRefData.join("");
+        let text = blockRefData.join("");
+        if (text.replace(/\s/g, "") === "") {
+            text = id;
+        }
+        textElement.innerText = text;
     };
     const setLink = (textOption: string) => {
         const options = textOption.split(Constants.ZWSP);
@@ -325,7 +361,6 @@ export const setFontStyle = (textElement: HTMLElement, textOption: ITextOption) 
                 break;
             case "inline-memo":
                 textElement.removeAttribute("contenteditable");
-                textElement.removeAttribute("data-subtype");
                 textElement.removeAttribute("data-content");
                 break;
         }
@@ -336,105 +371,69 @@ export const setFontStyle = (textElement: HTMLElement, textOption: ITextOption) 
     }
 };
 
-export const hasSameTextStyle = (currentElement: HTMLElement, sideElement: HTMLElement, textObj: ITextOption) => {
-    if (!textObj) {
-        return true;
-    }
-    if (textObj.type === "inline-math" || textObj.type === "inline-memo" || textObj.type === "a") {
+export const hasSameTextStyle = (currentElement: HTMLElement, sideElement: HTMLElement, textObj?: ITextOption) => {
+    if (!textObj && currentElement) {
+        const types = sideElement.getAttribute("data-type").split(" ");
+        if (types.includes("inline-math") || types.includes("inline-memo") ||
+            types.includes("a")) {
+            return false;
+        }
+        if (types.includes("block-ref")) {
+            if (currentElement.getAttribute("data-id") !== sideElement.getAttribute("data-id") ||
+                currentElement.getAttribute("data-subtype") !== sideElement.getAttribute("data-subtype") ||
+                currentElement.textContent !== sideElement.textContent) {
+                return false;
+            }
+        }
+        if (types.includes("file-annotation-ref")) {
+            if (currentElement.getAttribute("data-id") !== sideElement.getAttribute("data-id") ||
+                currentElement.textContent !== sideElement.textContent) {
+                return false;
+            }
+        }
+        if (sideElement.style.color === currentElement.style.color &&
+            sideElement.style.webkitTextFillColor === currentElement.style.webkitTextFillColor &&
+            sideElement.style.webkitTextStroke === currentElement.style.webkitTextStroke &&
+            sideElement.style.textShadow === currentElement.style.textShadow &&
+            sideElement.style.backgroundColor === currentElement.style.backgroundColor &&
+            sideElement.style.fontSize === currentElement.style.fontSize) {
+            return true;
+        }
         return false;
     }
-    if (textObj.type === "id") {
-        if (currentElement.nodeType !== 3) {
-            return currentElement.getAttribute("data-id") === sideElement.getAttribute("data-id") &&
-                currentElement.getAttribute("data-subtype") === sideElement.getAttribute("data-subtype") &&
-                currentElement.textContent === sideElement.textContent;
-        }
-        const blockRefData = textObj.color.split(Constants.ZWSP);
-        return blockRefData[0] === sideElement.getAttribute("data-id") &&
-            blockRefData[1] === sideElement.getAttribute("data-subtype") &&
-            blockRefData[2] === sideElement.textContent;
-    }
 
-    if (textObj.type === "file-annotation-ref") {
-        if (currentElement.nodeType !== 3) {
-            return currentElement.getAttribute("data-id") === sideElement.getAttribute("data-id") &&
-                currentElement.textContent === sideElement.textContent;
+    if (textObj) {
+        if (textObj.type === "text") {
+            // 清除样式
+            return !sideElement.style.color &&
+                !sideElement.style.webkitTextFillColor &&
+                !sideElement.style.webkitTextStroke &&
+                !sideElement.style.textShadow &&
+                !sideElement.style.fontSize &&
+                !sideElement.style.backgroundColor;
         }
-        return textObj.color === sideElement.getAttribute("data-id");
+        if (textObj.type === "color") {
+            return textObj.color === sideElement.style.color;
+        }
+        if (textObj.type === "backgroundColor") {
+            return textObj.color === sideElement.style.backgroundColor;
+        }
+        if (textObj.type === "style1") {
+            return textObj.color.split(Constants.ZWSP)[0] === sideElement.style.color &&
+                textObj.color.split(Constants.ZWSP)[1] === sideElement.style.backgroundColor;
+        }
+        if (textObj.type === "style2") {
+            return "transparent" === sideElement.style.webkitTextFillColor &&
+                "0.2px var(--b3-theme-on-background)" === sideElement.style.webkitTextStroke;
+        }
+        if (textObj.type === "style4") {
+            return "1px 1px var(--b3-theme-surface-lighter), 2px 2px var(--b3-theme-surface-lighter), 3px 3px var(--b3-theme-surface-lighter), 4px 4px var(--b3-theme-surface-lighter)" === sideElement.style.textShadow;
+        }
+        if (textObj.type === "fontSize") {
+            return textObj.color === sideElement.style.fontSize;
+        }
     }
-
-    let color = "";
-    let webkitTextFillColor = "";
-    let webkitTextStroke = "";
-    let textShadow = "";
-    let backgroundColor = "";
-    let fontSize = "";
-    if (currentElement.nodeType !== 3) {
-        color = currentElement.style.color;
-        webkitTextFillColor = currentElement.style.webkitTextFillColor;
-        webkitTextStroke = currentElement.style.webkitTextStroke;
-        textShadow = currentElement.style.textShadow;
-        backgroundColor = currentElement.style.backgroundColor;
-        fontSize = currentElement.style.fontSize;
-    }
-    if (textObj.type === "text") {
-        // 清除样式
-        return color === sideElement.style.color &&
-            webkitTextFillColor === sideElement.style.webkitTextFillColor &&
-            webkitTextStroke === sideElement.style.webkitTextStroke &&
-            textShadow === sideElement.style.textShadow &&
-            fontSize === sideElement.style.fontSize &&
-            backgroundColor === sideElement.style.backgroundColor;
-    }
-    if (textObj.type === "color") {
-        return textObj.color === sideElement.style.color &&
-            webkitTextFillColor === sideElement.style.webkitTextFillColor &&
-            webkitTextStroke === sideElement.style.webkitTextStroke &&
-            textShadow === sideElement.style.textShadow &&
-            fontSize === sideElement.style.fontSize &&
-            backgroundColor === sideElement.style.backgroundColor;
-    }
-    if (textObj.type === "backgroundColor") {
-        return color === sideElement.style.color &&
-            webkitTextFillColor === sideElement.style.webkitTextFillColor &&
-            webkitTextStroke === sideElement.style.webkitTextStroke &&
-            textShadow === sideElement.style.textShadow &&
-            fontSize === sideElement.style.fontSize &&
-            textObj.color === sideElement.style.backgroundColor;
-    }
-    if (textObj.type === "style1") {
-        return textObj.color.split(Constants.ZWSP)[0] === sideElement.style.color &&
-            webkitTextFillColor === sideElement.style.webkitTextFillColor &&
-            webkitTextStroke === sideElement.style.webkitTextStroke &&
-            textShadow === sideElement.style.textShadow &&
-            fontSize === sideElement.style.fontSize &&
-            textObj.color.split(Constants.ZWSP)[1] === sideElement.style.backgroundColor;
-    }
-    if (textObj.type === "style2") {
-        return color === sideElement.style.color &&
-            "transparent" === sideElement.style.webkitTextFillColor &&
-            "0.2px var(--b3-theme-on-background)" === sideElement.style.webkitTextStroke &&
-            textShadow === sideElement.style.textShadow &&
-            fontSize === sideElement.style.fontSize &&
-            backgroundColor === sideElement.style.backgroundColor;
-    }
-    if (textObj.type === "style4") {
-        return color === sideElement.style.color &&
-            webkitTextFillColor === sideElement.style.webkitTextFillColor &&
-            webkitTextStroke === sideElement.style.webkitTextStroke &&
-            fontSize === sideElement.style.fontSize &&
-            "1px 1px var(--b3-theme-surface-lighter), 2px 2px var(--b3-theme-surface-lighter), 3px 3px var(--b3-theme-surface-lighter), 4px 4px var(--b3-theme-surface-lighter)" === sideElement.style.textShadow &&
-            backgroundColor === sideElement.style.backgroundColor;
-    }
-    if (textObj.type === "fontSize") {
-        return color === sideElement.style.color &&
-            webkitTextFillColor === sideElement.style.webkitTextFillColor &&
-            webkitTextStroke === sideElement.style.webkitTextStroke &&
-            textShadow === sideElement.style.textShadow &&
-            textObj.color === sideElement.style.fontSize &&
-            backgroundColor === sideElement.style.backgroundColor;
-    }
-    return true; // 清除字体样式会使用 "text" 作为标识
+    return false;
 };
 
 export const getFontNodeElements = (protyle: IProtyle) => {

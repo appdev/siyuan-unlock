@@ -34,7 +34,7 @@ func removeShorthands(c *gin.Context) {
 		return
 	}
 
-	idsArg := arg["ids"].([]interface{})
+	idsArg := arg["ids"].([]any)
 	var ids []string
 	for _, id := range idsArg {
 		ids = append(ids, id.(string))
@@ -57,7 +57,10 @@ func getShorthand(c *gin.Context) {
 		return
 	}
 
-	id := arg["id"].(string)
+	var id string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("id", &id, true, true)) {
+		return
+	}
 	data, err := model.GetCloudShorthand(id)
 	if err != nil {
 		ret.Code = 1
@@ -76,8 +79,11 @@ func getShorthands(c *gin.Context) {
 		return
 	}
 
-	page := int(arg["page"].(float64))
-	data, err := model.GetCloudShorthands(page)
+	var page float64
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("page", &page, true, false)) {
+		return
+	}
+	data, err := model.GetCloudShorthands(int(page))
 	if err != nil {
 		ret.Code = 1
 		ret.Msg = err.Error()

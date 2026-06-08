@@ -61,7 +61,7 @@ func getBackmentionDoc(c *gin.Context) {
 		highlight = val.(bool)
 	}
 	backlinks, keywords := model.GetBackmentionDoc(defID, refTreeID, keyword, containChildren, highlight)
-	ret.Data = map[string]interface{}{
+	ret.Data = map[string]any{
 		"backmentions": backlinks,
 		"keywords":     keywords,
 	}
@@ -88,7 +88,7 @@ func getBacklinkDoc(c *gin.Context) {
 		highlight = val.(bool)
 	}
 	backlinks, keywords := model.GetBacklinkDoc(defID, refTreeID, keyword, containChildren, highlight)
-	ret.Data = map[string]interface{}{
+	ret.Data = map[string]any{
 		"backlinks": backlinks,
 		"keywords":  keywords,
 	}
@@ -125,7 +125,12 @@ func getBacklink2(c *gin.Context) {
 		containChildren = val.(bool)
 	}
 	boxID, backlinks, backmentions, linkRefsCount, mentionsCount := model.GetBacklink2(id, keyword, mentionKeyword, sort, mentionSort, containChildren)
-	ret.Data = map[string]interface{}{
+	if model.IsReadOnlyRoleContext(c) {
+		publishAccess := model.GetPublishAccess()
+		backlinks = model.FilterPathsByPublishAccess(c, publishAccess, backlinks)
+		backmentions = model.FilterPathsByPublishAccess(c, publishAccess, backmentions)
+	}
+	ret.Data = map[string]any{
 		"backlinks":     backlinks,
 		"linkRefsCount": linkRefsCount,
 		"backmentions":  backmentions,
@@ -161,7 +166,12 @@ func getBacklink(c *gin.Context) {
 		containChildren = val.(bool)
 	}
 	boxID, backlinks, backmentions, linkRefsCount, mentionsCount := model.GetBacklink(id, keyword, mentionKeyword, beforeLen, containChildren)
-	ret.Data = map[string]interface{}{
+	if model.IsReadOnlyRoleContext(c) {
+		publishAccess := model.GetPublishAccess()
+		backlinks = model.FilterPathsByPublishAccess(c, publishAccess, backlinks)
+		backmentions = model.FilterPathsByPublishAccess(c, publishAccess, backmentions)
+	}
+	ret.Data = map[string]any{
 		"backlinks":     backlinks,
 		"linkRefsCount": linkRefsCount,
 		"backmentions":  backmentions,

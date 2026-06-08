@@ -1,12 +1,12 @@
 {
 	"ID": "20200924100717-yzwzn64",
-	"Spec": "1",
+	"Spec": "2",
 	"Type": "NodeDocument",
 	"Properties": {
 		"id": "20200924100717-yzwzn64",
 		"title": "Kernel parameter",
 		"type": "doc",
-		"updated": "20221025095725"
+		"updated": "20260302173748"
 	},
 	"Children": [
 		{
@@ -212,7 +212,7 @@
 			"HeadingLevel": 3,
 			"Properties": {
 				"id": "20220517144139-qeoe1f3",
-				"updated": "20220517144139"
+				"updated": "20260302173748"
 			},
 			"Children": [
 				{
@@ -227,7 +227,7 @@
 			"Type": "NodeParagraph",
 			"Properties": {
 				"id": "20220517144139-7q5hnts",
-				"updated": "20220517144139"
+				"updated": "20260302173748"
 			},
 			"Children": [
 				{
@@ -241,7 +241,7 @@
 				},
 				{
 					"Type": "NodeText",
-					"Data": " will use Simplified Chinese to initialize the appearance language, the default is "
+					"Data": "​ will use Simplified Chinese to initialize the appearance language, the default is "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -250,25 +250,25 @@
 				},
 				{
 					"Type": "NodeText",
-					"Data": ". Currently available values: "
+					"Data": "​. Currently available values: "
 				},
 				{
 					"Type": "NodeTextMark",
 					"TextMarkType": "code",
-					"TextMarkTextContent": "zh_CN"
+					"TextMarkTextContent": "ar_SA"
 				},
 				{
 					"Type": "NodeText",
-					"Data": ", "
+					"Data": "​, "
 				},
 				{
 					"Type": "NodeTextMark",
 					"TextMarkType": "code",
-					"TextMarkTextContent": "zh_CHT"
+					"TextMarkTextContent": "de_DE"
 				},
 				{
 					"Type": "NodeText",
-					"Data": ", "
+					"Data": "​, "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -277,7 +277,16 @@
 				},
 				{
 					"Type": "NodeText",
-					"Data": " and "
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "es_ES"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -286,7 +295,106 @@
 				},
 				{
 					"Type": "NodeText",
-					"Data": "."
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "he_IL"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "it_IT"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "ja_JP"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "ko_KR"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "pl_PL"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "pt_BR"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "ru_RU"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "sk_SK"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "tr_TR"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​, "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "zh_CHT"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​ and "
+				},
+				{
+					"Type": "NodeTextMark",
+					"TextMarkType": "code",
+					"TextMarkTextContent": "zh_CN"
+				},
+				{
+					"Type": "NodeText",
+					"Data": "​."
 				}
 			]
 		},

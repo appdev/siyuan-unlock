@@ -1,5 +1,5 @@
 import {isPaidUser, needSubscribe} from "../util/needSubscribe";
-import {fetchPost} from "../util/fetch";
+import {fetchPost, fetchSyncPost} from "../util/fetch";
 import {showMessage} from "../dialog/message";
 import {bindSyncCloudListEvent, getSyncCloudList} from "../sync/syncGuide";
 import {processSync} from "../dialog/processSystem";
@@ -10,7 +10,7 @@ import {confirmDialog} from "../dialog/confirmDialog";
 const renderProvider = (provider: number) => {
     if (provider === 0) {
         if (needSubscribe("")) {
-            return `<div class="b3-label b3-label--inner">${window.siyuan.config.system.container === "ios" ? window.siyuan.languages._kernel[122] : window.siyuan.languages._kernel[29].replace("${url}", getCloudURL("subscribe/siyuan"))}</div>
+            return `<div class="b3-label b3-label--inner">${window.siyuan.config.system.container === "ios" ? window.siyuan.languages._kernel[122] : window.siyuan.languages._kernel[29].replaceAll("${accountServer}", getCloudURL(""))}</div>
 <div class="b3-label b3-label--inner">
     ${window.siyuan.languages.cloudIntro1}
     <div class="b3-label__text">
@@ -40,7 +40,13 @@ const renderProvider = (provider: number) => {
 </div>`;
     }
     if (!isPaidUser()) {
-        return `<div class="b3-label b3-label--inner">${window.siyuan.languages["_kernel"][214]}</div>`;
+        return `<div>
+    ${window.siyuan.languages["_kernel"][214].replaceAll("${accountServer}", getCloudURL(""))}
+</div>
+<div class="ft__error${provider == 4 ? "" : " fn__none"}">
+    <div class="fn__hr--b"></div>
+    ${window.siyuan.languages.mobileNotSupport}
+</div>`;
     }
     if (provider === 2) {
         return `<div class="b3-label b3-label--inner">
@@ -53,61 +59,61 @@ const renderProvider = (provider: number) => {
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Endpoint</div>
     <div class="fn__space"></div>
-    <input id="endpoint" class="b3-text-field fn__block" value="${window.siyuan.config.sync.s3.endpoint}">
+    <input id="endpoint" class="b3-text-field fn__block">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Access Key</div>
     <div class="fn__space"></div>
-    <input id="accessKey" class="b3-text-field fn__block" value="${window.siyuan.config.sync.s3.accessKey}">
+    <input id="accessKey" class="b3-text-field fn__block">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Secret Key</div>
     <div class="fn__space"></div>
     <div class="b3-form__icona fn__block">
-        <input id="secretKey" type="password" class="b3-text-field b3-form__icona-input" value="${window.siyuan.config.sync.s3.secretKey}">
+        <input id="secretKey" type="password" class="b3-text-field b3-form__icona-input">
         <svg class="b3-form__icona-icon" data-action="togglePassword"><use xlink:href="#iconEye"></use></svg>
     </div>
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Bucket</div>
     <div class="fn__space"></div>
-    <input id="bucket" class="b3-text-field fn__block" value="${window.siyuan.config.sync.s3.bucket}">
+    <input id="bucket" class="b3-text-field fn__block">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
-    <div class="fn__flex-center fn__size200">Region</div>
+    <div class="fn__flex-center fn__size200">Region ID</div>
     <div class="fn__space"></div>
-    <input id="region" class="b3-text-field fn__block" value="${window.siyuan.config.sync.s3.region}">
+    <input id="region" class="b3-text-field fn__block">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Timeout (s)</div>
     <div class="fn__space"></div>
-    <input id="timeout" class="b3-text-field fn__block" type="number" min="7" max="300" value="${window.siyuan.config.sync.s3.timeout}">
+    <input id="timeout" class="b3-text-field fn__block" type="number" min="7" max="300">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Addressing</div>
     <div class="fn__space"></div>
     <select class="b3-select fn__block" id="pathStyle">
-        <option ${window.siyuan.config.sync.s3.pathStyle ? "selected" : ""} value="true">Path-style</option>
-        <option ${window.siyuan.config.sync.s3.pathStyle ? "" : "selected"} value="false">Virtual-hosted-style</option>
+        <option value="true">Path-style</option>
+        <option value="false">Virtual-hosted-style</option>
     </select>
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">TLS Verify</div>
     <div class="fn__space"></div>
     <select class="b3-select fn__block" id="s3SkipTlsVerify">
-        <option ${window.siyuan.config.sync.s3.skipTlsVerify ? "" : "selected"} value="false">Verify</option>
-        <option ${window.siyuan.config.sync.s3.skipTlsVerify ? "selected" : ""} value="true">Skip</option>
+        <option value="false">Verify</option>
+        <option value="true">Skip</option>
     </select>
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Concurrent Reqs</div>
     <div class="fn__space"></div>
-    <input id="s3ConcurrentReqs" class="b3-text-field fn__block" type="number" min="1" max="16" value="${window.siyuan.config.sync.s3.concurrentReqs}">
+    <input id="s3ConcurrentReqs" class="b3-text-field fn__block" type="number" min="1" max="16">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-1"></div>
     <button class="b3-button b3-button--outline fn__size200" data-action="purgeData">
-        <svg><use xlink:href="#iconTrashcan"></use></svg>${window.siyuan.languages.purge}
+        <svg><use xlink:href="#iconTrashcan"></use></svg>${window.siyuan.languages.cloudStoragePurge}
     </button>
     <div class="fn__space"></div>
     <button class="b3-button b3-button--outline fn__size200" style="position: relative">
@@ -124,49 +130,49 @@ const renderProvider = (provider: number) => {
     ${window.siyuan.languages.syncThirdPartyProviderWebDAVIntro}
     <div class="fn__hr"></div>
     <em>${window.siyuan.languages.proFeature}</em>
-    <div class="fn__hr"></div>    
+    <div class="fn__hr"></div>
     ${window.siyuan.languages.syncThirdPartyProviderTip}
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Endpoint</div>
     <div class="fn__space"></div>
-    <input id="endpoint" class="b3-text-field fn__block" value="${window.siyuan.config.sync.webdav.endpoint}">
+    <input id="endpoint" class="b3-text-field fn__block">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Username</div>
     <div class="fn__space"></div>
-    <input id="username" class="b3-text-field fn__block" value="${window.siyuan.config.sync.webdav.username}">
+    <input id="username" class="b3-text-field fn__block">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Password</div>
     <div class="fn__space"></div>
     <div class="b3-form__icona fn__block">
-        <input id="password" type="password" class="b3-text-field b3-form__icona-input" value="${window.siyuan.config.sync.webdav.password}">
+        <input id="password" type="password" class="b3-text-field b3-form__icona-input">
         <svg class="b3-form__icona-icon" data-action="togglePassword"><use xlink:href="#iconEye"></use></svg>
     </div>
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Timeout (s)</div>
     <div class="fn__space"></div>
-    <input id="timeout" class="b3-text-field fn__block" type="number" min="7" max="300" value="${window.siyuan.config.sync.webdav.timeout}">
+    <input id="timeout" class="b3-text-field fn__block" type="number" min="7" max="300">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">TLS Verify</div>
     <div class="fn__space"></div>
     <select class="b3-select fn__block" id="webdavSkipTlsVerify">
-        <option ${window.siyuan.config.sync.webdav.skipTlsVerify ? "" : "selected"} value="false">Verify</option>
-        <option ${window.siyuan.config.sync.webdav.skipTlsVerify ? "selected" : ""} value="true">Skip</option>
+        <option value="false">Verify</option>
+        <option value="true">Skip</option>
     </select>
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-center fn__size200">Concurrent Reqs</div>
     <div class="fn__space"></div>
-    <input id="webdavConcurrentReqs" class="b3-text-field fn__block" type="number" min="1" max="16" value="${window.siyuan.config.sync.webdav.concurrentReqs}">
+    <input id="webdavConcurrentReqs" class="b3-text-field fn__block" type="number" min="1" max="16">
 </div>
 <div class="b3-label b3-label--inner fn__flex">
     <div class="fn__flex-1"></div>
     <button class="b3-button b3-button--outline fn__size200" data-action="purgeData">
-        <svg><use xlink:href="#iconTrashcan"></use></svg>${window.siyuan.languages.purge}
+        <svg><use xlink:href="#iconTrashcan"></use></svg>${window.siyuan.languages.cloudStoragePurge}
     </button>
     <div class="fn__space"></div>
     <button class="b3-button b3-button--outline fn__size200" style="position: relative">
@@ -178,9 +184,78 @@ const renderProvider = (provider: number) => {
         <svg><use xlink:href="#iconUpload"></use></svg>${window.siyuan.languages.export}
     </button>
 </div>`;
+    } else if (provider === 4) {
+        return `<div class="b3-label b3-label--inner">
+    <div class="ft__error">
+        ${window.siyuan.languages.mobileNotSupport}
+    </div>
+    <div class="fn__hr"></div>
+    ${window.siyuan.languages.syncThirdPartyProviderLocalIntro}
+    <div class="fn__hr"></div>
+    <em>${window.siyuan.languages.proFeature}</em>
+</div>
+<div class="b3-label b3-label--inner fn__flex">
+    <div class="fn__flex-center fn__size200">Endpoint</div>
+    <div class="fn__space"></div>
+    <input id="endpoint" class="b3-text-field fn__block">
+</div>
+<div class="b3-label b3-label--inner fn__flex">
+    <div class="fn__flex-center fn__size200">Timeout (s)</div>
+    <div class="fn__space"></div>
+    <input id="timeout" class="b3-text-field fn__block" type="number" min="7" max="300">
+</div>
+<div class="b3-label b3-label--inner fn__flex">
+    <div class="fn__flex-center fn__size200">Concurrent Reqs</div>
+    <div class="fn__space"></div>
+    <input id="localConcurrentReqs" class="b3-text-field fn__block" type="number" min="1" max="1024">
+</div>`;
     }
     return "";
 };
+
+const fillSyncProviderPanelValues = (panel: Element) => {
+    if (!isPaidUser()) {
+        return;
+    }
+    const provider = window.siyuan.config.sync.provider;
+    if (provider === 2) {
+        const s3 = window.siyuan.config.sync.s3;
+        (panel.querySelector("#endpoint") as HTMLInputElement).value = String(s3.endpoint);
+        (panel.querySelector("#accessKey") as HTMLInputElement).value = String(s3.accessKey);
+        (panel.querySelector("#secretKey") as HTMLInputElement).value = String(s3.secretKey);
+        (panel.querySelector("#bucket") as HTMLInputElement).value = String(s3.bucket);
+        (panel.querySelector("#region") as HTMLInputElement).value = String(s3.region);
+        (panel.querySelector("#timeout") as HTMLInputElement).value = String(s3.timeout);
+        (panel.querySelector("#pathStyle") as HTMLSelectElement).value = s3.pathStyle ? "true" : "false";
+        (panel.querySelector("#s3SkipTlsVerify") as HTMLSelectElement).value = s3.skipTlsVerify ? "true" : "false";
+        (panel.querySelector("#s3ConcurrentReqs") as HTMLInputElement).value = String(s3.concurrentReqs);
+    } else if (provider === 3) {
+        const webdav = window.siyuan.config.sync.webdav;
+        (panel.querySelector("#endpoint") as HTMLInputElement).value = String(webdav.endpoint);
+        (panel.querySelector("#username") as HTMLInputElement).value = String(webdav.username);
+        (panel.querySelector("#password") as HTMLInputElement).value = String(webdav.password);
+        (panel.querySelector("#timeout") as HTMLInputElement).value = String(webdav.timeout);
+        (panel.querySelector("#webdavSkipTlsVerify") as HTMLSelectElement).value = webdav.skipTlsVerify ? "true" : "false";
+        (panel.querySelector("#webdavConcurrentReqs") as HTMLInputElement).value = String(webdav.concurrentReqs);
+    } else if (provider === 4) {
+        const local = window.siyuan.config.sync.local;
+        (panel.querySelector("#endpoint") as HTMLInputElement).value = String(local.endpoint);
+        (panel.querySelector("#timeout") as HTMLInputElement).value = String(local.timeout);
+        (panel.querySelector("#localConcurrentReqs") as HTMLInputElement).value = String(local.concurrentReqs);
+    }
+};
+
+const getReposDataLoadingHTML = () => `<div class="fn__flex">
+    <div class="fn__flex-1">
+        ${window.siyuan.languages.cloudStorage}
+    </div>
+    <div class="fn__flex-1">
+        ${window.siyuan.languages.trafficStat}
+    </div>
+</div>
+<div style="min-height: 183px; display: flex; justify-content: center;" id="reposLoading">
+    <img src="/stage/loading-pure.svg">
+</div>`;
 
 const bindProviderEvent = () => {
     const importElement = repos.element.querySelector("#importData") as HTMLInputElement;
@@ -204,10 +279,8 @@ const bindProviderEvent = () => {
     }
 
     const reposDataElement = repos.element.querySelector("#reposData");
-    const loadingElement = repos.element.querySelector("#reposLoading");
     if (window.siyuan.config.sync.provider === 0) {
         if (needSubscribe("")) {
-            loadingElement.classList.add("fn__none");
             let nextElement = reposDataElement;
             while (nextElement) {
                 nextElement.classList.add("fn__none");
@@ -215,13 +288,13 @@ const bindProviderEvent = () => {
             }
             return;
         }
+        reposDataElement.innerHTML = getReposDataLoadingHTML();
         fetchPost("/api/cloud/getCloudSpace", {}, (response) => {
-            loadingElement.classList.add("fn__none");
             if (response.code === 1) {
                 reposDataElement.innerHTML = response.msg;
                 return;
-            } else {
-                reposDataElement.innerHTML = `<div class="fn__flex">
+            }
+            reposDataElement.innerHTML = `<div class="fn__flex">
     <div class="fn__flex-1">
         ${window.siyuan.languages.cloudStorage}
         <div class="fn__hr"></div>
@@ -245,13 +318,11 @@ const bindProviderEvent = () => {
         </ul>
     </div>
 </div>`;
-            }
         });
         reposDataElement.classList.remove("fn__none");
         return;
     }
 
-    loadingElement.classList.add("fn__none");
     let nextElement = reposDataElement.nextElementSibling;
     while (nextElement) {
         if (isPaidUser()) {
@@ -263,10 +334,12 @@ const bindProviderEvent = () => {
     }
     reposDataElement.classList.add("fn__none");
     const providerPanelElement = repos.element.querySelector("#syncProviderPanel");
+    fillSyncProviderPanelValues(providerPanelElement);
     providerPanelElement.querySelectorAll(".b3-text-field, .b3-select").forEach(item => {
         item.addEventListener("blur", () => {
             if (window.siyuan.config.sync.provider === 2) {
-                let timeout = parseInt((providerPanelElement.querySelector("#timeout") as HTMLInputElement).value, 10);
+                const s3TimeoutInput = providerPanelElement.querySelector("#timeout") as HTMLInputElement;
+                let timeout = parseInt(s3TimeoutInput.value, 10);
                 if (7 > timeout) {
                     if (1 > timeout) {
                         timeout = 30;
@@ -284,23 +357,32 @@ const bindProviderEvent = () => {
                 if (16 < concurrentReqs) {
                     concurrentReqs = 16;
                 }
-                (providerPanelElement.querySelector("#timeout") as HTMLInputElement).value = timeout.toString();
+                s3TimeoutInput.value = timeout.toString();
                 const s3 = {
                     endpoint: (providerPanelElement.querySelector("#endpoint") as HTMLInputElement).value,
-                    accessKey: (providerPanelElement.querySelector("#accessKey") as HTMLInputElement).value,
-                    secretKey: (providerPanelElement.querySelector("#secretKey") as HTMLInputElement).value,
-                    bucket: (providerPanelElement.querySelector("#bucket") as HTMLInputElement).value,
-                    pathStyle: (providerPanelElement.querySelector("#pathStyle") as HTMLInputElement).value === "true",
-                    region: (providerPanelElement.querySelector("#region") as HTMLInputElement).value,
-                    skipTlsVerify: (providerPanelElement.querySelector("#s3SkipTlsVerify") as HTMLInputElement).value === "true",
+                    accessKey: (providerPanelElement.querySelector("#accessKey") as HTMLInputElement).value.trim(),
+                    secretKey: (providerPanelElement.querySelector("#secretKey") as HTMLInputElement).value.trim(),
+                    bucket: (providerPanelElement.querySelector("#bucket") as HTMLInputElement).value.trim(),
+                    pathStyle: (providerPanelElement.querySelector("#pathStyle") as HTMLSelectElement).value === "true",
+                    region: (providerPanelElement.querySelector("#region") as HTMLInputElement).value.trim(),
+                    skipTlsVerify: (providerPanelElement.querySelector("#s3SkipTlsVerify") as HTMLSelectElement).value === "true",
                     timeout: timeout,
                     concurrentReqs: concurrentReqs,
                 };
-                fetchPost("/api/sync/setSyncProviderS3", {s3}, () => {
-                    window.siyuan.config.sync.s3 = s3;
-                });
+                // 使用 fetchSyncPost：内核返回 code < 0 时 fetchPost 不会调用回调，此处需始终回写界面与已保存配置一致
+                fetchSyncPost("/api/sync/setSyncProviderS3", {s3})
+                    .then((response) => {
+                        if (response.code === 0 && response.data?.s3) {
+                            window.siyuan.config.sync.s3 = response.data.s3;
+                        }
+                    })
+                    .finally(() => {
+                        fillSyncProviderPanelValues(providerPanelElement);
+                    })
+                    .catch(() => {});
             } else if (window.siyuan.config.sync.provider === 3) {
-                let timeout = parseInt((providerPanelElement.querySelector("#timeout") as HTMLInputElement).value, 10);
+                const webdavTimeoutInput = providerPanelElement.querySelector("#timeout") as HTMLInputElement;
+                let timeout = parseInt(webdavTimeoutInput.value, 10);
                 if (7 > timeout) {
                     timeout = 7;
                 }
@@ -314,18 +396,57 @@ const bindProviderEvent = () => {
                 if (16 < concurrentReqs) {
                     concurrentReqs = 16;
                 }
-                (providerPanelElement.querySelector("#timeout") as HTMLInputElement).value = timeout.toString();
+                webdavTimeoutInput.value = timeout.toString();
                 const webdav = {
                     endpoint: (providerPanelElement.querySelector("#endpoint") as HTMLInputElement).value,
-                    username: (providerPanelElement.querySelector("#username") as HTMLInputElement).value,
-                    password: (providerPanelElement.querySelector("#password") as HTMLInputElement).value,
-                    skipTlsVerify: (providerPanelElement.querySelector("#webdavSkipTlsVerify") as HTMLInputElement).value === "true",
+                    username: (providerPanelElement.querySelector("#username") as HTMLInputElement).value.trim(),
+                    password: (providerPanelElement.querySelector("#password") as HTMLInputElement).value.trim(),
+                    skipTlsVerify: (providerPanelElement.querySelector("#webdavSkipTlsVerify") as HTMLSelectElement).value === "true",
                     timeout: timeout,
                     concurrentReqs: concurrentReqs,
                 };
-                fetchPost("/api/sync/setSyncProviderWebDAV", {webdav}, () => {
-                    window.siyuan.config.sync.webdav = webdav;
-                });
+                fetchSyncPost("/api/sync/setSyncProviderWebDAV", {webdav})
+                    .then((response) => {
+                        if (response.code === 0 && response.data?.webdav) {
+                            window.siyuan.config.sync.webdav = response.data.webdav;
+                        }
+                    })
+                    .finally(() => {
+                        fillSyncProviderPanelValues(providerPanelElement);
+                    })
+                    .catch(() => {});
+            } else if (window.siyuan.config.sync.provider === 4) {
+                const localTimeoutInput = providerPanelElement.querySelector("#timeout") as HTMLInputElement;
+                let timeout = parseInt(localTimeoutInput.value, 10);
+                if (7 > timeout) {
+                    timeout = 7;
+                }
+                if (300 < timeout) {
+                    timeout = 300;
+                }
+                let concurrentReqs = parseInt((providerPanelElement.querySelector("#localConcurrentReqs") as HTMLInputElement).value, 10);
+                if (1 > concurrentReqs) {
+                    concurrentReqs = 1;
+                }
+                if (1024 < concurrentReqs) {
+                    concurrentReqs = 1024;
+                }
+                localTimeoutInput.value = timeout.toString();
+                const local = {
+                    endpoint: (providerPanelElement.querySelector("#endpoint") as HTMLInputElement).value,
+                    timeout: timeout,
+                    concurrentReqs: concurrentReqs,
+                };
+                fetchSyncPost("/api/sync/setSyncProviderLocal", {local})
+                    .then((response) => {
+                        if (response.code === 0 && response.data?.local) {
+                            window.siyuan.config.sync.local = response.data.local;
+                        }
+                    })
+                    .finally(() => {
+                        fillSyncProviderPanelValues(providerPanelElement);
+                    })
+                    .catch(() => {});
             }
         });
     });
@@ -334,11 +455,7 @@ const bindProviderEvent = () => {
 export const repos = {
     element: undefined as Element,
     genHTML: () => {
-        return `<div>
-<div style="position: fixed;width: 800px;height: 434px;box-sizing: border-box;text-align: center;display: flex;align-items: center;justify-content: center;z-index: 1;" id="reposLoading">
-    <img src="/stage/loading-pure.svg">
-</div>
-<div class="fn__flex b3-label config__item">
+        return `<div><div class="fn__flex b3-label config__item">
     <div class="fn__flex-1">
         ${window.siyuan.languages.syncProvider}
         <div class="b3-label__text">${window.siyuan.languages.syncProviderTip}</div>
@@ -348,20 +465,14 @@ export const repos = {
         <option value="0" ${window.siyuan.config.sync.provider === 0 ? "selected" : ""}>SiYuan</option>
         <option value="2" ${window.siyuan.config.sync.provider === 2 ? "selected" : ""}>S3</option>
         <option value="3" ${window.siyuan.config.sync.provider === 3 ? "selected" : ""}>WebDAV</option>
+        <option class="${!["std", "docker"].includes(window.siyuan.config.system.container) ? "fn__none" : ""}" value="4" ${window.siyuan.config.sync.provider === 4 ? "selected" : ""}>${window.siyuan.languages.localFileSystem}</option>
     </select>
 </div>
 <div id="syncProviderPanel" class="b3-label">
     ${renderProvider(window.siyuan.config.sync.provider)}
 </div>
 <div id="reposData" class="b3-label">
-    <div class="fn__flex">
-        <div class="fn__flex-1">
-            ${window.siyuan.languages.cloudStorage}
-        </div>
-        <div class="fn__flex-1">
-            ${window.siyuan.languages.trafficStat}
-        </div>
-    </div>
+    ${getReposDataLoadingHTML()}
 </div>
 <label class="fn__flex b3-label">
     <div class="fn__flex-1">
@@ -427,8 +538,7 @@ export const repos = {
 <div class="b3-label fn__flex">
     <div class="fn__flex-center">${window.siyuan.languages.cloudBackup}</div>
     <div class="b3-list-item__meta fn__flex-center">${window.siyuan.languages.cloudBackupTip}</div>
-</div>
-</div>`;
+</div></div>`;
     },
     bindEvent: () => {
         bindProviderEvent();
@@ -515,9 +625,6 @@ export const repos = {
                 }
             });
         });
-        const loadingElement = repos.element.querySelector("#reposLoading") as HTMLElement;
-        loadingElement.style.width = repos.element.clientWidth + "px";
-        loadingElement.style.height = repos.element.clientHeight + "px";
         bindSyncCloudListEvent(syncConfigElement);
         repos.element.firstElementChild.addEventListener("click", (event) => {
             let target = event.target as HTMLElement;

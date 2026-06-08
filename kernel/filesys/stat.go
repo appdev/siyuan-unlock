@@ -18,6 +18,7 @@ package filesys
 
 import (
 	"bytes"
+
 	"github.com/88250/lute"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/parse"
@@ -65,12 +66,12 @@ func StatBlock(id string) (ret *util.BlockStatResult) {
 
 	runeCnt, wordCnt, linkCnt, imgCnt, refCnt := node.Stat()
 	ret = &util.BlockStatResult{
-		runeCnt,
-		wordCnt,
-		linkCnt,
-		imgCnt,
-		refCnt,
-		1,
+		RuneCount:  runeCnt,
+		WordCount:  wordCnt,
+		LinkCount:  linkCnt,
+		ImageCount: imgCnt,
+		RefCount:   refCnt,
+		BlockCount: 1,
 	}
 	return
 }
@@ -93,7 +94,7 @@ func statTree(tree *parse.Tree) (ret *util.BlockStatResult) {
 	blockCount := 0
 	var databaseBlockNodes []*ast.Node
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
-		if !entering {
+		if !entering || tree.Root == n {
 			return ast.WalkContinue
 		}
 
@@ -126,14 +127,14 @@ func statTree(tree *parse.Tree) (ret *util.BlockStatResult) {
 			for _, v := range kValues.Values {
 				switch kValues.Key.Type {
 				case av.KeyTypeURL:
-					if v.IsEmpty() {
+					if v.IsBlank() {
 						continue
 					}
 
 					dbLinkCnt++
 					content.WriteString(v.URL.Content)
 				case av.KeyTypeMAsset:
-					if v.IsEmpty() {
+					if v.IsBlank() {
 						continue
 					}
 
@@ -143,7 +144,7 @@ func statTree(tree *parse.Tree) (ret *util.BlockStatResult) {
 						}
 					}
 				case av.KeyTypeBlock:
-					if v.IsEmpty() {
+					if v.IsBlank() {
 						continue
 					}
 
@@ -152,23 +153,23 @@ func statTree(tree *parse.Tree) (ret *util.BlockStatResult) {
 					}
 					content.WriteString(v.Block.Content)
 				case av.KeyTypeText:
-					if v.IsEmpty() {
+					if v.IsBlank() {
 						continue
 					}
 					content.WriteString(v.Text.Content)
 				case av.KeyTypeNumber:
-					if v.IsEmpty() {
+					if v.IsBlank() {
 						continue
 					}
 					v.Number.FormatNumber()
 					content.WriteString(v.Number.FormattedContent)
 				case av.KeyTypeEmail:
-					if v.IsEmpty() {
+					if v.IsBlank() {
 						continue
 					}
 					content.WriteString(v.Email.Content)
 				case av.KeyTypePhone:
-					if v.IsEmpty() {
+					if v.IsBlank() {
 						continue
 					}
 					content.WriteString(v.Phone.Content)

@@ -82,8 +82,8 @@ export const genCardHTML = (options: {
         <div data-type="fullscreen" class="b3-tooltips b3-tooltips__sw block__icon block__icon--show" aria-label="${window.siyuan.languages.fullscreen}">
             <svg><use xlink:href="#iconFullscreen"></use></svg>
         </div>
-        <div class="fn__space"></div>
-        <div data-type="more" class="b3-tooltips b3-tooltips__sw block__icon block__icon--show" aria-label="${window.siyuan.languages.more}">
+        <div class="fn__space${options.cardsData.cards.length === 0 ? " fn__none" : ""}"></div>
+        <div data-type="more" class="${options.cardsData.cards.length === 0 ? "fn__none " : ""}b3-tooltips b3-tooltips__sw block__icon block__icon--show" aria-label="${window.siyuan.languages.more}">
             <svg><use xlink:href="#iconMore"></use></svg>
         </div>
         <div class="fn__space${options.isTab ? " fn__none" : ""}"></div>
@@ -100,17 +100,25 @@ export const genCardHTML = (options: {
         ${window.siyuan.languages.noDueCard}
     </div>
     <div class="fn__flex card__action fn__none">
-        <button class="b3-button b3-button--cancel" disabled="disabled" data-type="-2" style="width: 25%;min-width: 86px;display: flex">
+        <button class="b3-button b3-button--cancel" disabled="disabled" data-type="-2" style="width: 25%;">
             <svg><use xlink:href="#iconLeft"></use></svg>
             ${!isMobile() ? "(p / q)" : ""}
         </button>
         <span class="fn__space"></span>
-        <button data-type="-1" class="b3-button fn__flex-1">${window.siyuan.languages.cardShowAnswer}${!isMobile() ? " (" + window.siyuan.languages.space + " / " + window.siyuan.languages.enterKey + ")" : ""}</button>
+        <button data-type="-1" aria-label="${window.siyuan.languages.space}/${window.siyuan.languages.enterKey}" class="b3-button b3-tooltips__n b3-tooltips">
+            <div class="card__icon">👀</div>
+            ${window.siyuan.languages.cardShowAnswer}
+        </button>
+        <span class="fn__space"></span>
+        <button data-type="-3" aria-label="0 / x" style="width: 25%" class="b3-button b3-button--cancel b3-tooltips__n b3-tooltips">
+            <div class="card__icon">💤</div>
+            ${window.siyuan.languages.skip}${!isMobile() ? " (0)" : ""}
+        </button>
     </div>
     <div class="fn__flex card__action fn__none">
         <div>
             <button class="b3-button b3-button--cancel" disabled="disabled" style="display: flex;margin-bottom: 8px;height: 28px;padding: 0;" data-type="-2"><svg><use xlink:href="#iconLeft"></use></svg>${!isMobile() ? "(p / q)" : ""}</button>
-            <button data-type="-3" aria-label="0 / x" class="b3-button b3-button--cancel b3-tooltips__n b3-tooltips">
+            <button data-type="-3" aria-label="0 / x" class="b3-button b3-button--white b3-tooltips__n b3-tooltips">
                 <div class="card__icon">💤</div>
                 ${window.siyuan.languages.skip}${!isMobile() ? " (0)" : ""}
             </button>
@@ -150,8 +158,8 @@ export const genCardHTML = (options: {
 const getEditor = (id: string, protyle: IProtyle, element: Element, currentCard: ICard) => {
     fetchPost("/api/block/getDocInfo", {
         id,
-    }, (response) => {
-        protyle.wysiwyg.renderCustom(response.data.ial);
+    }, (docResponse) => {
+        protyle.wysiwyg.renderCustom(docResponse.data.ial);
         fetchPost("/api/filetree/getDoc", {
             id,
             mode: 0,
@@ -161,8 +169,11 @@ const getEditor = (id: string, protyle: IProtyle, element: Element, currentCard:
                 updateReadonly: true,
                 data: response,
                 protyle,
-                action: response.data.rootID === response.data.id ? [Constants.CB_GET_HTML] : [Constants.CB_GET_ALL, Constants.CB_GET_HTML],
+                action: response.data.rootID === response.data.id ? [] : [Constants.CB_GET_ALL],
                 afterCB: () => {
+                    if (protyle.element.classList.contains("fn__none")) {
+                        return;
+                    }
                     let hasHide = false;
                     if (!window.siyuan.config.flashcard.superBlock &&
                         !window.siyuan.config.flashcard.heading &&
@@ -199,7 +210,7 @@ const getEditor = (id: string, protyle: IProtyle, element: Element, currentCard:
                             if (btnIndex < 2) {
                                 return;
                             }
-                            element.previousElementSibling.textContent = currentCard.nextDues[btnIndex-1];
+                            element.previousElementSibling.textContent = currentCard.nextDues[btnIndex - 1];
                         });
                         actionElements[1].classList.remove("fn__none");
                     } else {
@@ -233,7 +244,7 @@ export const bindCardEvent = async (options: {
     cardType: TCardType,
     id?: string,
     dialog?: Dialog,
-    index?: number
+    index?: number,
 }) => {
     if (window.siyuan.storage[Constants.LOCAL_FLASHCARD].fullscreen) {
         fullscreen(options.element.querySelector(".card__main"),
@@ -250,6 +261,8 @@ export const bindCardEvent = async (options: {
             background: false,
             gutter: true,
             breadcrumbDocName: true,
+            title: true,
+            hideTitleOnZoom: true,
         },
         typewriterMode: false
     });
@@ -299,7 +312,7 @@ export const bindCardEvent = async (options: {
     };
 
     countElement.innerHTML = genCardCount(options.cardsData, index);
-    options.element.addEventListener("click", (event: MouseEvent) => {
+    options.element.firstChild.addEventListener("click", (event: MouseEvent) => {
         const target = event.target as HTMLElement;
         let type = "";
         const currentCard = options.cardsData.cards[index];
@@ -333,7 +346,7 @@ export const bindCardEvent = async (options: {
                 return;
             }
             const moreElement = hasClosestByAttribute(target, "data-type", "more");
-            if (moreElement) {
+            if (moreElement && currentCard) {
                 event.stopPropagation();
                 event.preventDefault();
                 if (filterElement.getAttribute("data-cardtype") === "all" && filterElement.getAttribute("data-id")) {
@@ -342,6 +355,7 @@ export const bindCardEvent = async (options: {
                 }
                 const menu = new Menu();
                 menu.addItem({
+                    id: "setDueTime",
                     icon: "iconClock",
                     label: window.siyuan.languages.setDueTime,
                     click() {
@@ -382,7 +396,7 @@ export const bindCardEvent = async (options: {
                                 } else {
                                     options.cardsData.unreviewedOldCardCount--;
                                 }
-                                options.element.dispatchEvent(new CustomEvent("click", {detail: "0"}));
+                                options.element.firstElementChild.dispatchEvent(new CustomEvent("click", {detail: "0"}));
                                 options.cardsData.cards.splice(index, 1);
                                 index--;
                                 timedialog.destroy();
@@ -392,6 +406,7 @@ export const bindCardEvent = async (options: {
                 });
                 if (currentCard.state !== 0) {
                     menu.addItem({
+                        id: "reset",
                         icon: "iconRefresh",
                         label: window.siyuan.languages.reset,
                         click() {
@@ -416,7 +431,7 @@ export const bindCardEvent = async (options: {
                                     if (btnIndex < 2) {
                                         return;
                                     }
-                                    element.previousElementSibling.textContent = currentCard.nextDues[btnIndex-1];
+                                    element.previousElementSibling.textContent = currentCard.nextDues[btnIndex - 1];
                                 });
                                 options.cardsData.unreviewedOldCardCount--;
                                 options.cardsData.unreviewedNewCardCount++;
@@ -426,6 +441,7 @@ export const bindCardEvent = async (options: {
                     });
                 }
                 menu.addItem({
+                    id: "removeRiffCard",
                     icon: "iconTrashcan",
                     label: `${window.siyuan.languages.remove} <b>${window.siyuan.languages.riffCard}</b>`,
                     click() {
@@ -436,7 +452,7 @@ export const bindCardEvent = async (options: {
                         } else {
                             options.cardsData.unreviewedOldCardCount--;
                         }
-                        options.element.dispatchEvent(new CustomEvent("click", {detail: "0"}));
+                        options.element.firstElementChild.dispatchEvent(new CustomEvent("click", {detail: "0"}));
                         transaction(undefined, [{
                             action: "removeFlashcards",
                             deckID: Constants.QUICK_DECK_ID,
@@ -448,6 +464,7 @@ export const bindCardEvent = async (options: {
                 });
                 menu.addSeparator();
                 menu.addItem({
+                    id: "forgetCountAndRevisionCountAndCardStatusAndLastReviewTime",
                     iconHTML: "",
                     type: "readonly",
                     label: `<div class="fn__flex">
@@ -484,6 +501,30 @@ export const bindCardEvent = async (options: {
             if (sticktabElement) {
                 const stickMenu = new Menu();
                 stickMenu.addItem({
+                    id: "openInNewTab",
+                    icon: "iconOpen",
+                    label: window.siyuan.languages.openInNewTab,
+                    click() {
+                        openFile({
+                            app: options.app,
+                            custom: {
+                                icon: "iconRiffCard",
+                                title: window.siyuan.languages.spaceRepetition,
+                                data: {
+                                    cardsData: options.cardsData,
+                                    index,
+                                    cardType: filterElement.getAttribute("data-cardtype") as TCardType,
+                                    id: docId,
+                                    title: options.title
+                                },
+                                id: "siyuan-card"
+                            },
+                        });
+                        options.dialog.destroy();
+                    }
+                });
+                stickMenu.addItem({
+                    id: "insertRight",
                     icon: "iconLayoutRight",
                     label: window.siyuan.languages.insertRight,
                     click() {
@@ -508,6 +549,7 @@ export const bindCardEvent = async (options: {
                 });
                 /// #if !BROWSER
                 stickMenu.addItem({
+                    id: "openByNewWindow",
                     icon: "iconOpenWindow",
                     label: window.siyuan.languages.openByNewWindow,
                     click() {
@@ -519,6 +561,8 @@ export const bindCardEvent = async (options: {
                                 "instance": "Custom",
                                 "customModelType": "siyuan-card",
                                 "customModelData": {
+                                    "cardsData": options.cardsData,
+                                    "index": index,
                                     "cardType": filterElement.getAttribute("data-cardtype"),
                                     "id": docId,
                                     "title": options.title
@@ -557,6 +601,7 @@ export const bindCardEvent = async (options: {
                 fetchPost("/api/riff/getRiffDecks", {}, (response) => {
                     window.siyuan.menus.menu.remove();
                     window.siyuan.menus.menu.append(new MenuItem({
+                        id: "all",
                         iconHTML: "",
                         label: window.siyuan.languages.all,
                         click() {
@@ -566,14 +611,19 @@ export const bindCardEvent = async (options: {
                         },
                     }).element);
                     window.siyuan.menus.menu.append(new MenuItem({
+                        id: "fileTree",
                         iconHTML: "",
                         label: window.siyuan.languages.fileTree,
                         click() {
-                            movePathTo((toPath, toNotebook) => {
-                                filterElement.setAttribute("data-id", toPath[0] === "/" ? toNotebook[0] : getDisplayName(toPath[0], true, true));
-                                filterElement.setAttribute("data-cardtype", toPath[0] === "/" ? "notebook" : "doc");
-                                fetchNewRound();
-                            }, [], undefined, window.siyuan.languages.specifyPath, true);
+                            movePathTo({
+                                cb: (toPath, toNotebook) => {
+                                    filterElement.setAttribute("data-id", toPath[0] === "/" ? toNotebook[0] : getDisplayName(toPath[0], true, true));
+                                    filterElement.setAttribute("data-cardtype", toPath[0] === "/" ? "notebook" : "doc");
+                                    fetchNewRound();
+                                },
+                                title: window.siyuan.languages.specifyPath,
+                                flashcard: true
+                            });
                         }
                     }).element);
                     if (options.title || response.data.length > 0) {
@@ -642,7 +692,7 @@ export const bindCardEvent = async (options: {
                     if (btnIndex < 2) {
                         return;
                     }
-                    element.previousElementSibling.textContent = currentCard.nextDues[btnIndex-1];
+                    element.previousElementSibling.textContent = currentCard.nextDues[btnIndex - 1];
                 });
                 actionElements[1].classList.remove("fn__none");
                 emitEvent(options.app, currentCard, type);
@@ -662,7 +712,7 @@ export const bindCardEvent = async (options: {
             }
             return;
         }
-        if (["1", "2", "3", "4", "-3"].includes(type) && actionElements[0].classList.contains("fn__none")) {
+        if ("-3" === type || (["1", "2", "3", "4"].includes(type) && actionElements[0].classList.contains("fn__none"))) {
             fetchPost(type === "-3" ? "/api/riff/skipReviewRiffCard" : "/api/riff/reviewRiffCard", {
                 deckID: currentCard.deckID,
                 cardID: currentCard.cardID,
@@ -782,7 +832,7 @@ export const openCardByData = async (app: App, cardsData: ICardData, cardType: T
             }
         }
     });
-    (dialog.element.querySelector(".b3-dialog__scrim") as HTMLElement).style.backgroundColor = "var(--b3-theme-background)";
+    (dialog.element.querySelector(".b3-dialog__scrim") as HTMLElement).style.backgroundColor = "var(--b3-theme-surface)";
     (dialog.element.querySelector(".b3-dialog__container") as HTMLElement).style.maxWidth = "1024px";
     const editor = await bindCardEvent({
         app,
@@ -839,6 +889,9 @@ const allDone = (countElement: Element, editor: Protyle, actionElements: NodeLis
     emptyElement.classList.remove("fn__none");
     actionElements[0].classList.add("fn__none");
     actionElements[1].classList.add("fn__none");
+    const moreElement = countElement.parentElement.querySelector('[data-type="more"]');
+    moreElement.classList.add("fn__none");
+    moreElement.previousElementSibling.classList.add("fn__none");
 };
 
 const newRound = (countElement: Element, editor: Protyle, actionElements: NodeListOf<Element>, unreviewedCount: number) => {

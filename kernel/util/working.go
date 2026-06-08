@@ -20,8 +20,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"math/rand"
 	"mime"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -30,7 +30,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/88250/go-humanize"
 	"github.com/88250/gulu"
@@ -45,33 +44,46 @@ import (
 var Mode = "prod"
 
 const (
-	Ver       = "103.1.18"
+	Ver       = "3.6.5"
 	IsInsider = false
 )
 
 var (
 	RunInContainer             = false // 是否运行在容器中
-	SiyuanAccessAuthCodeBypass = false // 是否跳过空访问授权码检查
+	SiYuanAccessAuthCodeBypass = false // 是否跳过空访问授权码检查
 )
 
 func initEnvVars() {
 	RunInContainer = isRunningInDockerContainer()
 	var err error
-	if SiyuanAccessAuthCodeBypass, err = strconv.ParseBool(os.Getenv("SIYUAN_ACCESS_AUTH_CODE_BYPASS")); err != nil {
-		SiyuanAccessAuthCodeBypass = false
+	if SiYuanAccessAuthCodeBypass, err = strconv.ParseBool(os.Getenv("SIYUAN_ACCESS_AUTH_CODE_BYPASS")); err != nil {
+		SiYuanAccessAuthCodeBypass = false
 	}
 }
 
 var (
 	bootProgress = atomic.Int32{} // 启动进度，从 0 到 100
 	bootDetails  string           // 启动细节描述
+	HttpServer   *http.Server     // HTTP 伺服器实例
 	HttpServing  = false          // 是否 HTTP 伺服已经可用
 )
+
+// If a commandline parameter is empty, fallback to the env var.
+//
+// "empty" means the parameter is not set or set to an empty string.
+// It returns a pointer to string, to be a drop-in replacement for
+// the commandline parameter itself.
+func coalesceToEnvVar(fromCLI *string, envVarName string) *string {
+	if fromCLI == nil || "" == *fromCLI {
+		ret := os.Getenv(envVarName)
+		return &ret
+	}
+	return fromCLI
+}
 
 func Boot() {
 	initEnvVars()
 	IncBootProgress(3, "Booting kernel...")
-	rand.Seed(time.Now().UTC().UnixNano())
 	initMime()
 	initHttpClient()
 
@@ -81,9 +93,16 @@ func Boot() {
 	readOnly := flag.String("readonly", "false", "read-only mode")
 	accessAuthCode := flag.String("accessAuthCode", "", "access auth code")
 	ssl := flag.Bool("ssl", false, "for https and wss")
-	lang := flag.String("lang", "", "zh_CN/zh_CHT/en_US/fr_FR/es_ES/ja_JP/it_IT/de_DE/he_IL/ru_RU/pl_PL/ar_SA")
+	lang := flag.String("lang", "", "ar_SA/de_DE/en_US/es_ES/fr_FR/he_IL/it_IT/ja_JP/ko_KR/pl_PL/pt_BR/ru_RU/sk_SK/tr_TR/zh_CHT/zh_CN")
 	mode := flag.String("mode", "prod", "dev/prod")
 	flag.Parse()
+
+	// Fallback to env vars if commandline args are not set
+	// valid only for CLI args that default to "", as the
+	// others have explicit (sane) defaults
+	workspacePath = coalesceToEnvVar(workspacePath, "SIYUAN_WORKSPACE_PATH")
+	accessAuthCode = coalesceToEnvVar(accessAuthCode, "SIYUAN_ACCESS_AUTH_CODE")
+	lang = coalesceToEnvVar(lang, "SIYUAN_LANG")
 
 	if "" != *wdPath {
 		WorkingDir = *wdPath
@@ -95,22 +114,25 @@ func Boot() {
 	ServerPort = *port
 	ReadOnly, _ = strconv.ParseBool(*readOnly)
 	AccessAuthCode = *accessAuthCode
+	AccessAuthCode = RemoveInvalid(AccessAuthCode)
+	AccessAuthCode = strings.TrimSpace(AccessAuthCode)
 	Container = ContainerStd
 	if RunInContainer {
 		Container = ContainerDocker
-		if "" == AccessAuthCode {
+		if "" == AccessAuthCode { // Still empty?
 			interruptBoot := true
 
 			// Set the env `SIYUAN_ACCESS_AUTH_CODE_BYPASS=true` to skip checking empty access auth code https://github.com/siyuan-note/siyuan/issues/9709
-			if SiyuanAccessAuthCodeBypass {
+			if SiYuanAccessAuthCodeBypass {
 				interruptBoot = false
 				fmt.Println("bypass access auth code check since the env [SIYUAN_ACCESS_AUTH_CODE_BYPASS] is set to [true]")
 			}
 
 			if interruptBoot {
 				// The access authorization code command line parameter must be set when deploying via Docker https://github.com/siyuan-note/siyuan/issues/9328
-				fmt.Printf("the access authorization code command line parameter (--accessAuthCode) must be set when deploying via Docker")
-				os.Exit(1)
+				fmt.Printf("the access authorization code command line parameter (--accessAuthCode) must be set when deploying via Docker\n")
+				fmt.Printf("or you can set the SIYUAN_ACCESS_AUTH_CODE env var")
+				os.Exit(logging.ExitCodeSecurityRisk)
 			}
 		}
 	}
@@ -216,6 +238,7 @@ var (
 	ThemesPath         string        // 配置目录下的外观目录下的 themes/ 路径
 	IconsPath          string        // 配置目录下的外观目录下的 icons/ 路径
 	SnippetsPath       string        // 数据目录下的 snippets/ 路径
+	ShortcutsPath      string        // 用户家目录下的快捷方式目录路径 home/.config/siyuan/shortcuts/
 
 	UIProcessIDs = sync.Map{} // UI 进程 ID
 )
@@ -238,6 +261,9 @@ func initWorkspaceDir(workspaceArg string) {
 		if userProfile := os.Getenv("USERPROFILE"); "" != userProfile {
 			defaultWorkspaceDir = filepath.Join(userProfile, "SiYuan")
 		}
+	} else if gulu.OS.IsDarwin() {
+		// Change the initial workspace path to ~/Library/Application Support/SiYuan on macOS https://github.com/siyuan-note/siyuan/issues/17095
+		defaultWorkspaceDir = filepath.Join(HomeDir, "Library", "Application Support", "SiYuan")
 	}
 
 	var workspacePaths []string
@@ -292,6 +318,7 @@ func initWorkspaceDir(workspaceArg string) {
 	AssetContentDBPath = filepath.Join(TempDir, "asset_content.db")
 	BlockTreeDBPath = filepath.Join(TempDir, "blocktree.db")
 	SnippetsPath = filepath.Join(DataDir, "snippets")
+	ShortcutsPath = filepath.Join(userHomeConfDir, "shortcuts")
 }
 
 func ReadWorkspacePaths() (ret []string, err error) {
@@ -313,10 +340,19 @@ func ReadWorkspacePaths() (ret []string, err error) {
 	}
 
 	var tmp []string
+	workspaceBaseDir := filepath.Dir(HomeDir)
 	for _, d := range ret {
+		if ContainerIOS == Container && strings.Contains(d, "/Documents/") {
+			// iOS 端沙箱路径会变化，需要转换为相对路径再拼接当前沙箱中的工作空间基路径
+			d = d[strings.Index(d, "/Documents/")+len("/Documents/"):]
+			d = filepath.Join(workspaceBaseDir, d)
+		}
+
 		d = strings.TrimRight(d, " \t\n") // 去掉工作空间路径尾部空格 https://github.com/siyuan-note/siyuan/issues/6353
 		if gulu.File.IsDir(d) {
 			tmp = append(tmp, d)
+		} else {
+			logging.LogWarnf("workspace path [%s] is not a dir", d)
 		}
 	}
 	ret = tmp
@@ -395,18 +431,18 @@ func initPathDir() {
 
 	plugins := filepath.Join(DataDir, "plugins")
 	if err := os.MkdirAll(plugins, 0755); err != nil && !os.IsExist(err) {
-		logging.LogFatalf(logging.ExitCodeInitWorkspaceErr, "create data plugins folder [%s] failed: %s", widgets, err)
+		logging.LogFatalf(logging.ExitCodeInitWorkspaceErr, "create data plugins folder [%s] failed: %s", plugins, err)
 	}
 
 	emojis := filepath.Join(DataDir, "emojis")
 	if err := os.MkdirAll(emojis, 0755); err != nil && !os.IsExist(err) {
-		logging.LogFatalf(logging.ExitCodeInitWorkspaceErr, "create data emojis folder [%s] failed: %s", widgets, err)
+		logging.LogFatalf(logging.ExitCodeInitWorkspaceErr, "create data emojis folder [%s] failed: %s", emojis, err)
 	}
 
 	// Support directly access `data/public/*` contents via URL link https://github.com/siyuan-note/siyuan/issues/8593
 	public := filepath.Join(DataDir, "public")
 	if err := os.MkdirAll(public, 0755); err != nil && !os.IsExist(err) {
-		logging.LogFatalf(logging.ExitCodeInitWorkspaceErr, "create data public folder [%s] failed: %s", widgets, err)
+		logging.LogFatalf(logging.ExitCodeInitWorkspaceErr, "create data public folder [%s] failed: %s", public, err)
 	}
 }
 
@@ -439,6 +475,17 @@ func initMime() {
 
 	mime.AddExtensionType(".md", "text/markdown")
 	mime.AddExtensionType(".markdown", "text/markdown")
+
+	// 添加常用的图片格式
+	mime.AddExtensionType(".png", "image/png")
+	mime.AddExtensionType(".jpg", "image/jpeg")
+	mime.AddExtensionType(".jpeg", "image/jpeg")
+	mime.AddExtensionType(".gif", "image/gif")
+	mime.AddExtensionType(".bmp", "image/bmp")
+	mime.AddExtensionType(".tiff", "image/tiff")
+	mime.AddExtensionType(".tif", "image/tiff")
+	mime.AddExtensionType(".webp", "image/webp")
+	mime.AddExtensionType(".ico", "image/x-icon")
 }
 
 func GetDataAssetsAbsPath() (ret string) {
@@ -511,4 +558,30 @@ func LogDatabaseSize(dbPath string) {
 
 	dbSize := humanize.BytesCustomCeil(uint64(dbFile.Size()), 2)
 	logging.LogInfof("database [%s] size [%s]", dbPath, dbSize)
+}
+
+func RemoveDatabaseFile(dbPath string) {
+	if gulu.File.IsExist(dbPath) {
+		err := os.RemoveAll(dbPath)
+		if err != nil {
+			logging.LogErrorf("remove database file [%s] failed: %s", dbPath, err)
+			return
+		}
+	}
+
+	if gulu.File.IsExist(dbPath + "-shm") {
+		err := os.RemoveAll(dbPath + "-shm")
+		if err != nil {
+			logging.LogErrorf("remove database file [%s] failed: %s", dbPath+"-shm", err)
+			return
+		}
+	}
+
+	if gulu.File.IsExist(dbPath + "-wal") {
+		err := os.RemoveAll(dbPath + "-wal")
+		if err != nil {
+			logging.LogErrorf("remove database file [%s] failed: %s", dbPath+"-wal", err)
+			return
+		}
+	}
 }

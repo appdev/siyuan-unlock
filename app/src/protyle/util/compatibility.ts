@@ -1,11 +1,79 @@
 import {focusByRange} from "./selection";
-import {fetchPost} from "../../util/fetch";
+import {fetchPost, fetchSyncPost} from "../../util/fetch";
 import {Constants} from "../../constants";
+/// #if !BROWSER
+import {ipcRenderer} from "electron";
+/// #endif
+/// #if MOBILE
+import {processSYLink} from "../../editor/openLink";
+/// #endif
+import {getDefaultType} from "../../search/getDefault";
+
+export const isPhablet = () => {
+    return /Android|webOS|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(navigator.userAgent) || isIPhone() || isIPad();
+};
+
+export const encodeBase64 = (text: string): string => {
+    if (typeof Buffer !== "undefined") {
+        return Buffer.from(text, "utf8").toString("base64");
+    } else {
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(text);
+        let binary = "";
+        const chunkSize = 0x8000; // 避免栈溢出
+
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+            binary += String.fromCharCode(...chunk);
+        }
+
+        return btoa(binary);
+    }
+};
+
+export const getTextSiyuanFromTextHTML = (html: string) => {
+    if (html.trimStart().startsWith("<html") &&
+        html.substring(0, html.indexOf(">")).includes('xmlns:x="urn:schemas-microsoft-com:office:excel"')) {
+        // 移除 Microsoft Excel 中的 data-siyuan https://github.com/siyuan-note/siyuan/pull/16338
+        return {
+            textSiyuan: "",
+            textHtml: html.replace(/<!--data-siyuan='[^']+'-->/g, "")
+        };
+    }
+    const siyuanMatch = html.match(/<!--data-siyuan='([^']+)'-->/);
+    let textSiyuan = "";
+    let textHtml = html;
+    if (siyuanMatch) {
+        try {
+            if (typeof Buffer !== "undefined") {
+                const decodedBytes = Buffer.from(siyuanMatch[1], "base64");
+                textSiyuan = decodedBytes.toString("utf8");
+            } else {
+                const decoder = new TextDecoder();
+                const bytes = Uint8Array.from(atob(siyuanMatch[1]), char => char.charCodeAt(0));
+                textSiyuan = decoder.decode(bytes);
+            }
+            // 移除注释节点，保持原有的 text/html 内容
+            textHtml = html.replace(/<!--data-siyuan='[^']+'-->/g, "");
+        } catch (e) {
+            console.log("Failed to decode siyuan data from HTML comment:", e);
+        }
+    }
+    return {
+        textSiyuan,
+        textHtml
+    };
+};
 
 export const openByMobile = (uri: string) => {
     if (!uri) {
         return;
     }
+    /// #if MOBILE
+    if (processSYLink(window.siyuan.ws.app, uri)) {
+        return;
+    }
+    /// #endif
     if (isInIOS()) {
         if (uri.startsWith("assets/")) {
             // iOS 16.7 之前的版本，uri 需要 encodeURIComponent
@@ -30,13 +98,123 @@ export const openByMobile = (uri: string) => {
     }
 };
 
+export const exportByMobile = (uri: string) => {
+    if (!uri) {
+        return;
+    }
+    if (isInIOS()) {
+        openByMobile(uri);
+    } else if (isInAndroid()) {
+        window.JSAndroid.exportByDefault(uri);
+    } else if (isInHarmony()) {
+        window.JSHarmony.exportByDefault(uri);
+    } else {
+        window.open(uri);
+    }
+};
+
 export const readText = () => {
     if (isInAndroid()) {
         return window.JSAndroid.readClipboard();
     } else if (isInHarmony()) {
         return window.JSHarmony.readClipboard();
     }
-    return navigator.clipboard.readText();
+    if (typeof navigator.clipboard === "undefined") {
+        alert(window.siyuan.languages.clipboardPermissionDenied);
+        return "";
+    }
+    return navigator.clipboard.readText().catch(() => {
+        alert(window.siyuan.languages.clipboardPermissionDenied);
+    }) || "";
+};
+
+/// #if !BROWSER
+export const getLocalFiles = async () => {
+    // 不再支持 PC 浏览器 https://github.com/siyuan-note/siyuan/issues/7206
+    let localFiles: ILocalFiles[] = [];
+    if ("darwin" === window.siyuan.config.system.os) {
+        const xmlString = await ipcRenderer.invoke(Constants.SIYUAN_GET, {
+            cmd: "clipboardRead",
+            format: "NSFilenamesPboardType",
+        });
+        if (xmlString) {
+            const domParser = new DOMParser();
+            const xmlDom = domParser.parseFromString(xmlString, "application/xml");
+            Array.from(xmlDom.getElementsByTagName("string")).forEach(item => {
+                localFiles.push({path: item.childNodes[0].nodeValue, size: null});
+            });
+        }
+    } else {
+        const xmlString = await fetchSyncPost("/api/clipboard/readFilePaths", {});
+        if (xmlString.data.length > 0) {
+            localFiles = xmlString.data;
+        }
+    }
+    return localFiles;
+};
+/// #endif
+
+export const readClipboard = async () => {
+    const text: IClipboardData = {textPlain: "", textHTML: "", siyuanHTML: ""};
+    if (isInAndroid()) {
+        text.textPlain = window.JSAndroid.readClipboard();
+        text.textHTML = window.JSAndroid.readHTMLClipboard();
+        const textObj = getTextSiyuanFromTextHTML(text.textHTML);
+        text.textHTML = textObj.textHtml;
+        text.siyuanHTML = textObj.textSiyuan;
+        if (!text.siyuanHTML) {
+            text.siyuanHTML = window.JSAndroid.readSiYuanHTMLClipboard();
+        }
+        return text;
+    }
+    if (isInHarmony()) {
+        text.textPlain = window.JSHarmony.readClipboard();
+        text.textHTML = window.JSHarmony.readHTMLClipboard();
+        const textObj = getTextSiyuanFromTextHTML(text.textHTML);
+        text.textHTML = textObj.textHtml;
+        text.siyuanHTML = textObj.textSiyuan;
+        if (!text.siyuanHTML) {
+            text.siyuanHTML = window.JSHarmony.readSiYuanHTMLClipboard();
+        }
+        return text;
+    }
+    if (typeof navigator.clipboard === "undefined") {
+        alert(window.siyuan.languages.clipboardPermissionDenied);
+        return text;
+    }
+    try {
+        const clipboardContents = await navigator.clipboard.read().catch(() => {
+            alert(window.siyuan.languages.clipboardPermissionDenied);
+        });
+        if (!clipboardContents) {
+            return text;
+        }
+        for (const item of clipboardContents) {
+            if (item.types.includes("text/html")) {
+                const blob = await item.getType("text/html");
+                text.textHTML = await blob.text();
+                const textObj = getTextSiyuanFromTextHTML(text.textHTML);
+                text.textHTML = textObj.textHtml;
+                text.siyuanHTML = textObj.textSiyuan;
+            }
+            if (item.types.includes("text/plain")) {
+                const blob = await item.getType("text/plain");
+                text.textPlain = await blob.text();
+            }
+            if (item.types.includes("image/png")) {
+                const blob = await item.getType("image/png");
+                text.files = [new File([blob], "image.png", {type: "image/png", lastModified: Date.now()})];
+            }
+        }
+        /// #if !BROWSER
+        if (!text.textHTML && !text.files) {
+            text.localFiles = await getLocalFiles();
+        }
+        /// #endif
+        return text;
+    } catch (e) {
+        return text;
+    }
 };
 
 export const writeText = (text: string) => {
@@ -82,9 +260,9 @@ export const writeText = (text: string) => {
     }
 };
 
-export const copyPlainText = async (text: string) => {
+export const copyPlainText = (text: string) => {
     text = text.replace(new RegExp(Constants.ZWSP, "g"), ""); // `复制纯文本` 时移除所有零宽空格 https://github.com/siyuan-note/siyuan/issues/6674
-    await writeText(text);
+    writeText(text);
 };
 
 // 用户 iPhone 点击延迟/需要双击的处理
@@ -130,6 +308,11 @@ export const isIPhone = () => {
     return navigator.userAgent.indexOf("iPhone") > -1;
 };
 
+export const isSafari = () => {
+    const userAgent = navigator.userAgent;
+    return userAgent.includes("Safari") && !userAgent.includes("Chrome") && !userAgent.includes("Chromium");
+};
+
 export const isIPad = () => {
     return navigator.userAgent.indexOf("iPad") > -1;
 };
@@ -145,10 +328,23 @@ export const isWin11 = async () => {
     const ua = await (navigator as any).userAgentData.getHighEntropyValues(["platformVersion"]);
     if ((navigator as any).userAgentData.platform === "Windows") {
         if (parseInt(ua.platformVersion.split(".")[0]) >= 13) {
-           return true;
+            return true;
         }
     }
     return false;
+};
+
+export const getScreenWidth = () => {
+    if (isInAndroid()) {
+        return window.JSAndroid.getScreenWidthPx();
+    } else if (isInHarmony()) {
+        return window.JSHarmony.getScreenWidthPx();
+    }
+    return window.outerWidth;
+};
+
+export const isWindows = () => {
+    return navigator.platform.toUpperCase().indexOf("WIN") > -1;
 };
 
 export const isInAndroid = () => {
@@ -159,39 +355,70 @@ export const isInIOS = () => {
     return window.siyuan.config.system.container === "ios" && window.webkit?.messageHandlers;
 };
 
+export const isInMobileApp = () => {
+    if (isInAndroid() || isInHarmony() || isInIOS()) {
+        return true;
+    }
+    return false;
+};
+
 export const isInHarmony = () => {
     return window.siyuan.config.system.container === "harmony" && window.JSHarmony;
 };
 
+export const isInEdge = () => {
+    const ua = navigator.userAgent;
+    return ua.indexOf("EdgA/") > -1 || ua.indexOf("Edge/") > -1;
+};
+
+export function isChromeBrowser(): boolean {
+    const nav = window.navigator as Navigator & {
+        userAgentData: {
+            brands: {
+                brand: string;
+                version: string;
+            }[]
+        }
+    };
+    if (nav.userAgentData && Array.isArray(nav.userAgentData.brands)) {
+        return nav.userAgentData.brands.some((b: any) => /Chrome|Chromium/i.test(b.brand));
+    }
+    // 回退到 userAgent
+    const ua = nav.userAgent || "";
+    const isChromium = /\bChrome\/\d+/i.test(ua) || /\bChromium\/\d+/i.test(ua);
+    const isEdge = /\bEdg(e|A|iOS)?\/\d+/i.test(ua); // Edge Chromium
+    const isOpera = /\b(OPR|Opera)\/\d+/i.test(ua);
+
+    return isChromium && !isEdge && !isOpera;
+}
+
+export const updateHotkeyAfterTip = (hotkey: string, split = " ") => {
+    if (hotkey) {
+        return split + updateHotkeyTip(hotkey);
+    }
+    return "";
+};
+
 // Mac，Windows 快捷键展示
 export const updateHotkeyTip = (hotkey: string) => {
-    if (isMac()) {
+    if (!hotkey || isMac()) {
         return hotkey;
     }
-
-    const KEY_MAP = new Map(Object.entries({
-        "⌘": "Ctrl",
-        "⌃": "Ctrl",
-        "⇧": "Shift",
-        "⌥": "Alt",
-        "⇥": "Tab",
-        "⌫": "Backspace",
-        "⌦": "Delete",
-        "↩": "Enter",
-    }));
-
     const keys = [];
-
-    if ((hotkey.indexOf("⌘") > -1 || hotkey.indexOf("⌃") > -1)) keys.push(KEY_MAP.get("⌘"));
-    if (hotkey.indexOf("⇧") > -1) keys.push(KEY_MAP.get("⇧"));
-    if (hotkey.indexOf("⌥") > -1) keys.push(KEY_MAP.get("⌥"));
+    if ((hotkey.indexOf("⌘") > -1 || hotkey.indexOf("⌃") > -1)) keys.push("Ctrl");
+    if (hotkey.indexOf("⇧") > -1) keys.push("Shift");
+    if (hotkey.indexOf("⌥") > -1) keys.push("Alt");
 
     // 不能去最后一个，需匹配 F2
-    const lastKey = hotkey.replace(/⌘|⇧|⌥|⌃/g, "");
+    const lastKey = hotkey.replace(/[⌘⇧⌥⌃]/g, "");
     if (lastKey) {
-        keys.push(KEY_MAP.get(lastKey) || lastKey);
+        keys.push({
+            "⇥": "Tab",
+            "⌫": "Backspace",
+            "⌦": "Delete",
+            "↩": "Enter"
+        }[lastKey] || lastKey);
     }
-
     return keys.join("+");
 };
 
@@ -233,11 +460,11 @@ export const getLocalStorage = (cb: () => void) => {
             dark: "dark",
             annoColor: "var(--b3-pdf-background1)"
         };
-        defaultStorage[Constants.LOCAL_LAYOUTS] = [];   // {name: "", layout:{}, time: number, filespaths: filesPath[]}
+        defaultStorage[Constants.LOCAL_LAYOUTS] = [];   // {name: "", layout:{}, time: number, filespaths: IFilesPath[]}
         defaultStorage[Constants.LOCAL_AI] = [];   // {name: "", memo: ""}
         defaultStorage[Constants.LOCAL_PLUGIN_DOCKS] = {};  // { pluginName: {dockId: IPluginDockTab}}
         defaultStorage[Constants.LOCAL_PLUGINTOPUNPIN] = [];
-        defaultStorage[Constants.LOCAL_OUTLINE] = {keepExpand: true};
+        defaultStorage[Constants.LOCAL_OUTLINE] = {keepCurrentExpand: false};
         defaultStorage[Constants.LOCAL_FILEPOSITION] = {}; // {id: IScrollAttr}
         defaultStorage[Constants.LOCAL_DIALOGPOSITION] = {}; // {id: IPosition}
         defaultStorage[Constants.LOCAL_HISTORY] = {
@@ -266,7 +493,8 @@ export const getLocalStorage = (cb: () => void) => {
             removeAssets: true,
             keepFold: false,
             mergeSubdocs: false,
-            watermark: false
+            watermark: false,
+            paged: true
         };
         defaultStorage[Constants.LOCAL_EXPORTIMG] = {
             keepFold: false,
@@ -284,8 +512,10 @@ export const getLocalStorage = (cb: () => void) => {
             currentTab: "emoji"
         };
         defaultStorage[Constants.LOCAL_FONTSTYLES] = [];
-        defaultStorage[Constants.LOCAL_FILESPATHS] = [];    // filesPath[]
+        defaultStorage[Constants.LOCAL_CLOSED_TABS] = [];
+        defaultStorage[Constants.LOCAL_FILESPATHS] = [];    // IFilesPath[]
         defaultStorage[Constants.LOCAL_SEARCHDATA] = {
+            removed: true,
             page: 1,
             sort: 0,
             group: 0,
@@ -295,25 +525,12 @@ export const getLocalStorage = (cb: () => void) => {
             idPath: [],
             k: "",
             r: "",
-            types: {
-                document: window.siyuan.config.search.document,
-                heading: window.siyuan.config.search.heading,
-                list: window.siyuan.config.search.list,
-                listItem: window.siyuan.config.search.listItem,
-                codeBlock: window.siyuan.config.search.codeBlock,
-                htmlBlock: window.siyuan.config.search.htmlBlock,
-                mathBlock: window.siyuan.config.search.mathBlock,
-                table: window.siyuan.config.search.table,
-                blockquote: window.siyuan.config.search.blockquote,
-                superBlock: window.siyuan.config.search.superBlock,
-                paragraph: window.siyuan.config.search.paragraph,
-                embedBlock: window.siyuan.config.search.embedBlock,
-                databaseBlock: window.siyuan.config.search.databaseBlock,
-            },
+            types: getDefaultType(),
             replaceTypes: Object.assign({}, Constants.SIYUAN_DEFAULT_REPLACETYPES),
         };
         defaultStorage[Constants.LOCAL_ZOOM] = 1;
         defaultStorage[Constants.LOCAL_MOVE_PATH] = {keys: [], k: ""};
+        defaultStorage[Constants.LOCAL_RECENT_DOCS] = {type: "viewedAt"};   // TRecentDocsSort
 
         [Constants.LOCAL_EXPORTIMG, Constants.LOCAL_SEARCHKEYS, Constants.LOCAL_PDFTHEME, Constants.LOCAL_BAZAAR,
             Constants.LOCAL_EXPORTWORD, Constants.LOCAL_EXPORTPDF, Constants.LOCAL_DOCINFO, Constants.LOCAL_FONTSTYLES,
@@ -321,7 +538,8 @@ export const getLocalStorage = (cb: () => void) => {
             Constants.LOCAL_PLUGINTOPUNPIN, Constants.LOCAL_SEARCHASSET, Constants.LOCAL_FLASHCARD,
             Constants.LOCAL_DIALOGPOSITION, Constants.LOCAL_SEARCHUNREF, Constants.LOCAL_HISTORY,
             Constants.LOCAL_OUTLINE, Constants.LOCAL_FILEPOSITION, Constants.LOCAL_FILESPATHS, Constants.LOCAL_IMAGES,
-            Constants.LOCAL_PLUGIN_DOCKS, Constants.LOCAL_EMOJIS, Constants.LOCAL_MOVE_PATH].forEach((key) => {
+            Constants.LOCAL_PLUGIN_DOCKS, Constants.LOCAL_EMOJIS, Constants.LOCAL_MOVE_PATH, Constants.LOCAL_RECENT_DOCS,
+            Constants.LOCAL_CLOSED_TABS].forEach((key) => {
             if (typeof response.data[key] === "string") {
                 try {
                     const parseData = JSON.parse(response.data[key]);
@@ -348,7 +566,7 @@ export const getLocalStorage = (cb: () => void) => {
 };
 
 export const setStorageVal = (key: string, val: any, cb?: () => void) => {
-    if (window.siyuan.config.readonly) {
+    if (window.siyuan.config.readonly || window.siyuan.isPublish) {
         return;
     }
     fetchPost("/api/storage/setLocalStorageVal", {
@@ -361,3 +579,41 @@ export const setStorageVal = (key: string, val: any, cb?: () => void) => {
         }
     });
 };
+
+/// #if !BROWSER
+export const initNativeDialogOverride = () => {
+    const originalAlert = window.alert;
+    const originalConfirm = window.confirm;
+
+    window.alert = function (message: string) {
+        try {
+            ipcRenderer.sendSync(Constants.SIYUAN_ALERT_DIALOG, {
+                title: window.siyuan.languages.siyuanNote,
+                message,
+                buttons: [window.siyuan.languages.confirm],
+                noLink: true,
+            });
+            return undefined;
+        } catch (error) {
+            return originalAlert.call(this, message);
+        }
+    };
+
+    window.confirm = function (message: string): boolean {
+        try {
+            const buttonIndex = ipcRenderer.sendSync(Constants.SIYUAN_CONFIRM_DIALOG, {
+                title: window.siyuan?.languages?.siyuanNote || "SiYuan",
+                message,
+                buttons: [window.siyuan?.languages?.cancel || "Cancel", window.siyuan?.languages?.confirm || "OK"],
+                cancelId: 0,
+                defaultId: 1,
+                noLink: true,
+            });
+            return buttonIndex === 1;
+        } catch (error) {
+            return originalConfirm.call(this, message);
+        }
+    };
+};
+/// #endif
+

@@ -33,12 +33,17 @@
 
     &--full {
       margin-top: -16px;
+      margin-bottom: -16px;
       height: calc(100% + 32px);
     }
 
     &--top {
       margin-top: -16px;
       height: calc(100% + 16px);
+    }
+
+    textarea.b3-text-field {
+      resize: vertical;
     }
   }
 
@@ -73,8 +78,8 @@
       &__graphic {
         margin-right: 0;
         padding: 0 10px 0 5px;
-        height: 16px;
-        width: 16px;
+        height: 14px;
+        width: 14px;
       }
     }
   }
@@ -208,6 +213,7 @@
       justify-content: center;
       overflow: auto;
       flex: 1;
+      padding: 0 8px;
       margin-top: 8px;
     }
   }
@@ -215,7 +221,7 @@
   &-keymap {
     &__key {
       padding: 2px 4px;
-      font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace, var(--b3-font-family);
+      font-family: var(--b3-font-family-kbd);
       line-height: 1;
       color: var(--b3-theme-on-surface);
       vertical-align: middle;
@@ -254,7 +260,7 @@
     }
 
     &__content {
-      margin-top: -15px;
+      margin: 1px 16px;
     }
 
     &__readme {

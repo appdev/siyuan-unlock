@@ -1,12 +1,13 @@
 {
 	"ID": "20240113102857-c63dmo5",
-	"Spec": "1",
+	"Spec": "2",
 	"Type": "NodeDocument",
 	"Properties": {
 		"icon": "1f4f1",
 		"id": "20240113102857-c63dmo5",
 		"title": "移动端 App",
-		"updated": "20240119205333"
+		"type": "doc",
+		"updated": "20260317202452"
 	},
 	"Children": [
 		{
@@ -15,7 +16,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20240113102857-aof1w7f",
-				"updated": "20240113103019"
+				"updated": "20250114214155"
 			},
 			"Children": [
 				{
@@ -29,12 +30,12 @@
 			"Type": "NodeParagraph",
 			"Properties": {
 				"id": "20240113103019-9qixtas",
-				"updated": "20240113105701"
+				"updated": "20250114214155"
 			},
 			"Children": [
 				{
 					"Type": "NodeText",
-					"Data": "思源笔记提供了 Android 端和 iOS 端 App，已经上架部分手机应用商店，请在应用商店中搜索 "
+					"Data": "思源笔记提供了 Android 端、iOS 端和鸿蒙端 App，已经上架部分手机应用商店，请在应用商店中搜索 "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -62,7 +63,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20240113103514-zn9zqby",
-				"updated": "20240113103527"
+				"updated": "20250114213859"
 			},
 			"Children": [
 				{
@@ -91,7 +92,7 @@
 			"ListData": {},
 			"Properties": {
 				"id": "20240113103626-ubxacja",
-				"updated": "20240113103627"
+				"updated": "20250114213859"
 			},
 			"Children": [
 				{
@@ -130,7 +131,8 @@
 						"Marker": "Kg=="
 					},
 					"Properties": {
-						"id": "20240113103636-d16mhk2"
+						"id": "20240113103636-d16mhk2",
+						"updated": "20240113103636"
 					},
 					"Children": [
 						{
@@ -150,6 +152,34 @@
 					]
 				},
 				{
+					"ID": "20250114213857-808p5ry",
+					"Type": "NodeListItem",
+					"ListData": {
+						"BulletChar": 42,
+						"Marker": "Kg=="
+					},
+					"Properties": {
+						"id": "20250114213857-808p5ry",
+						"updated": "20250114213859"
+					},
+					"Children": [
+						{
+							"ID": "20250114213857-d50uviq",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20250114213857-d50uviq",
+								"updated": "20250114213859"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "荣耀"
+								}
+							]
+						}
+					]
+				},
+				{
 					"ID": "20240113103639-l2ytma2",
 					"Type": "NodeListItem",
 					"ListData": {
@@ -157,7 +187,8 @@
 						"Marker": "Kg=="
 					},
 					"Properties": {
-						"id": "20240113103639-l2ytma2"
+						"id": "20240113103639-l2ytma2",
+						"updated": "20240113103639"
 					},
 					"Children": [
 						{
@@ -184,7 +215,8 @@
 						"Marker": "Kg=="
 					},
 					"Properties": {
-						"id": "20240113103641-v5mcpqr"
+						"id": "20240113103641-v5mcpqr",
+						"updated": "20240113103641"
 					},
 					"Children": [
 						{
@@ -211,7 +243,8 @@
 						"Marker": "Kg=="
 					},
 					"Properties": {
-						"id": "20240113103645-f24px3a"
+						"id": "20240113103645-f24px3a",
+						"updated": "20240113103645"
 					},
 					"Children": [
 						{
@@ -238,7 +271,8 @@
 						"Marker": "Kg=="
 					},
 					"Properties": {
-						"id": "20240113103702-duvw7xt"
+						"id": "20240113103702-duvw7xt",
+						"updated": "20240113103702"
 					},
 					"Children": [
 						{
@@ -265,7 +299,8 @@
 						"Marker": "Kg=="
 					},
 					"Properties": {
-						"id": "20240113103706-rvth88e"
+						"id": "20240113103706-rvth88e",
+						"updated": "20240113103706"
 					},
 					"Children": [
 						{
@@ -301,8 +336,8 @@
 				{
 					"Type": "NodeTextMark",
 					"TextMarkType": "a",
-					"TextMarkAHref": "https://github.com/appdev/siyuan-unlock/releases",
-					"TextMarkTextContent": "https://github.com/appdev/siyuan-unlock/releases"
+					"TextMarkAHref": "https://b3log.org/siyuan/download.html",
+					"TextMarkTextContent": "https://b3log.org/siyuan/download.html"
 				}
 			]
 		},
@@ -373,7 +408,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20240113103753-6tsixvt",
-				"updated": "20240113104524"
+				"updated": "20250114214413"
 			},
 			"Children": [
 				{
@@ -517,6 +552,228 @@
 					]
 				}
 			]
+		},
+		{
+			"ID": "20250114214413-n2v7z20",
+			"Type": "NodeHeading",
+			"HeadingLevel": 2,
+			"Properties": {
+				"id": "20250114214413-n2v7z20",
+				"updated": "20260317202452"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "Android 端自定义保活通知"
+				}
+			]
+		},
+		{
+			"ID": "20250114214422-sv4vhfx",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20250114214422-sv4vhfx",
+				"updated": "20260317183614"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "如果你需要思源尽量保活后台运行，请按如下步骤操作："
+				}
+			]
+		},
+		{
+			"ID": "20250114215159-d40seb3",
+			"Type": "NodeList",
+			"ListData": {
+				"Typ": 1
+			},
+			"Properties": {
+				"id": "20250114215159-d40seb3",
+				"updated": "20260317202452"
+			},
+			"Children": [
+				{
+					"ID": "20260317183810-qwz9j00",
+					"Type": "NodeListItem",
+					"ListData": {
+						"Typ": 1,
+						"Delimiter": 46,
+						"Marker": "MS4=",
+						"Num": 1
+					},
+					"Properties": {
+						"id": "20260317183810-qwz9j00",
+						"updated": "20260317202452"
+					},
+					"Children": [
+						{
+							"ID": "20260317183810-ghgiv5m",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20260317183810-ghgiv5m",
+								"updated": "20260317202452"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "省电策略调整为 "
+								},
+								{
+									"Type": "NodeTextMark",
+									"TextMarkType": "code",
+									"TextMarkTextContent": "无限制"
+								},
+								{
+									"Type": "NodeText",
+									"Data": "​"
+								}
+							]
+						}
+					]
+				},
+				{
+					"ID": "20260317183714-af6het7",
+					"Type": "NodeListItem",
+					"ListData": {
+						"Typ": 1,
+						"Delimiter": 46,
+						"Marker": "Mi4=",
+						"Num": 2
+					},
+					"Properties": {
+						"id": "20260317183714-af6het7",
+						"updated": "20260317183714"
+					},
+					"Children": [
+						{
+							"ID": "20260317183714-uxiyad6",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20260317183714-uxiyad6",
+								"updated": "20260317183724"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "允许通知"
+								}
+							]
+						}
+					]
+				},
+				{
+					"ID": "20250114215201-degei8s",
+					"Type": "NodeListItem",
+					"ListData": {
+						"Typ": 1,
+						"Delimiter": 46,
+						"Marker": "My4=",
+						"Num": 3
+					},
+					"Properties": {
+						"id": "20250114215201-degei8s",
+						"updated": "20250117171835"
+					},
+					"Children": [
+						{
+							"ID": "20250114215201-ffgvnm6",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20250114215201-ffgvnm6",
+								"updated": "20260317183745"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "在桌面端 "
+								},
+								{
+									"Type": "NodeTextMark",
+									"TextMarkType": "code",
+									"TextMarkTextContent": "工作空间/data/assets/"
+								},
+								{
+									"Type": "NodeText",
+									"Data": "​ 文件夹下创建一个名为 "
+								},
+								{
+									"Type": "NodeTextMark",
+									"TextMarkType": "code",
+									"TextMarkTextContent": "android-notification-texts.txt"
+								},
+								{
+									"Type": "NodeText",
+									"Data": "​ 的文本文件，其中每一行会作为通知的文本"
+								}
+							]
+						}
+					]
+				},
+				{
+					"ID": "20250114215213-x87hdl5",
+					"Type": "NodeListItem",
+					"ListData": {
+						"Typ": 1,
+						"Delimiter": 46,
+						"Marker": "NC4=",
+						"Num": 4
+					},
+					"Properties": {
+						"id": "20250114215213-x87hdl5",
+						"updated": "20250114215213"
+					},
+					"Children": [
+						{
+							"ID": "20250114215213-ca89zpd",
+							"Type": "NodeParagraph",
+							"Properties": {
+								"id": "20250114215213-ca89zpd",
+								"updated": "20250114215220"
+							},
+							"Children": [
+								{
+									"Type": "NodeText",
+									"Data": "通过"
+								},
+								{
+									"Type": "NodeTextMark",
+									"TextMarkType": "block-ref",
+									"TextMarkBlockRefID": "20230808120347-3cob0nb",
+									"TextMarkBlockRefSubtype": "d",
+									"TextMarkTextContent": "数据同步"
+								},
+								{
+									"Type": "NodeText",
+									"Data": "将其同步到 Android 端"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"ID": "20260317183852-dxt8l8a",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20260317183852-dxt8l8a",
+				"updated": "20260317183945"
+			},
+			"Children": [
+				{
+					"Type": "NodeText",
+					"Data": "完成以上步骤后思源每隔 45 秒会发送一条通知来尽量保活后台运行。"
+				}
+			]
+		},
+		{
+			"ID": "20250114215221-sl97cs4",
+			"Type": "NodeParagraph",
+			"Properties": {
+				"id": "20250114215221-sl97cs4",
+				"updated": "20260317183704"
+			}
 		}
 	]
 }

@@ -64,7 +64,7 @@ type AppConf struct {
 	User           *conf.User       `json:"-"`              // 社区用户内存结构，不持久化。不要直接使用，使用 GetUser() 和 SetUser() 方法
 	Account        *conf.Account    `json:"account"`        // 帐号配置
 	ReadOnly       bool             `json:"readonly"`       // 是否是以只读模式运行
-	LocalIPs       []string         `json:"localIPs"`       // 本地 IP 列表
+	ServerAddrs    []string         `json:"serverAddrs"`    // 本地服务器地址列表
 	AccessAuthCode string           `json:"accessAuthCode"` // 访问授权码
 	System         *conf.System     `json:"system"`         // 系统配置
 	Keymap         *conf.Keymap     `json:"keymap"`         // 快捷键配置
@@ -82,12 +82,18 @@ type AppConf struct {
 	CloudRegion    int              `json:"cloudRegion"`    // 云端区域，0：中国大陆，1：北美
 	Snippet        *conf.Snpt       `json:"snippet"`        // 代码片段
 	DataIndexState int              `json:"dataIndexState"` // 数据索引状态，0：已索引，1：未索引
+	CookieKey      string           `json:"cookieKey"`      // 用于加密 Cookie 的密钥
 
-	m *sync.Mutex
+	m        *sync.RWMutex // 配置数据锁
+	userLock *sync.RWMutex // 用户数据独立锁，避免与配置保存操作竞争
 }
 
 func NewAppConf() *AppConf {
-	return &AppConf{LogLevel: "debug", m: &sync.Mutex{}}
+	return &AppConf{
+		LogLevel: "debug",
+		m:        &sync.RWMutex{},
+		userLock: &sync.RWMutex{},
+	}
 }
 
 func (conf *AppConf) GetUILayout() *conf.UILayout {
@@ -103,14 +109,14 @@ func (conf *AppConf) SetUILayout(uiLayout *conf.UILayout) {
 }
 
 func (conf *AppConf) GetUser() *conf.User {
-	conf.m.Lock()
-	defer conf.m.Unlock()
+	conf.userLock.RLock()
+	defer conf.userLock.RUnlock()
 	return conf.User
 }
 
 func (conf *AppConf) SetUser(user *conf.User) {
-	conf.m.Lock()
-	defer conf.m.Unlock()
+	conf.userLock.Lock()
+	defer conf.userLock.Unlock()
 	conf.User = user
 }
 
@@ -203,6 +209,10 @@ func InitConf() {
 	if "" == Conf.Appearance.CodeBlockThemeLight {
 		Conf.Appearance.CodeBlockThemeLight = "github"
 	}
+	if nil == Conf.Appearance.StatusBar {
+		Conf.Appearance.StatusBar = &util.StatusBar{}
+	}
+	util.StatusBarCfg = Conf.Appearance.StatusBar
 	if nil == Conf.FileTree {
 		Conf.FileTree = conf.NewFileTree()
 	}
@@ -215,8 +225,23 @@ func InitConf() {
 	if 32 < Conf.FileTree.MaxOpenTabCount {
 		Conf.FileTree.MaxOpenTabCount = 32
 	}
-	Conf.FileTree.DocCreateSavePath = strings.TrimSpace(Conf.FileTree.DocCreateSavePath)
+	Conf.FileTree.DocCreateSavePath = util.TrimSpaceInPath(Conf.FileTree.DocCreateSavePath)
+	Conf.FileTree.RefCreateSavePath = util.TrimSpaceInPath(Conf.FileTree.RefCreateSavePath)
 	util.UseSingleLineSave = Conf.FileTree.UseSingleLineSave
+	if 2 > Conf.FileTree.LargeFileWarningSize {
+		Conf.FileTree.LargeFileWarningSize = 8
+	}
+	util.LargeFileWarningSize = Conf.FileTree.LargeFileWarningSize
+	if nil == Conf.FileTree.CreateDocAtTop { // v3.4.0 之前的版本没有该字段，设置默认值为 true，即在顶部创建新文档，不改变用户习惯
+		Conf.FileTree.CreateDocAtTop = func() *bool { b := true; return &b }()
+	}
+
+	if conf.MinFileTreeRecentDocsListCount > Conf.FileTree.RecentDocsMaxListCount {
+		Conf.FileTree.RecentDocsMaxListCount = conf.MinFileTreeRecentDocsListCount
+	}
+	if conf.MaxFileTreeRecentDocsListCount < Conf.FileTree.RecentDocsMaxListCount {
+		Conf.FileTree.RecentDocsMaxListCount = conf.MaxFileTreeRecentDocsListCount
+	}
 
 	util.CurrentCloudRegion = Conf.CloudRegion
 
@@ -224,11 +249,27 @@ func InitConf() {
 		Conf.Tag = conf.NewTag()
 	}
 
+	defaultEditor := conf.NewEditor()
 	if nil == Conf.Editor {
-		Conf.Editor = conf.NewEditor()
+		Conf.Editor = defaultEditor
+	}
+
+	// 新增字段的默认值，使用指针类型来区分字段不存在（nil）和用户设置为 0（非 nil）
+	if nil == Conf.Editor.BacklinkSort {
+		Conf.Editor.BacklinkSort = defaultEditor.BacklinkSort
+	}
+	if nil == Conf.Editor.BackmentionSort {
+		Conf.Editor.BackmentionSort = defaultEditor.BackmentionSort
 	}
 	if 1 > len(Conf.Editor.Emoji) {
 		Conf.Editor.Emoji = []string{}
+	}
+	for i, emoji := range Conf.Editor.Emoji {
+		if strings.Contains(emoji, ".") {
+			// XSS through emoji name https://github.com/siyuan-note/siyuan/issues/15034
+			emoji = util.FilterUploadEmojiFileName(emoji)
+			Conf.Editor.Emoji[i] = emoji
+		}
 	}
 	if 9 > Conf.Editor.FontSize || 72 < Conf.Editor.FontSize {
 		Conf.Editor.FontSize = 16
@@ -248,8 +289,20 @@ func InitConf() {
 	if 1 > Conf.Editor.HistoryRetentionDays {
 		Conf.Editor.HistoryRetentionDays = 30
 	}
+	if 3650 < Conf.Editor.HistoryRetentionDays {
+		Conf.Editor.HistoryRetentionDays = 3650
+	}
+	if nil == Conf.Editor.FloatWindowDelay {
+		v := 620
+		Conf.Editor.FloatWindowDelay = &v
+	} else {
+		*Conf.Editor.FloatWindowDelay = max(0, min(2000, *Conf.Editor.FloatWindowDelay))
+	}
 	if conf.MinDynamicLoadBlocks > Conf.Editor.DynamicLoadBlocks {
 		Conf.Editor.DynamicLoadBlocks = conf.MinDynamicLoadBlocks
+	}
+	if 1 > len(Conf.Editor.SpellcheckLanguages) {
+		Conf.Editor.SpellcheckLanguages = []string{"en-US"}
 	}
 	if 0 > Conf.Editor.BacklinkExpandCount {
 		Conf.Editor.BacklinkExpandCount = 0
@@ -284,10 +337,11 @@ func InitConf() {
 			Conf.OpenHelp = true
 		}
 	} else {
-		if 0 < semver.Compare("v"+util.Ver, "v"+Conf.System.KernelVersion) {
+		cmp := semver.Compare("v"+util.Ver, "v"+Conf.System.KernelVersion)
+		if 0 < cmp {
 			logging.LogInfof("upgraded from version [%s] to [%s]", Conf.System.KernelVersion, util.Ver)
 			Conf.ShowChangelog = true
-		} else if 0 > semver.Compare("v"+util.Ver, "v"+Conf.System.KernelVersion) {
+		} else if 0 > cmp {
 			logging.LogInfof("downgraded from version [%s] to [%s]", Conf.System.KernelVersion, util.Ver)
 		}
 
@@ -312,10 +366,6 @@ func InitConf() {
 		Conf.System.DisabledFeatures = []string{}
 	}
 
-	if nil == Conf.Snippet {
-		Conf.Snippet = conf.NewSnpt()
-	}
-
 	Conf.System.AppDir = util.WorkingDir
 	Conf.System.ConfDir = util.ConfDir
 	Conf.System.HomeDir = util.HomeDir
@@ -328,6 +378,24 @@ func InitConf() {
 	}
 	Conf.System.OS = runtime.GOOS
 	Conf.System.OSPlatform = util.GetOSPlatform()
+
+	docxTemplate := util.RemoveInvalid(Conf.Export.DocxTemplate)
+	if "" != docxTemplate {
+		params := util.RemoveInvalid(Conf.Export.PandocParams)
+		if gulu.File.IsExist(docxTemplate) && !strings.Contains(params, "--reference-doc") && !Conf.System.IsMicrosoftStore {
+			if !strings.HasPrefix(docxTemplate, "\"") {
+				docxTemplate = "\"" + docxTemplate + "\""
+			}
+			params += " --reference-doc " + docxTemplate
+			Conf.Export.PandocParams = strings.TrimSpace(params)
+		}
+		Conf.Export.DocxTemplate = ""
+		Conf.Save()
+	}
+
+	if nil == Conf.Snippet {
+		Conf.Snippet = conf.NewSnpt()
+	}
 
 	if "" != Conf.UserData {
 		Conf.SetUser(loadUserFromConf())
@@ -360,6 +428,13 @@ func InitConf() {
 	Conf.Sync.WebDAV.Endpoint = util.NormalizeEndpoint(Conf.Sync.WebDAV.Endpoint)
 	Conf.Sync.WebDAV.Timeout = util.NormalizeTimeout(Conf.Sync.WebDAV.Timeout)
 	Conf.Sync.WebDAV.ConcurrentReqs = util.NormalizeConcurrentReqs(Conf.Sync.WebDAV.ConcurrentReqs, conf.ProviderWebDAV)
+	if nil == Conf.Sync.Local {
+		Conf.Sync.Local = &conf.Local{}
+	}
+	Conf.Sync.Local.Endpoint = util.NormalizeLocalPath(Conf.Sync.Local.Endpoint)
+	Conf.Sync.Local.Timeout = util.NormalizeTimeout(Conf.Sync.Local.Timeout)
+	Conf.Sync.Local.ConcurrentReqs = util.NormalizeConcurrentReqs(Conf.Sync.Local.ConcurrentReqs, conf.ProviderLocal)
+
 	if util.ContainerDocker == util.Container {
 		Conf.Sync.Perception = false
 	}
@@ -436,6 +511,33 @@ func InitConf() {
 	if "" == Conf.Flashcard.Weights {
 		Conf.Flashcard.Weights = conf.NewFlashcard().Weights
 	}
+	if 19 != len(strings.Split(Conf.Flashcard.Weights, ",")) {
+		defaultWeights := conf.DefaultFSRSWeights()
+		msg := "fsrs store weights length must be [19]"
+		logging.LogWarnf("%s , given [%s], reset to default weights [%s]", msg, Conf.Flashcard.Weights, defaultWeights)
+		Conf.Flashcard.Weights = defaultWeights
+		go func() {
+			util.WaitForUILoaded()
+			task.AppendAsyncTaskWithDelay(task.PushMsg, 2*time.Second, util.PushErrMsg, msg, 15000)
+		}()
+	}
+	isInvalidFlashcardWeights := false
+	for _, w := range strings.Split(Conf.Flashcard.Weights, ",") {
+		if _, err := strconv.ParseFloat(strings.TrimSpace(w), 64); err != nil {
+			isInvalidFlashcardWeights = true
+			break
+		}
+	}
+	if isInvalidFlashcardWeights {
+		defaultWeights := conf.DefaultFSRSWeights()
+		msg := "fsrs store weights contain invalid number"
+		logging.LogWarnf("%s, given [%s], reset to default weights [%s]", msg, Conf.Flashcard.Weights, defaultWeights)
+		Conf.Flashcard.Weights = defaultWeights
+		go func() {
+			util.WaitForUILoaded()
+			task.AppendAsyncTaskWithDelay(task.PushMsg, 2*time.Second, util.PushErrMsg, msg, 15000)
+		}()
+	}
 
 	if nil == Conf.AI {
 		Conf.AI = conf.NewAI()
@@ -487,8 +589,8 @@ func InitConf() {
 	if "" != util.AccessAuthCode {
 		Conf.AccessAuthCode = util.AccessAuthCode
 	}
-
-	Conf.LocalIPs = util.GetLocalIPs()
+	Conf.AccessAuthCode = util.RemoveInvalid(Conf.AccessAuthCode)
+	Conf.AccessAuthCode = strings.TrimSpace(Conf.AccessAuthCode)
 
 	if 1 == Conf.DataIndexState {
 		// 上次未正常完成数据索引
@@ -504,17 +606,49 @@ func InitConf() {
 
 	Conf.DataIndexState = 0
 
+	if cookieKey := readCookieKey(); "" != cookieKey {
+		Conf.CookieKey = cookieKey
+	} else {
+		if "" == Conf.CookieKey {
+			Conf.CookieKey = gulu.Rand.String(16)
+		}
+		writeCookieKey(Conf.CookieKey)
+	}
+
 	Conf.Save()
 	logging.SetLogLevel(Conf.LogLevel)
-
-	if Conf.System.DisableGoogleAnalytics {
-		logging.LogInfof("user has disabled [Google Analytics]")
-	}
 
 	util.SetNetworkProxy(Conf.System.NetworkProxy.String())
 
 	go util.InitPandoc()
 	go util.InitTesseract()
+}
+
+func readCookieKey() (cookieKey string) {
+	cookieKeyPath := filepath.Join(util.HomeDir, ".config", "siyuan", "cookie.key")
+	if !gulu.File.IsExist(cookieKeyPath) {
+		return
+	}
+
+	data, err := os.ReadFile(cookieKeyPath)
+	if err != nil {
+		logging.LogErrorf("read cookie key file [%s] failed: %s", cookieKeyPath, err)
+		return
+	}
+
+	cookieKey = string(bytes.TrimSpace(data))
+	return
+}
+
+func writeCookieKey(cookieKey string) {
+	cookieKeyPath := filepath.Join(util.HomeDir, ".config", "siyuan", "cookie.key")
+	if gulu.File.IsExist(cookieKeyPath) {
+		return
+	}
+
+	if err := os.WriteFile(cookieKeyPath, []byte(cookieKey), 0644); err != nil {
+		logging.LogErrorf("save cookie key file [%s] failed: %s", cookieKeyPath, err)
+	}
 }
 
 func initLang() {
@@ -541,7 +675,7 @@ func initLang() {
 			logging.LogErrorf("read language configuration [%s] failed: %s", jsonPath, err)
 			continue
 		}
-		langMap := map[string]interface{}{}
+		langMap := map[string]any{}
 		if err := gulu.JSON.UnmarshalJSON(data, &langMap); err != nil {
 			logging.LogErrorf("parse language configuration failed [%s] failed: %s", jsonPath, err)
 			continue
@@ -549,7 +683,7 @@ func initLang() {
 
 		kernelMap := map[int]string{}
 		label := langMap["_label"].(string)
-		kernelLangs := langMap["_kernel"].(map[string]interface{})
+		kernelLangs := langMap["_kernel"].(map[string]any)
 		for k, v := range kernelLangs {
 			num, convErr := strconv.Atoi(k)
 			if nil != convErr {
@@ -562,10 +696,10 @@ func initLang() {
 		name := langName[:strings.LastIndex(langName, ".")]
 		util.Langs[name] = kernelMap
 
-		util.TimeLangs[name] = langMap["_time"].(map[string]interface{})
-		util.TaskActionLangs[name] = langMap["_taskAction"].(map[string]interface{})
-		util.TrayMenuLangs[name] = langMap["_trayMenu"].(map[string]interface{})
-		util.AttrViewLangs[name] = langMap["_attrView"].(map[string]interface{})
+		util.TimeLangs[name] = langMap["_time"].(map[string]any)
+		util.TaskActionLangs[name] = langMap["_taskAction"].(map[string]any)
+		util.TrayMenuLangs[name] = langMap["_trayMenu"].(map[string]any)
+		util.AttrViewLangs[name] = langMap["_attrView"].(map[string]any)
 	}
 }
 
@@ -628,6 +762,7 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int) {
 
 	util.IsExiting.Store(true)
 	waitSecondForExecInstallPkg := false
+	newVerInstallPkgPath := getNewVerInstallPkgPath()
 	if !skipNewVerInstallPkg() && "" != newVerInstallPkgPath {
 		if 2 == execInstallPkg || (force && 0 == execInstallPkg) { // 执行新版本安装
 			waitSecondForExecInstallPkg = true
@@ -662,6 +797,7 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int) {
 		}
 	}
 
+	util.BroadcastByType("main", "exit", 0, "", nil)
 	util.UnlockWorkspace()
 
 	time.Sleep(500 * time.Millisecond)
@@ -672,17 +808,38 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int) {
 			time.Sleep(30 * time.Second)
 		}
 	}
+
 	closeSyncWebSocket()
+
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		logging.LogInfof("exited kernel")
-		util.WebSocketServer.Close()
+		if nil != util.WebSocketServer {
+			util.WebSocketServer.Close()
+		}
+		if nil != util.HttpServer {
+			util.HttpServer.Close()
+		}
+		util.HttpServing = false
+
+		if util.ContainerAndroid == util.Container || util.ContainerIOS == util.Container || util.ContainerHarmony == util.Container {
+			return
+		}
+
 		os.Exit(logging.ExitCodeOk)
 	}()
 	return
 }
 
-var CustomEmojis = sync.Map{}
+var customEmojis = sync.Map{}
+
+func AddCustomEmoji(emojiName, imgSrc string) {
+	customEmojis.Store(emojiName, imgSrc)
+}
+
+func ClearCustomEmojis() {
+	customEmojis.Clear()
+}
 
 func NewLute() (ret *lute.Lute) {
 	ret = util.NewLute()
@@ -692,12 +849,22 @@ func NewLute() (ret *lute.Lute) {
 	ret.SetSpellcheck(Conf.Editor.Spellcheck)
 
 	customEmojiMap := map[string]string{}
-	CustomEmojis.Range(func(key, value interface{}) bool {
+	customEmojis.Range(func(key, value any) bool {
 		customEmojiMap[key.(string)] = value.(string)
 		return true
 	})
 	ret.PutEmojis(customEmojiMap)
 	return
+}
+
+func enableLuteInlineSyntax(luteEngine *lute.Lute) {
+	luteEngine.SetInlineAsterisk(true)
+	luteEngine.SetInlineUnderscore(true)
+	luteEngine.SetSup(true)
+	luteEngine.SetSub(true)
+	luteEngine.SetTag(true)
+	luteEngine.SetInlineMath(true)
+	luteEngine.SetGFMStrikethrough(true)
 }
 
 func (conf *AppConf) Save() {
@@ -818,8 +985,7 @@ func (conf *AppConf) GetClosedBoxes() (ret []*Box) {
 
 func (conf *AppConf) Language(num int) (ret string) {
 	ret = conf.language(num)
-	subscribeURL := util.GetCloudAccountServer() + "/subscribe/siyuan"
-	ret = strings.ReplaceAll(ret, "${url}", subscribeURL)
+	ret = strings.ReplaceAll(ret, "${accountServer}", util.GetCloudAccountServer())
 	return
 }
 
@@ -839,7 +1005,7 @@ func InitBoxes() {
 		box.UpdateHistoryGenerated() // 初始化历史生成时间为当前时间
 
 		if !initialized {
-			index(box.ID)
+			indexBox(box.ID)
 		}
 	}
 
@@ -852,14 +1018,15 @@ func IsSubscriber() bool {
 }
 
 func IsPaidUser() bool {
-	// S3/WebDAV data sync and backup are available for a fee https://github.com/siyuan-note/siyuan/issues/8780
-	// if IsSubscriber() {
-	// 	return true
-	// }
-	// return nil != Conf.User // Sign in to use S3/WebDAV data sync https://github.com/siyuan-note/siyuan/issues/8779
-	// TODO S3/WebDAV data sync and backup are available for a fee https://github.com/siyuan-note/siyuan/issues/8780
-	// return nil != Conf.User && 1 == Conf.User.UserSiYuanOneTimePayStatus
-	return true
+	if IsSubscriber() {
+		return true
+	}
+
+	u := Conf.GetUser()
+	if nil == u {
+		return false
+	}
+	return 1 == u.UserSiYuanOneTimePayStatus
 }
 
 const (
@@ -867,9 +1034,12 @@ const (
 	MaskedAccessAuthCode = "*******"
 )
 
+// GetMaskedConf 获取脱敏后的 Conf
 func GetMaskedConf() (ret *AppConf, err error) {
-	// 脱敏处理
-	data, err := gulu.JSON.MarshalIndentJSON(Conf, "", "  ")
+	// 序列化时持锁，避免与 loadThemes/LoadIcons 等写操作并发导致 slice 在编码过程中被改写而 panic https://github.com/siyuan-note/siyuan/issues/16978
+	Conf.m.Lock()
+	data, err := gulu.JSON.MarshalJSON(Conf)
+	Conf.m.Unlock()
 	if err != nil {
 		logging.LogErrorf("marshal conf failed: %s", err)
 		return
@@ -887,13 +1057,13 @@ func GetMaskedConf() (ret *AppConf, err error) {
 	return
 }
 
-// REF: https://github.com/siyuan-note/siyuan/issues/11364
 // HideConfSecret 隐藏设置中的秘密信息
+// REF: https://github.com/siyuan-note/siyuan/issues/11364
 func HideConfSecret(c *AppConf) {
 	c.AI = &conf.AI{}
 	c.Api = &conf.API{}
 	c.Flashcard = &conf.Flashcard{}
-	c.LocalIPs = []string{}
+	c.ServerAddrs = []string{}
 	c.Publish = &conf.Publish{}
 	c.Repo = &conf.Repo{}
 	c.Sync = &conf.Sync{}
@@ -966,12 +1136,11 @@ func clearCorruptedNotebooks() {
 func clearWorkspaceTemp() {
 	os.RemoveAll(filepath.Join(util.TempDir, "bazaar"))
 	os.RemoveAll(filepath.Join(util.TempDir, "export"))
-	os.RemoveAll(filepath.Join(util.TempDir, "convert"))
 	os.RemoveAll(filepath.Join(util.TempDir, "import"))
+	os.RemoveAll(filepath.Join(util.TempDir, "convert"))
 	os.RemoveAll(filepath.Join(util.TempDir, "repo"))
 	os.RemoveAll(filepath.Join(util.TempDir, "os"))
-	os.RemoveAll(filepath.Join(util.TempDir, "blocktree.msgpack")) // v2.7.2 前旧版的块树数据
-	os.RemoveAll(filepath.Join(util.TempDir, "blocktree"))         // v3.1.0 前旧版的块树数据
+	os.RemoveAll(filepath.Join(util.TempDir, "base64"))
 
 	// 退出时自动删除超过 7 天的安装包 https://github.com/siyuan-note/siyuan/issues/6128
 	install := filepath.Join(util.TempDir, "install")
@@ -1021,7 +1190,9 @@ func clearWorkspaceTemp() {
 	os.RemoveAll(filepath.Join(util.DataDir, ".siyuan", "history"))
 	os.RemoveAll(filepath.Join(util.WorkspaceDir, "backup"))
 	os.RemoveAll(filepath.Join(util.WorkspaceDir, "sync"))
-	os.RemoveAll(filepath.Join(util.DataDir, "%")) // v3.0.6 生成的错误历史文件夹
+	os.RemoveAll(filepath.Join(util.TempDir, "blocktree.msgpack")) // v2.7.2 前旧版的块树数据
+	os.RemoveAll(filepath.Join(util.DataDir, "%"))                 // v3.0.6 生成的错误历史文件夹
+	os.RemoveAll(filepath.Join(util.TempDir, "blocktree"))         // v3.1.0 前旧版的块树数据
 
 	logging.LogInfof("cleared workspace temp")
 }
@@ -1079,16 +1250,21 @@ func closeUserGuide() {
 		}
 
 		msgId := util.PushMsg(Conf.language(233), 30000)
-		evt := util.NewCmdResult("unmount", 0, util.PushModeBroadcast)
-		evt.Data = map[string]interface{}{
-			"box": boxID,
-		}
-		util.PushEvent(evt)
 
 		unindex(boxID)
 
-		if removeErr := filelock.Remove(boxDirPath); nil != removeErr {
-			logging.LogErrorf("remove corrupted user guide box [%s] failed: %s", boxDirPath, removeErr)
+		sql.FlushQueue()
+
+		if removeErr := RemoveBox(boxID); nil == removeErr {
+			evt := util.NewCmdResult("removeBox", 0, util.PushModeBroadcast)
+			evt.Data = map[string]any{
+				"box": boxID,
+			}
+			util.PushEvent(evt)
+		} else {
+			logging.LogErrorf("close user guide box [%s] failed: %s", boxID, removeErr)
+			util.PushClearMsg(msgId)
+			continue
 		}
 
 		util.PushClearMsg(msgId)
@@ -1104,6 +1280,16 @@ func subscribeConfEvents() {
 	eventbus.Subscribe(util.EvtConfPandocInitialized, func() {
 		logging.LogInfof("pandoc initialized, set pandoc bin to [%s]", util.PandocBinPath)
 		Conf.Export.PandocBin = util.PandocBinPath
+
+		params := util.RemoveInvalid(Conf.Export.PandocParams)
+		if !strings.Contains(params, "--reference-doc") && "" != util.PandocTemplatePath && !Conf.System.IsMicrosoftStore {
+			params += " --reference-doc"
+			params += " \"" + util.PandocTemplatePath + "\""
+			Conf.Export.PandocParams = strings.TrimSpace(params)
+		}
+
+		logging.LogInfof("pandoc params set to [%s]", Conf.Export.PandocParams)
+		logging.LogInfof("pandoc resources [%s, %s]", util.PandocTemplatePath, util.PandocColorFilterPath)
 		Conf.Save()
 	})
 }

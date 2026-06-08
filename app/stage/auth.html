@@ -2,7 +2,7 @@
 <html style="height: 100%">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, height=device-height, interactive-widget=resizes-content, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <title>{{.l6}}</title>
     <style>
         body {
@@ -21,6 +21,7 @@
             --b3-theme-background: #fff;
             --b3-theme-on-background: #202124;
             --b3-theme-on-primary: #fff;
+            background-color: var(--b3-theme-background);
         }
 
         .dark {
@@ -33,7 +34,6 @@
             --b3-theme-background: #1e1e1e;
             --b3-theme-on-background: #c9d1d9;
             --b3-theme-on-primary: #fff;
-            background-color: var(--b3-theme-background);
         }
 
         .b3-button {
@@ -183,6 +183,10 @@
     <div style="position: relative;width: 240px;margin: 8px auto 0;display: none">
         <img id="captchaImg" style="top: 1px;position: absolute;height: 26px;right: 1px;cursor: pointer">
         <input id="captcha" class="b3-text-field" placeholder="{{.l3}}">
+    </div>
+    <div style="width: 240px; margin: 8px auto; text-align: left; display: flex; align-items: center;">
+        <input type="checkbox" id="rememberMe" style="margin-right: 8px;">
+        <label for="rememberMe" style="color: var(--b3-theme-on-surface); font-size: 14px;">{{.l10}}</label>
     </div>
     <button class="b3-button" onclick="submitAuth()">{{.l1}}</button>
     <div class="ft__on-surface">
@@ -411,20 +415,43 @@
     <div class="b3-snackbar__content"></div>
 </div>
 <script>
+    window.showKeyboardToolbar = function () {}
+    window.hideKeyboardToolbar = function () {}
+
     const exitApp = () => {
         try {
             const {ipcRenderer} = require('electron')
             ipcRenderer.send('siyuan-quit', window.location.port)
         } catch (e) {
-            if ((window.webkit && window.webkit.messageHandlers) || window.JSAndroid || window.JSHarmony) {
-                window.location.href = 'siyuan://api/system/exit'
-            } else {
-                window.location.reload()
+            if (window.JSAndroid) {
+                window.JSAndroid.exit();
+                return;
             }
+
+            if (window.webkit && window.webkit.messageHandlers) {
+                window.webkit.messageHandlers.exit.postMessage("");
+                return;
+            }
+
+            if (window.JSHarmony) {
+                window.JSHarmony.exit();
+                return;
+            }
+
+            window.location.reload()
         }
     }
 
+    const url = new URL(window.location)
+    toPath = url.searchParams.get("to") || "/"
+
     const exitSiYuan = () => {
+        if (toPath.indexOf("/stage/build/app/window.html") > -1) {
+            const {ipcRenderer} = require('electron');
+            ipcRenderer.send("siyuan-cmd", "destroy");
+            return;
+        }
+
         document.querySelector('#message').classList.add('b3-snackbar--show')
         document.querySelector('#message').firstElementChild.innerHTML = "{{.l8}}"
         try {
@@ -460,21 +487,40 @@
         }
     }
 
+    const showMessage = (msg) => {
+        document.querySelector('#message').classList.add('b3-snackbar--show')
+        document.querySelector('#message').firstElementChild.innerHTML = msg
+        setTimeout(() => {
+            document.querySelector('#message').classList.remove('b3-snackbar--show')
+            document.querySelector('#message').firstElementChild.textContent = ''
+        }, 6000)
+    }
+
     const submitAuth = () => {
         const inputElement = document.getElementById('authCode')
         const captchaElement = document.getElementById('captcha')
+        const rememberMeElement = document.getElementById('rememberMe')
+        let code = inputElement.value.trim();
+        if ("" === code) {
+            showMessage({{.l9}})
+            inputElement.value = ''
+            captchaElement.value = ''
+            inputElement.focus()
+            return
+        }
+
         fetch('/api/system/loginAuth', {
             method: 'POST',
             body: JSON.stringify({
-                authCode: inputElement.value,
+                authCode: code,
                 captcha: captchaElement.value,
+                rememberMe: rememberMeElement.checked
             }),
         }).then((response) => {
             return response.json()
         }).then((response) => {
             if (0 === response.code) {
-                const url = new URL(window.location)
-                window.location.href = url.searchParams.get("to") || "/"
+                window.location.href = toPath
                 return
             }
 
@@ -486,15 +532,10 @@
                 captchaElement.previousElementSibling.src = ''
             }
 
-            document.querySelector('#message').classList.add('b3-snackbar--show')
-            document.querySelector('#message').firstElementChild.textContent = response.msg
+            showMessage(response.msg)
             inputElement.value = ''
             captchaElement.value = ''
             inputElement.focus()
-            setTimeout(() => {
-                document.querySelector('#message').classList.remove('b3-snackbar--show')
-                document.querySelector('#message').firstElementChild.textContent = ''
-            }, 6000)
         })
     }
 
@@ -504,10 +545,13 @@
         }
         if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
             document.querySelector('.b3-button--white').remove()
+        } else if (toPath.indexOf("/stage/build/app/window.html") > -1) {
+            document.querySelector('.b3-button--white').textContent = "{{.l11}}"
         }
 
         try {
             const {ipcRenderer} = require('electron')
+            ipcRenderer.send("siyuan-ready-to-show");
             ipcRenderer.on('siyuan-save-close', (event, close) => {
                 exitSiYuan()
             })
@@ -538,9 +582,26 @@
         })
 
         // 用于授权页保持连接，避免非常驻内存内核自动退出 https://github.com/siyuan-note/insider/issues/1099
-        new WebSocket((window.location.protocol === 'https:' ? 'wss' : 'ws') + '://' + window.location.host + '/ws?app=siyuan&id=auth')
+        const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss' : 'ws') + '://' + window.location.host + '/ws?app=siyuan' + Math.random().toString(36).substring(8) + '&id=auth&type=auth')
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.cmd === "loginAuth") {
+                window.location.href = toPath
+            }
+        };
     }
     init();
+    window.addEventListener("click", (event) => {
+        if (event.target.tagName === "INPUT" &&
+            ["email", "number", "password", "search", "tel", "text", "url", "", null].includes(event.target.getAttribute("type")) &&
+            event.target.getAttribute("readonly") !== "readonly") {
+            if (window.JSAndroid && window.JSAndroid.showKeyboard) {
+                window.JSAndroid.showKeyboard();
+            } else if (window.JSHarmony && window.JSHarmony.showKeyboard) {
+                window.JSHarmony.showKeyboard();
+            }
+        }
+    })
 </script>
 </body>
 </html>

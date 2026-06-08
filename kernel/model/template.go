@@ -42,6 +42,12 @@ import (
 	"github.com/xrash/smetrics"
 )
 
+// TemplateSearchResult 描述了模板搜索结果。
+type TemplateSearchResult struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
 func RenderGoTemplate(templateContent string) (ret string, err error) {
 	tmpl := template.New("")
 	tplFuncMap := filesys.BuiltInTemplateFuncs()
@@ -49,14 +55,14 @@ func RenderGoTemplate(templateContent string) (ret string, err error) {
 	tmpl = tmpl.Funcs(tplFuncMap)
 	tpl, err := tmpl.Parse(templateContent)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf(Conf.Language(44), err.Error()))
+		return "", fmt.Errorf(Conf.Language(44), err.Error())
 	}
 
 	buf := &bytes.Buffer{}
 	buf.Grow(4096)
 	err = tpl.Execute(buf, nil)
 	if err != nil {
-		return "", errors.New(fmt.Sprintf(Conf.Language(44), err.Error()))
+		return "", fmt.Errorf(Conf.Language(44), err.Error())
 	}
 	ret = buf.String()
 	return
@@ -70,8 +76,8 @@ func RemoveTemplate(p string) (err error) {
 	return
 }
 
-func SearchTemplate(keyword string) (ret []*Block) {
-	ret = []*Block{}
+func SearchTemplate(keyword string) (ret []*TemplateSearchResult) {
+	ret = []*TemplateSearchResult{}
 
 	templates := filepath.Join(util.DataDir, "templates")
 	if !util.IsPathRegularDirOrSymlinkDir(templates) {
@@ -90,7 +96,7 @@ func SearchTemplate(keyword string) (ret []*Block) {
 
 	keyword = strings.TrimSpace(keyword)
 	type result struct {
-		block *Block
+		item  *TemplateSearchResult
 		score float64
 	}
 	var results []*result
@@ -133,8 +139,8 @@ func SearchTemplate(keyword string) (ret []*Block) {
 					content = strings.TrimSuffix(content, ".md")
 					content = filepath.ToSlash(content)
 					_, content = search.MarkText(content, strings.Join(keywords, search.TermSep), 32, Conf.Search.CaseSensitive)
-					b := &Block{Path: path, Content: content}
-					results = append(results, &result{block: b, score: score})
+					b := &TemplateSearchResult{Path: path, Content: content}
+					results = append(results, &result{item: b, score: score})
 				}
 				return nil
 			})
@@ -159,8 +165,8 @@ func SearchTemplate(keyword string) (ret []*Block) {
 			if hit {
 				content = filepath.ToSlash(content)
 				_, content = search.MarkText(content, strings.Join(keywords, search.TermSep), 32, Conf.Search.CaseSensitive)
-				b := &Block{Path: filepath.Join(templates, group.Name()), Content: content}
-				results = append(results, &result{block: b, score: score})
+				b := &TemplateSearchResult{Path: filepath.Join(templates, group.Name()), Content: content}
+				results = append(results, &result{item: b, score: score})
 			}
 		}
 	}
@@ -169,7 +175,7 @@ func SearchTemplate(keyword string) (ret []*Block) {
 		return results[i].score > results[j].score
 	})
 	for _, r := range results {
-		ret = append(ret, r.block)
+		ret = append(ret, r.item)
 	}
 	return
 }
@@ -188,11 +194,15 @@ func DocSaveAsTemplate(id, name string, overwrite bool) (code int, err error) {
 			return ast.WalkContinue
 		}
 
-		// Code content in templates is not properly escaped https://github.com/siyuan-note/siyuan/issues/9649
+		// Content in templates is not properly escaped
+		// https://github.com/siyuan-note/siyuan/issues/9649
+		// https://github.com/siyuan-note/siyuan/issues/13701
 		switch n.Type {
 		case ast.NodeCodeBlockCode:
 			n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("&quot;"), []byte("\""))
 		case ast.NodeCodeSpanContent:
+			n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("&quot;"), []byte("\""))
+		case ast.NodeBlockQueryEmbedScript:
 			n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("&quot;"), []byte("\""))
 		case ast.NodeTextMark:
 			if n.IsTextMarkType("code") {
@@ -202,8 +212,30 @@ func DocSaveAsTemplate(id, name string, overwrite bool) (code int, err error) {
 		return ast.WalkContinue
 	})
 
+	var unlinks []*ast.Node
+	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering {
+			return ast.WalkContinue
+		}
+
+		if ast.NodeCodeBlockFenceInfoMarker == n.Type {
+			if lang := string(n.CodeBlockInfo); "siyuan-template" == lang || "template" == lang {
+				// 将模板代码转换为段落文本 https://github.com/siyuan-note/siyuan/pull/15345
+				unlinks = append(unlinks, n.Parent)
+				p := treenode.NewParagraph(n.Parent.ID)
+				// 代码块内可能会有多个空行，但是这里不需要分块处理，后面渲染一个文本节点即可
+				p.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: n.Next.Tokens})
+				n.Parent.InsertBefore(p)
+			}
+		}
+		return ast.WalkContinue
+	})
+	for _, n := range unlinks {
+		n.Unlink()
+	}
+
 	luteEngine := NewLute()
-	formatRenderer := render.NewFormatRenderer(tree, luteEngine.RenderOptions)
+	formatRenderer := render.NewFormatRenderer(tree, luteEngine.RenderOptions, luteEngine.ParseOptions)
 	md := formatRenderer.Render()
 
 	// 单独渲染根节点的 IAL
@@ -260,14 +292,14 @@ func RenderDynamicIconContentTemplate(content, id string) (ret string) {
 	goTpl = goTpl.Funcs(tplFuncMap)
 	tpl, err := goTpl.Funcs(tplFuncMap).Parse(content)
 	if err != nil {
-		err = errors.New(fmt.Sprintf(Conf.Language(44), err.Error()))
+		err = fmt.Errorf(Conf.Language(44), err.Error())
 		return
 	}
 
 	buf := &bytes.Buffer{}
 	buf.Grow(4096)
 	if err = tpl.Execute(buf, dataModel); err != nil {
-		err = errors.New(fmt.Sprintf(Conf.Language(44), err.Error()))
+		err = fmt.Errorf(Conf.Language(44), err.Error())
 		return
 	}
 	ret = buf.String()
@@ -310,14 +342,14 @@ func RenderTemplate(p, id string, preview bool) (tree *parse.Tree, dom string, e
 	goTpl = goTpl.Funcs(tplFuncMap)
 	tpl, err := goTpl.Funcs(tplFuncMap).Parse(gulu.Str.FromBytes(md))
 	if err != nil {
-		err = errors.New(fmt.Sprintf(Conf.Language(44), err.Error()))
+		err = fmt.Errorf(Conf.Language(44), err.Error())
 		return
 	}
 
 	buf := &bytes.Buffer{}
 	buf.Grow(4096)
 	if err = tpl.Execute(buf, dataModel); err != nil {
-		err = errors.New(fmt.Sprintf(Conf.Language(44), err.Error()))
+		err = fmt.Errorf(Conf.Language(44), err.Error())
 		return
 	}
 	md = buf.Bytes()
@@ -342,16 +374,16 @@ func RenderTemplate(p, id string, preview bool) (tree *parse.Tree, dom string, e
 			n.RemoveIALAttr(av.NodeAttrNameAvs)
 
 			// Blocks created via template update time earlier than creation time https://github.com/siyuan-note/siyuan/issues/8607
-			refreshUpdated(n)
+			treenode.RefreshUpdated(n)
 		}
 
 		if (ast.NodeListItem == n.Type && (nil == n.FirstChild ||
 			(3 == n.ListData.Typ && (nil == n.FirstChild.Next || ast.NodeKramdownBlockIAL == n.FirstChild.Next.Type)))) ||
-			(ast.NodeBlockquote == n.Type && nil != n.FirstChild && nil != n.FirstChild.Next && ast.NodeKramdownBlockIAL == n.FirstChild.Next.Type) {
+			(ast.NodeBlockquote == n.Type && nil != n.FirstChild && nil != n.FirstChild.Next && ast.NodeKramdownBlockIAL == n.FirstChild.Next.Type) ||
+			(ast.NodeCallout == n.Type && nil != n.FirstChild && ast.NodeKramdownBlockIAL == n.FirstChild.Type) {
 			nodesNeedAppendChild = append(nodesNeedAppendChild, n)
 		}
 
-		// 块引缺失锚文本情况下自动补全 https://github.com/siyuan-note/siyuan/issues/6087
 		if n.IsTextMarkType("block-ref") {
 			if refText := n.Text(); "" == refText {
 				refText = strings.TrimSpace(sql.GetRefText(n.TextMarkBlockRefID))
@@ -359,6 +391,17 @@ func RenderTemplate(p, id string, preview bool) (tree *parse.Tree, dom string, e
 					treenode.SetDynamicBlockRefText(n, refText)
 				} else {
 					unlinks = append(unlinks, n)
+				}
+			}
+		} else if ast.NodeBlockRef == n.Type {
+			if refText := n.Text(); "" == refText {
+				if refID := n.ChildByType(ast.NodeBlockRefID); nil != refID {
+					refText = strings.TrimSpace(sql.GetRefText(refID.TokensStr()))
+					if "" != refText {
+						treenode.SetDynamicBlockRefText(n, refText)
+					} else {
+						unlinks = append(unlinks, n)
+					}
 				}
 			}
 		} else if n.IsTextMarkType("inline-math") {
@@ -374,7 +417,7 @@ func RenderTemplate(p, id string, preview bool) (tree *parse.Tree, dom string, e
 			if nil != parseErr {
 				logging.LogErrorf("parse attribute view [%s] failed: %s", n.AttributeViewID, parseErr)
 			} else {
-				cloned := attrView.ShallowClone()
+				cloned := attrView.Clone()
 				if nil == cloned {
 					logging.LogErrorf("clone attribute view [%s] failed", n.AttributeViewID)
 					return ast.WalkContinue
@@ -395,7 +438,7 @@ func RenderTemplate(p, id string, preview bool) (tree *parse.Tree, dom string, e
 						return ast.WalkContinue
 					}
 
-					table := sql.RenderAttributeViewTable(attrView, view, "")
+					table := getAttrViewTable(attrView, view, "")
 
 					var aligns []int
 					for range table.Columns {
@@ -451,7 +494,7 @@ func RenderTemplate(p, id string, preview bool) (tree *parse.Tree, dom string, e
 	}
 
 	luteEngine := NewLute()
-	dom = luteEngine.Tree2BlockDOM(tree, luteEngine.RenderOptions)
+	dom = luteEngine.Tree2BlockDOM(tree, luteEngine.RenderOptions, luteEngine.ParseOptions)
 	return
 }
 

@@ -1,11 +1,12 @@
 {
 	"ID": "20210612224500-ywcms1m",
-	"Spec": "1",
+	"Spec": "2",
 	"Type": "NodeDocument",
 	"Properties": {
 		"id": "20210612224500-ywcms1m",
 		"title": "内容块属性",
-		"updated": "20210613105851"
+		"type": "doc",
+		"updated": "20251201102135"
 	},
 	"Children": [
 		{
@@ -213,7 +214,7 @@
 			"HeadingLevel": 2,
 			"Properties": {
 				"id": "20210613004117-1jnl9m0",
-				"updated": "20210613004135"
+				"updated": "20251201102135"
 			},
 			"Children": [
 				{
@@ -227,7 +228,7 @@
 			"Type": "NodeParagraph",
 			"Properties": {
 				"id": "20210613004135-7td7u1o",
-				"updated": "20210613122309"
+				"updated": "20251201102135"
 			},
 			"Children": [
 				{
@@ -236,21 +237,21 @@
 				},
 				{
 					"Type": "NodeTextMark",
-					"TextMarkType": "code",
+					"TextMarkType": "code kbd",
 					"TextMarkTextContent": "块标菜单"
 				},
 				{
 					"Type": "NodeText",
-					"Data": " - "
+					"Data": "​ - "
 				},
 				{
 					"Type": "NodeTextMark",
-					"TextMarkType": "code",
+					"TextMarkType": "code kbd",
 					"TextMarkTextContent": "属性"
 				},
 				{
 					"Type": "NodeText",
-					"Data": " 进行设置，属性名仅允许使用英文字母和阿拉伯数字（例如 "
+					"Data": "​ 进行设置，属性名仅允许使用小写英文字母和阿拉伯数字并且需要以字母开头（例如 "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -259,16 +260,16 @@
 				},
 				{
 					"Type": "NodeText",
-					"Data": "、"
+					"Data": "​、"
 				},
 				{
 					"Type": "NodeTextMark",
 					"TextMarkType": "code",
-					"TextMarkTextContent": " 7days"
+					"TextMarkTextContent": "day1"
 				},
 				{
 					"Type": "NodeText",
-					"Data": "）。设置后，思源会自动在属性名前加上前缀 "
+					"Data": "​）。设置后，思源会自动在属性名前加上前缀 "
 				},
 				{
 					"Type": "NodeTextMark",
@@ -277,7 +278,7 @@
 				},
 				{
 					"Type": "NodeText",
-					"Data": "，以区分内置属性和自定义属性。"
+					"Data": "​，以区分内置属性和自定义属性。"
 				}
 			]
 		},

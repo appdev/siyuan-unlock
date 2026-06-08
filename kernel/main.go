@@ -31,7 +31,7 @@ func main() {
 	util.Boot()
 
 	model.InitConf()
-	go server.Serve(false)
+	go server.Serve(false, model.Conf.CookieKey)
 	model.InitAppearance()
 	sql.InitDatabase(false)
 	sql.InitHistoryDatabase(false)
@@ -49,12 +49,12 @@ func main() {
 
 	job.StartCron()
 
-	go util.LoadSysFonts()
 	go model.AutoGenerateFileHistory()
 	go cache.LoadAssets()
 	go util.CheckFileSysStatus()
 
 	model.WatchAssets()
 	model.WatchEmojis()
+	model.WatchThemes()
 	model.HandleSignal()
 }

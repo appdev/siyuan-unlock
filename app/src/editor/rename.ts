@@ -14,7 +14,7 @@ import {getAllModels} from "../layout/getAll";
 import {getAllEditor} from "../layout/getAll";
 
 export const validateName = (name: string, targetElement?: HTMLElement) => {
-    if (/\r\n|\r|\n|\u2028|\u2029|\t|\//.test(name)) {
+    if (/\r\n|\r|\n|\u2028|\u2029|\t/.test(name)) {
         if (targetElement) {
             showTooltip(window.siyuan.languages.fileNameRule, targetElement, "error");
         } else {
@@ -34,7 +34,11 @@ export const validateName = (name: string, targetElement?: HTMLElement) => {
 };
 
 export const replaceFileName = (name: string) => {
-    return name.replace(/\r\n|\r|\n|\u2028|\u2029|\t|\//g, "").substring(0, Constants.SIZE_TITLE);
+    if (name.indexOf("/") > -1) {
+        showMessage(window.siyuan.languages.fileNameRule);
+        name = name.replace(/\//g, "／");
+    }
+    return name.replace(/\r\n|\r|\n|\u2028|\u2029|\t|/g, "").substring(0, Constants.SIZE_TITLE);
 };
 
 export const replaceLocalPath = (name: string) => {
@@ -46,11 +50,13 @@ export const rename = (options: {
     notebookId: string
     name: string,
     type: "notebook" | "file"
+    empty?: boolean
     range?: Range,
 }) => {
     if (window.siyuan.config.readonly) {
         return;
     }
+    const initialName = options.empty ? "" : options.name;
     const dialog = new Dialog({
         title: window.siyuan.languages.rename,
         content: `<div class="b3-dialog__content"><input class="b3-text-field fn__block" value=""></div>
@@ -71,7 +77,7 @@ export const rename = (options: {
     dialog.bindInput(inputElement, () => {
         (btnsElement[1] as HTMLButtonElement).click();
     });
-    inputElement.value = Lute.UnEscapeHTMLStr(options.name);
+    inputElement.value = initialName;
     inputElement.focus();
     inputElement.select();
     btnsElement[0].addEventListener("click", () => {
@@ -81,27 +87,27 @@ export const rename = (options: {
         if (!validateName(inputElement.value)) {
             return false;
         }
-        if (inputElement.value === options.name) {
+        let name = inputElement.value.trim();
+        if (name === initialName) {
             dialog.destroy();
             return false;
         }
-        if (inputElement.value.trim() === "") {
-            inputElement.value = window.siyuan.languages.untitled;
-        } else {
-            inputElement.value = replaceFileName(inputElement.value);
-        }
+        name = replaceFileName(name);
         if (options.type === "notebook") {
+            if (!name) {
+                name = window.siyuan.languages.untitled;
+            }
             fetchPost("/api/notebook/renameNotebook", {
                 notebook: options.notebookId,
-                name: inputElement.value
+                name,
             }, () => {
-                setNotebookName(options.notebookId, inputElement.value);
+                setNotebookName(options.notebookId, name);
             });
         } else {
             fetchPost("/api/filetree/renameDoc", {
                 notebook: options.notebookId,
                 path: options.path,
-                title: inputElement.value,
+                title: name,
             });
         }
         dialog.destroy();
@@ -141,8 +147,7 @@ export const renameAsset = (assetPath: string) => {
             /// #if !MOBILE
             getAllModels().asset.forEach(item => {
                 if (item.path === assetPath) {
-                    item.path = response.data.newPath;
-                    item.parent.updateTitle(getDisplayName(response.data.newPath));
+                    item.update(response.data.newPath);
                 }
             });
             /// #endif

@@ -1,6 +1,8 @@
+@use "../util/function";
+
 @font-face {
   font-family: 'JetBrainsMono-Regular';
-  /* webpackIgnore: true */
+  /*! /* webpackIgnore: true */
   src: url(../../../appearance/fonts/JetBrainsMono-2.304/JetBrainsMono-Regular.woff2) format('woff2');
 }
 
@@ -9,6 +11,7 @@
   font-variant-ligatures: no-common-ligatures;
   display: flex;
   flex-direction: column;
+  font-size: var(--b3-font-size-editor);
   font-family: var(--b3-font-family-protyle);
 
   img {
@@ -31,15 +34,6 @@
     border: 0;
   }
 
-  iframe {
-    border: 1px solid var(--b3-theme-surface-lighter);
-    width: 765px;
-    box-sizing: border-box;
-    height: 256px;
-    max-width: 100%;
-    vertical-align: bottom;
-  }
-
   span[data-type~="sup"],
   span[data-type~="sub"] {
     position: relative;
@@ -57,6 +51,7 @@
   }
 
   em,
+  a[data-type~="em"],
   span[data-type~="em"] {
     font-style: italic;
     color: var(--b3-protyle-inline-em-color);
@@ -69,34 +64,29 @@
   }
 
   strong,
+  a[data-type~="strong"],
   span[data-type~="strong"] {
     font-weight: bold;
     color: var(--b3-protyle-inline-strong-color);
   }
 
   span[data-type~="inline-math"] {
+    direction: ltr;
     user-select: text;
     display: inline;
+    // https://github.com/siyuan-note/siyuan/issues/17211
+    &:after {
+      content: '‎';
+    }
     // https://github.com/siyuan-note/siyuan/issues/3081 test $\begin{bmatrix}   a & b \\c & d \\   e & f\end{bmatrix}$ test
     // https://ld246.com/article/1626937851892 <u>test $\mu_p$ test</u>
     // https://ld246.com/article/1636204769623  test $\rightarrow$ test
   }
 
-  mark,
-  span[data-type~="mark"] {
-    background-color: var(--b3-protyle-inline-mark-background);
-    color: var(--b3-protyle-inline-mark-color);
-
-    &.mark--hl {
-      background-color: var(--b3-theme-primary-lighter);
-      box-shadow: 0 0 0 .5px var(--b3-theme-on-background);
-    }
-  }
-
   kbd,
   span[data-type~="kbd"] {
     padding: 2px 4px;
-    font: 75% Consolas, "Liberation Mono", Menlo, Courier, monospace, var(--b3-font-family);
+    font: 75% var(--b3-font-family-kbd);
     line-height: 1;
     color: var(--b3-theme-on-surface);
     vertical-align: middle;
@@ -120,6 +110,17 @@
   span[data-type~="inline-memo"] {
     background-color: var(--b3-card-info-background);
     border-bottom: 2px solid var(--b3-card-info-color);
+  }
+
+  mark,
+  span[data-type~="mark"] {
+    background-color: var(--b3-protyle-inline-mark-background);
+    color: var(--b3-protyle-inline-mark-color);
+
+    &.mark--hl {
+      background-color: var(--b3-theme-primary-lighter);
+      box-shadow: 0 0 0 .5px var(--b3-theme-on-background);
+    }
   }
 
   blockquote {
@@ -146,33 +147,140 @@
     flex-direction: column;
   }
 
-  .h1,
+  .callout {
+    position: relative;
+
+    &::before {
+      content: '';
+      width: .25em;
+      border-radius: var(--b3-border-radius);
+      position: absolute;
+      left: 2px;
+      top: 6px;
+      bottom: 6px;
+    }
+
+    padding-left: calc(0.25em + 6px);
+    color: var(--b3-theme-on-surface);
+    background-color: var(--b3-bq-background);
+    display: flex;
+    flex-direction: column;
+
+    // NOTE
+    &::before {
+      background-color: var(--b3-callout-note);
+    }
+
+    .callout-info {
+      color: var(--b3-callout-note);
+    }
+
+    .callout-icon:empty {
+      display: none;
+    }
+
+    &[data-subtype="WARNING"] {
+      &::before {
+        background-color: var(--b3-callout-warning);
+      }
+
+      .callout-info {
+        color: var(--b3-callout-warning);
+      }
+    }
+
+    &[data-subtype="TIP"] {
+      &::before {
+        background-color: var(--b3-callout-tip);
+      }
+
+      .callout-info {
+        color: var(--b3-callout-tip);
+      }
+    }
+
+    &[data-subtype="IMPORTANT"] {
+      &::before {
+        background-color: var(--b3-callout-important);
+      }
+
+      .callout-info {
+        color: var(--b3-callout-important);
+      }
+    }
+
+    &[data-subtype="CAUTION"] {
+      &::before {
+        background-color: var(--b3-callout-caution);
+      }
+
+      .callout-info {
+        color: var(--b3-callout-caution);
+      }
+    }
+
+    &-info {
+      display: flex;
+      align-items: center;
+      user-select: none;
+    }
+
+    &-icon {
+      width: 1.2em;
+      display: flex;
+      text-align: center;
+      height: 1.2em;
+      line-height: 1.2em;
+      padding: 4px;
+      border-radius: var(--b3-border-radius);
+    }
+
+    &-img {
+      height: 1.2em;
+      width: 100%;
+    }
+
+    &-title {
+      margin-left: 4px;
+      font-weight: 500;
+      font-size: 114%;
+      opacity: .86;
+      transition: var(--b3-color-transition);
+    }
+  }
+
   h1,
-  .h2,
   h2,
-  .h3,
   h3,
-  .h4,
   h4,
-  .h5,
   h5,
-  .h6,
   h6 {
     padding: 4px;
-    margin: 4px 0;
-    font-weight: 600;
-    line-height: 1.25;
+    margin: 2px 0;
   }
 
   .h1,
-  h1 {
-    padding: .3em 4px;
+  .h2,
+  .h3,
+  .h4,
+  .h5,
+  .h6,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+  }
+
+  h1,
+  .h1 {
     font-size: 1.75em;
   }
 
-  .h2,
-  h2 {
-    padding: .3em 4px;
+  h2,
+  .h2 {
     font-size: 1.55em;
   }
 
@@ -268,12 +376,14 @@
     display: inline-block !important;
     position: absolute !important;
     width: 1px !important;
-    right: 8px !important;
+    left: 0 !important;
     outline: 0 !important;
     background: 0 0 !important;
     text-decoration: initial !important;
     text-shadow: initial !important;
     color: var(--b3-theme-background);
+    font-size: 12px !important;
+    overflow: hidden !important;
   }
 
   pre.code-block {
@@ -281,7 +391,7 @@
   }
 
   .code-block:not(pre) {
-    margin: 1em 0;
+    margin: 2px 0;
     box-sizing: border-box;
 
     .protyle-action {
@@ -297,10 +407,13 @@
         color: var(--b3-theme-on-surface);
         margin-top: -4px;
         align-self: center;
+        margin-left: 1em;
+        opacity: 0;
+        transition: var(--b3-transition);
+        line-height: calc(1.625 / 0.85);
       }
 
-      .protyle-icon,
-      .protyle-action__language {
+      .protyle-icon {
         opacity: 0;
         transition: var(--b3-transition);
       }
@@ -332,10 +445,10 @@
   [data-subtype="echarts"],
   [data-subtype="mindmap"] {
     z-index: 1;
+    height: 420px;
 
     & > div:not(.protyle-icons):not(.protyle-attr) {
       overflow: hidden;
-      height: 420px;
     }
   }
 
@@ -380,12 +493,7 @@
     [contenteditable="false"] svg {
       border-radius: var(--b3-border-radius);
       max-width: 100%; // https://github.com/siyuan-note/siyuan/issues/11181
-
-      /* 由于会覆盖颜色，先移除看看有没有副作用 https://github.com/siyuan-note/siyuan/issues/7735
-      polygon {
-        fill: var(--b3-theme-on-primary);
-      }
-      */
+      height: 100%; // https://github.com/siyuan-note/siyuan/issues/13852
     }
   }
 
@@ -404,6 +512,34 @@
     text-align: center;
   }
 
+  [data-type="NodeIFrame"] {
+    height: 256px;
+  }
+
+  [data-type="NodeIFrame"],
+  [data-type="NodeWidget"] {
+    width: 100%;
+    max-width: 100%;
+
+    .iframe-content {
+      position: relative;
+      height: 100%;
+      width: 100%;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 1px solid var(--b3-theme-surface-lighter);
+      box-sizing: border-box;
+      max-width: 100%;
+      min-height: 100%;
+      max-height: 100%;
+    }
+  }
+
+  [data-subtype="flowchart"] > [spin="1"],
+  [data-subtype="plantuml"] > [spin="1"],
   [data-subtype="mermaid"] > [spin="1"] {
     // 不能加到上一级，否则属性会跟随滚动
     overflow: auto;
@@ -428,7 +564,6 @@
     vertical-align: top; // https://ld246.com/article/1647522074722
     margin: 0 auto;
     max-width: 100%;
-    user-select: none;
     word-break: keep-all;
     white-space: nowrap;
 
@@ -467,8 +602,11 @@
 
   .iframe {
     text-align: center;
-    padding: 4px;
-    margin: 4px 0;
+
+    iframe {
+      width: 100%;
+      max-width: 100%;
+    }
   }
 }
 
@@ -498,6 +636,20 @@
 
   table {
     margin: 1em 0;
+
+    &[style*="direction: rtl"]:not([style*="text-align: left"]),
+    &[style*="text-align: right"] {
+      margin-left: auto;
+    }
+
+    &[style*="text-align: center"] {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    &[style*="direction: ltr"]:not([style*="text-align: right"]) {
+      margin-left: initial;
+    }
   }
 
   div[data-subtype="math"] {
@@ -586,11 +738,15 @@
     & > span {
       pointer-events: none;
       display: block;
+      color: var(--b3-theme-on-surface);
+
+      &:not(:empty)::before {
+        content: "";
+      }
 
       &::before {
         counter-increment: linenumber;
         content: counter(linenumber);
-        color: var(--b3-theme-on-surface);
         display: block;
         text-align: right;
         white-space: nowrap;

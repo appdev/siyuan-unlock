@@ -1,35 +1,16 @@
+/// #if !MOBILE
 import {getAllModels} from "../../layout/getAll";
-import {
-    hasClosestByAttribute,
-    hasClosestByClassName,
-    hasTopClosestByClassName
-} from "../../protyle/util/hasClosest";
+/// #endif
+import {hasClosestByAttribute, hasClosestByClassName, hasTopClosestByClassName} from "../../protyle/util/hasClosest";
 import {hideAllElements} from "../../protyle/ui/hideElements";
 import {isWindow} from "../../util/functions";
 import {writeText} from "../../protyle/util/compatibility";
 import {showMessage} from "../../dialog/message";
+import {cancelDrag} from "./dragover";
+import {nbsp2space, removeZWJ} from "../../protyle/util/normalizeText";
 
-export const globalClick = (event: MouseEvent & { target: HTMLElement }) => {
-    const ghostElement = document.getElementById("dragGhost");
-    if (ghostElement) {
-        if (ghostElement.dataset.ghostType === "dock") {
-            ghostElement.parentElement.querySelectorAll(".dock__item").forEach((item: HTMLElement) => {
-                item.style.opacity = "";
-            });
-            document.querySelector("#dockMoveItem")?.remove();
-        } else {
-            const startElement = ghostElement.parentElement.querySelector(`[data-node-id="${ghostElement.getAttribute("data-node-id")}"]`) as HTMLElement;
-            if (startElement) {
-                startElement.style.opacity = "";
-            }
-            ghostElement.parentElement.querySelectorAll(".dragover__top, .dragover__bottom, .dragover").forEach((item: HTMLElement) => {
-                item.classList.remove("dragover__top", "dragover__bottom", "dragover");
-                item.style.opacity = "";
-            });
-        }
-        ghostElement.remove();
-    }
-    if (!window.siyuan.menus.menu.element.contains(event.target) && !hasClosestByAttribute(event.target, "data-menu", "true")) {
+export const globalClickHideMenu = (element: HTMLElement) => {
+    if (!window.siyuan.menus.menu.element.contains(element) && !hasClosestByAttribute(element, "data-menu", "true")) {
         if (getSelection().rangeCount > 0 && window.siyuan.menus.menu.element.contains(getSelection().getRangeAt(0).startContainer) &&
             window.siyuan.menus.menu.element.contains(document.activeElement)) {
             // https://ld246.com/article/1654567749834/comment/1654589171218#comments
@@ -37,13 +18,37 @@ export const globalClick = (event: MouseEvent & { target: HTMLElement }) => {
             window.siyuan.menus.menu.remove();
         }
     }
-    // protyle.toolbar 点击空白处时进行隐藏
-    if (!hasClosestByClassName(event.target, "protyle-toolbar")) {
-        hideAllElements(["toolbar"]);
+};
+
+export const globalClick = (event: MouseEvent & { target: HTMLElement }) => {
+    cancelDrag();
+
+    globalClickHideMenu(event.target);
+
+    const protyleElement = hasClosestByClassName(event.target, "protyle", true);
+    if (protyleElement) {
+        const wysiwygElement = protyleElement.querySelector(".protyle-wysiwyg");
+        if (wysiwygElement.getAttribute("data-readonly") === "true" || !wysiwygElement.contains(event.target)) {
+            wysiwygElement.dispatchEvent(new Event("focusin"));
+        }
     }
-    if (!hasClosestByClassName(event.target, "pdf__outer")) {
-        hideAllElements(["pdfutil"]);
+
+    if (!hasTopClosestByClassName(event.target, "protyle-util") &&
+        !hasTopClosestByClassName(event.target, "protyle-toolbar")) {
+        document.querySelectorAll(".protyle-font").forEach((item: HTMLElement) => {
+            item.parentElement.classList.add("fn__none");
+        });
     }
+
+    const copyElement = hasTopClosestByClassName(event.target, "protyle-action__copy");
+    if (copyElement) {
+        writeText(removeZWJ(nbsp2space(copyElement.parentElement.nextElementSibling.textContent.replace(/\n$/, ""))));
+        showMessage(window.siyuan.languages.copied, 2000);
+        event.preventDefault();
+        return;
+    }
+
+    /// #if !MOBILE
     // dock float 时，点击空白处，隐藏 dock。场景：文档树上重命名后
     if (!isWindow() && window.siyuan.layout.leftDock &&
         !hasClosestByClassName(event.target, "b3-dialog--open", true) &&
@@ -57,21 +62,8 @@ export const globalClick = (event: MouseEvent & { target: HTMLElement }) => {
         window.siyuan.layout.rightDock.hideDock();
     }
 
-    const protyleElement = hasClosestByClassName(event.target, "protyle", true);
-    if (protyleElement) {
-        const wysiwygElement = protyleElement.querySelector(".protyle-wysiwyg");
-        if (wysiwygElement.getAttribute("data-readonly") === "true" || !wysiwygElement.contains(event.target)) {
-            wysiwygElement.dispatchEvent(new Event("focusin"));
-        }
-    }
-    const copyElement = hasTopClosestByClassName(event.target, "protyle-action__copy");
-    if (copyElement) {
-        let text = copyElement.parentElement.nextElementSibling.textContent.replace(/\n$/, "");
-        text = text.replace(/\u00A0/g, " "); // Replace non-breaking spaces with normal spaces when copying https://github.com/siyuan-note/siyuan/issues/9382
-        writeText(text);
-        showMessage(window.siyuan.languages.copied, 2000);
-        event.preventDefault();
-        return;
+    if (!hasClosestByClassName(event.target, "pdf__outer")) {
+        hideAllElements(["pdfutil"]);
     }
 
     // 点击空白，pdf 搜索、更多消失
@@ -100,4 +92,5 @@ export const globalClick = (event: MouseEvent & { target: HTMLElement }) => {
     ) {
         currentPDFViewerObject.findBar.close();
     }
+    /// #endif
 };

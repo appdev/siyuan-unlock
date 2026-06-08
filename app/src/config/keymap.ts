@@ -7,6 +7,7 @@ import {confirmDialog} from "../dialog/confirmDialog";
 import {App} from "../index";
 /// #if !BROWSER
 import {ipcRenderer} from "electron";
+import {sendUnregisterGlobalShortcut} from "../boot/globalEvent/keydown";
 /// #endif
 import {sendGlobalShortcut} from "../boot/globalEvent/keydown";
 
@@ -55,13 +56,16 @@ export const keymap = {
 </label>`;
             });
             item.updateProtyleToolbar([]).forEach(toolbarItem => {
-                if (typeof toolbarItem === "string" || Constants.INLINE_TYPE.concat("|").includes(toolbarItem.name) || !toolbarItem.hotkey) {
+                if (typeof toolbarItem === "string" || Constants.INLINE_TYPE.concat("|").includes(toolbarItem.name)) {
                     return;
+                }
+                if (typeof toolbarItem.hotkey !== "string") {
+                    toolbarItem.hotkey = "";
                 }
                 const dockKeymap = window.siyuan.config.keymap.plugin[item.name][toolbarItem.name];
                 const keyValue = updateHotkeyTip(dockKeymap.custom);
                 commandHTML += `<label class="b3-list-item b3-list-item--narrow b3-list-item--hide-action">
-    <span class="b3-list-item__text">${toolbarItem.tip||window.siyuan.languages[toolbarItem.lang]}</span>
+    <span class="b3-list-item__text">${toolbarItem.tip || window.siyuan.languages[toolbarItem.lang]}</span>
     <span data-type="reset" class="b3-list-item__action b3-tooltips b3-tooltips__w" aria-label="${window.siyuan.languages.reset}">
         <svg><use xlink:href="#iconUndo"></use></svg>
     </span>
@@ -74,9 +78,6 @@ export const keymap = {
             });
             Object.keys(item.docks).forEach(key => {
                 const dockConfig = item.docks[key].config;
-                if (!dockConfig.hotkey) {
-                    return;
-                }
                 const dockKeymap = window.siyuan.config.keymap.plugin[item.name][key];
                 const keyValue = updateHotkeyTip(dockKeymap.custom);
                 commandHTML += `<label class="b3-list-item b3-list-item--narrow b3-list-item--hide-action">
@@ -142,7 +143,7 @@ export const keymap = {
         <div class="fn__space"></div>
         <label class="b3-form__icon fn__block searchByKeyLabel">
             <svg class="b3-form__icon-icon"><use xlink:href="#iconKeymap"></use></svg>
-            <input id="searchByKey" data-value="" class="b3-form__icon-input b3-text-field fn__block" spellcheck="false" placeholder="${window.siyuan.languages.keymap}">
+            <input id="searchByKey" style="font-family: var(--b3-font-family-kbd);" data-keymap="" class="b3-form__icon-input b3-text-field fn__block" spellcheck="false" placeholder="${window.siyuan.languages.keymap}">
         </label>
         <div class="fn__space"></div>
         <button id="clearSearchBtn" class="b3-button b3-button--outline fn__flex-center fn__size200">
@@ -219,6 +220,14 @@ export const keymap = {
                     if (plugin.name === keys[1]) {
                         plugin.commands.forEach(command => {
                             if (command.langKey === keys[2]) {
+                                /// #if !BROWSER
+                                if (command.globalCallback && command.customHotkey && command.customHotkey !== newHotkey) {
+                                    ipcRenderer.send(Constants.SIYUAN_CMD, {
+                                        cmd: "unregisterGlobalShortcut",
+                                        accelerator: command.customHotkey
+                                    });
+                                }
+                                /// #endif
                                 command.customHotkey = newHotkey;
                             }
                         });
@@ -234,6 +243,7 @@ export const keymap = {
         fetchPost("/api/setting/setKeymap", {
             data
         }, () => {
+            /// #if !BROWSER
             ipcRenderer.send(Constants.SIYUAN_CMD, {
                 cmd: "writeLog",
                 msg: "user update keymap:" + JSON.stringify(window.siyuan.config.keymap)
@@ -245,6 +255,7 @@ export const keymap = {
                 });
             }
             sendGlobalShortcut(app);
+            /// #endif
         });
     },
     search(value: string, keymapString: string) {
@@ -326,20 +337,17 @@ export const keymap = {
         const searchElement = keymap.element.querySelector("#keymapInput") as HTMLInputElement;
         const searchKeymapElement = keymap.element.querySelector("#searchByKey") as HTMLInputElement;
         searchElement.addEventListener("compositionend", () => {
-            keymap.search(searchElement.value, searchKeymapElement.dataset.value);
+            keymap.search(searchElement.value, searchKeymapElement.dataset.keymap);
         });
         searchElement.addEventListener("input", (event: InputEvent) => {
             if (event.isComposing) {
                 return;
             }
-            keymap.search(searchElement.value, searchKeymapElement.dataset.value);
+            keymap.search(searchElement.value, searchKeymapElement.dataset.keymap);
         });
         /// #if !BROWSER
         searchKeymapElement.addEventListener("focus", () => {
-            ipcRenderer.send(Constants.SIYUAN_CMD, {
-                cmd: "unregisterGlobalShortcut",
-                accelerator: window.siyuan.config.keymap.general.toggleWin.custom
-            });
+            sendUnregisterGlobalShortcut(app);
         });
         /// #endif
         searchKeymapElement.addEventListener("blur", () => {
@@ -359,6 +367,7 @@ export const keymap = {
         keymap.element.querySelector("#clearSearchBtn").addEventListener("click", () => {
             searchElement.value = "";
             searchKeymapElement.value = "";
+            searchKeymapElement.dataset.keymap = "";
             keymap.search("", "");
         });
         keymap.element.querySelector("#keymapResetBtn").addEventListener("click", () => {
@@ -366,6 +375,7 @@ export const keymap = {
                 fetchPost("/api/setting/setKeymap", {
                     data: Constants.SIYUAN_KEYMAP,
                 }, () => {
+                    /// #if !BROWSER
                     ipcRenderer.send(Constants.SIYUAN_CMD, {
                         cmd: "writeLog",
                         msg: "user reset keymap"
@@ -376,8 +386,9 @@ export const keymap = {
                             accelerator: window.siyuan.config.keymap.general.toggleWin.custom
                         });
                     }
-                    window.location.reload();
                     sendGlobalShortcut(app);
+                    /// #endif
+                    window.location.reload();
                 });
             });
         });
@@ -454,7 +465,8 @@ export const keymap = {
                     let hasConflict = false;
                     const isAssistKey = ["⌘", "⇧", "⌥", "⌃"].includes(keymapStr.substr(keymapStr.length - 1, 1));
                     if (isAssistKey ||
-                        ["⌘A", "⌘X", "⌘C", "⌘V", "⌘-", "⌘=", "⌘0", "⇧⌘V", "⌘/", "⇧↑", "⇧↓", "⇧→", "⇧←", "⇧⇥", "⌃D", "⇧⌘→", "⇧⌘←", "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦", "Escape"].includes(keymapStr) ||
+                        ["⌘A", "⌘X", "⌘C", "⌘V", "⌘-", "⌘=", "⌘0", "⇧⌘V", "⌘/", "⇧↑", "⇧↓", "⇧→", "⇧←", "⇧⇥", "⌃D", "⇧⌘→",
+                            "⇧⌘←", "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦", "Escape"].includes(keymapStr) ||
                         // 跳转到下/上一个编辑页签不能包含 ctrl， 否则不能监听到 keyup
                         (isMac() && keys[0] === "general" && ["goToEditTabNext", "goToEditTabPrev"].includes(keys[1]) && keymapStr.includes("⌘"))
                     ) {
@@ -464,7 +476,7 @@ export const keymap = {
                         hasConflict = true;
                     }
                     Array.from(keymap.element.querySelectorAll("label.b3-list-item input")).find((inputItem: HTMLElement) => {
-                        if (!inputItem.isSameNode(this) && inputItem.getAttribute("data-value") === keymapStr) {
+                        if ((inputItem !== this) && inputItem.getAttribute("data-value") === keymapStr) {
                             const inputValueList = inputItem.getAttribute("data-key").split(Constants.ZWSP);
                             if (inputValueList[1] === "list") {
                                 inputValueList[1] = "list1";
@@ -497,10 +509,7 @@ export const keymap = {
             });
             /// #if !BROWSER
             item.addEventListener("focus", () => {
-                ipcRenderer.send(Constants.SIYUAN_CMD, {
-                    cmd: "unregisterGlobalShortcut",
-                    accelerator: window.siyuan.config.keymap.general.toggleWin.custom
-                });
+                sendUnregisterGlobalShortcut(app);
             });
             /// #endif
         });

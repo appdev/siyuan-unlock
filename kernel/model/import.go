@@ -43,6 +43,8 @@ import (
 	"github.com/88250/lute/html/atom"
 	"github.com/88250/lute/parse"
 	"github.com/88250/lute/render"
+	util2 "github.com/88250/lute/util"
+	"github.com/siyuan-note/dataparser"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/riff"
@@ -54,19 +56,6 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-func HTML2Markdown(htmlStr string, luteEngine *lute.Lute) (markdown string, withMath bool, err error) {
-	tree, withMath := HTML2Tree(htmlStr, luteEngine)
-
-	var formatted []byte
-	renderer := render.NewFormatRenderer(tree, luteEngine.RenderOptions)
-	for nodeType, rendererFunc := range luteEngine.HTML2MdRendererFuncs {
-		renderer.ExtRendererFuncs[nodeType] = rendererFunc
-	}
-	formatted = renderer.Render()
-	markdown = gulu.Str.FromBytes(formatted)
-	return
-}
-
 func HTML2Tree(htmlStr string, luteEngine *lute.Lute) (tree *parse.Tree, withMath bool) {
 	htmlStr = gulu.Str.RemovePUA(htmlStr)
 	assetDirPath := filepath.Join(util.DataDir, "assets")
@@ -76,26 +65,42 @@ func HTML2Tree(htmlStr string, luteEngine *lute.Lute) (tree *parse.Tree, withMat
 			return ast.WalkContinue
 		}
 
-		if ast.NodeText == n.Type {
+		switch n.Type {
+		case ast.NodeHTMLBlock:
+			if bytes.HasPrefix(n.Tokens, []byte("<pre ")) && bytes.HasSuffix(n.Tokens, []byte("</pre>")) {
+				if bytes.Contains(n.Tokens, []byte("data:image/svg+xml;base64")) {
+					matches := regexp.MustCompile(`(?sU)<pre [^>]*>(.*)</pre>`).FindSubmatch(n.Tokens)
+					if len(matches) >= 2 {
+						n.Tokens = matches[1]
+					}
+					subTree := parse.Inline("", n.Tokens, luteEngine.ParseOptions)
+					if nil != subTree && nil != subTree.Root && nil != subTree.Root.FirstChild {
+						n.Type = ast.NodeParagraph
+						var children []*ast.Node
+						for c := subTree.Root.FirstChild.FirstChild; nil != c; c = c.Next {
+							children = append(children, c)
+						}
+						for _, c := range children {
+							n.AppendChild(c)
+						}
+					}
+				} else if bytes.Contains(n.Tokens, []byte("<svg")) {
+					processHTMLBlockSvgImg(n, assetDirPath)
+				}
+			}
+		case ast.NodeText:
 			if n.ParentIs(ast.NodeTableCell) {
 				n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("\\|"), []byte("|"))
 				n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("|"), []byte("\\|"))
+				n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("\\<br /\\>"), []byte("<br />"))
 			}
-		}
-
-		if ast.NodeInlineMath == n.Type {
+		case ast.NodeInlineMath:
 			withMath = true
-			return ast.WalkContinue
-		}
-
-		if ast.NodeLinkDest != n.Type {
-			return ast.WalkContinue
-		}
-
-		dest := n.TokensStr()
-		if strings.HasPrefix(dest, "data:image") && strings.Contains(dest, ";base64,") {
-			processBase64Img(n, dest, assetDirPath)
-			return ast.WalkContinue
+		case ast.NodeLinkDest:
+			dest := n.TokensStr()
+			if strings.HasPrefix(dest, "data:image") && strings.Contains(dest, ";base64,") {
+				processBase64Img(n, dest, assetDirPath)
+			}
 		}
 		return ast.WalkContinue
 	})
@@ -124,7 +129,9 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 		if err != nil {
 			return err
 		}
-
+		if d == nil {
+			return nil
+		}
 		if !d.IsDir() && strings.HasSuffix(d.Name(), ".sy") {
 			syPaths = append(syPaths, path)
 		}
@@ -159,7 +166,7 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 			err = readErr
 			return
 		}
-		tree, _, parseErr := filesys.ParseJSON(data, luteEngine.ParseOptions)
+		tree, _, parseErr := dataparser.ParseJSON(data, luteEngine.ParseOptions)
 		if nil != parseErr {
 			logging.LogErrorf("parse .sy [%s] failed: %s", syPath, parseErr)
 			err = parseErr
@@ -176,6 +183,13 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 			blockIDs[n.ID] = newNodeID
 			n.ID = newNodeID
 			n.SetIALAttr("id", newNodeID)
+
+			if icon := n.IALAttr("icon"); "" != icon {
+				// XSS through emoji name https://github.com/siyuan-note/siyuan/issues/15034
+				icon = util.FilterUploadEmojiFileName(icon)
+				n.SetIALAttr("icon", icon)
+			}
+
 			return ast.WalkContinue
 		})
 		tree.ID = tree.Root.ID
@@ -229,6 +243,20 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 	if gulu.File.IsExist(storageAvDir) {
 		// 重新生成数据库数据
 		filelock.Walk(storageAvDir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d == nil {
+				return nil
+			}
+
+			if ".json" == d.Name() { // https://github.com/siyuan-note/siyuan/issues/16637
+				if removeErr := os.RemoveAll(path); nil != removeErr {
+					logging.LogErrorf("remove empty av file [%s] failed: %s", path, removeErr)
+				}
+				return nil
+			}
+
 			if !strings.HasSuffix(path, ".json") || !ast.IsNodeIDPattern(strings.TrimSuffix(d.Name(), ".json")) {
 				return nil
 			}
@@ -352,7 +380,7 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 			bIDs := deckToImport.GetBlockIDs()
 			cards := deckToImport.GetCardsByBlockIDs(bIDs)
 			for _, card := range cards {
-				deck.AddCard(card.ID(), blockIDs[card.BlockID()])
+				deck.AddCard(ast.NewNodeID(), blockIDs[card.BlockID()])
 			}
 
 			if 0 < len(cards) {
@@ -385,11 +413,8 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 	for _, tree := range trees {
 		util.PushEndlessProgress(Conf.language(73) + " " + fmt.Sprintf(Conf.language(70), tree.Root.IALAttr("title")))
 		syPath := filepath.Join(unzipRootPath, tree.Path)
-		if "" == tree.Root.Spec {
-			parse.NestedInlines2FlattedSpans(tree, false)
-			tree.Root.Spec = "1"
-		}
-		renderer := render.NewJSONRenderer(tree, luteEngine.RenderOptions)
+		treenode.UpgradeSpec(tree)
+		renderer := render.NewJSONRenderer(tree, luteEngine.RenderOptions, luteEngine.ParseOptions)
 		data := renderer.Render()
 
 		if !util.UseSingleLineSave {
@@ -466,13 +491,15 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 		if err != nil {
 			return err
 		}
-
+		if d == nil {
+			return nil
+		}
 		if d.IsDir() && ast.IsNodeIDPattern(d.Name()) {
 			renamePaths[path] = path
 		}
 		return nil
 	})
-	for p, _ := range renamePaths {
+	for p := range renamePaths {
 		originalPath := p
 		p = strings.TrimPrefix(p, unzipRootPath)
 		p = filepath.ToSlash(p)
@@ -498,7 +525,7 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 	}
 
 	var oldPaths []string
-	for oldPath, _ := range renamePaths {
+	for oldPath := range renamePaths {
 		oldPaths = append(oldPaths, oldPath)
 	}
 	sort.Slice(oldPaths, func(i, j int) bool {
@@ -538,7 +565,13 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 	// 将包含的资源文件统一移动到 data/assets/ 下
 	var assetsDirs []string
 	filelock.Walk(unzipRootPath, func(path string, d fs.DirEntry, err error) error {
-		if strings.Contains(path, "assets") && d.IsDir() {
+		if err != nil {
+			return err
+		}
+		if d == nil || unzipRootPath == path {
+			return nil
+		}
+		if d.Name() == "assets" && d.IsDir() {
 			assetsDirs = append(assetsDirs, path)
 		}
 		return nil
@@ -555,9 +588,34 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 	}
 
 	// 将包含的自定义表情统一移动到 data/emojis/ 下
+	unzipRootEmojisPath := filepath.Join(unzipRootPath, "emojis")
+	filelock.Walk(unzipRootEmojisPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d == nil {
+			return nil
+		}
+		if !util.IsValidUploadFileName(d.Name()) {
+			emojiFullName := path
+			fullPathFilteredName := filepath.Join(filepath.Dir(path), util.FilterUploadEmojiFileName(d.Name()))
+			// XSS through emoji name https://github.com/siyuan-note/siyuan/issues/15034
+			logging.LogWarnf("renaming invalid custom emoji file [%s] to [%s]", d.Name(), fullPathFilteredName)
+			if removeErr := filelock.Rename(emojiFullName, fullPathFilteredName); nil != removeErr {
+				logging.LogErrorf("renaming invalid custom emoji file to [%s] failed: %s", fullPathFilteredName, removeErr)
+			}
+		}
+		return nil
+	})
 	var emojiDirs []string
 	filelock.Walk(unzipRootPath, func(path string, d fs.DirEntry, err error) error {
-		if strings.Contains(path, "emojis") && d.IsDir() {
+		if err != nil {
+			return err
+		}
+		if d == nil || unzipRootPath == path {
+			return nil
+		}
+		if d.Name() == "emojis" && d.IsDir() {
 			emojiDirs = append(emojiDirs, path)
 		}
 		return nil
@@ -592,6 +650,12 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 
 	var treePaths []string
 	filelock.Walk(unzipRootPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d == nil {
+			return nil
+		}
 		if d.IsDir() {
 			if strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
@@ -673,6 +737,25 @@ func ImportData(zipPath string) (err error) {
 	}
 
 	tmpDataPath := filepath.Join(unzipPath, dirs[0].Name())
+	tmpDataEmojisPath := filepath.Join(tmpDataPath, "emojis")
+	filelock.Walk(tmpDataEmojisPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d == nil {
+			return nil
+		}
+		if !util.IsValidUploadFileName(d.Name()) {
+			emojiFullName := path
+			fullPathFilteredName := filepath.Join(filepath.Dir(path), util.FilterUploadEmojiFileName(d.Name()))
+			// XSS through emoji name https://github.com/siyuan-note/siyuan/issues/15034
+			logging.LogWarnf("renaming invalid custom emoji file [%s] to [%s]", d.Name(), fullPathFilteredName)
+			if removeErr := filelock.Rename(emojiFullName, fullPathFilteredName); nil != removeErr {
+				logging.LogErrorf("renaming invalid custom emoji file to [%s] failed: %s", fullPathFilteredName, removeErr)
+			}
+		}
+		return nil
+	})
 	if err = filelock.Copy(tmpDataPath, util.DataDir); err != nil {
 		logging.LogErrorf("copy data dir from [%s] to [%s] failed: %s", tmpDataPath, util.DataDir, err)
 		err = errors.New("copy data failed")
@@ -681,7 +764,7 @@ func ImportData(zipPath string) (err error) {
 
 	logging.LogInfof("import data from [%s] done", zipPath)
 	IncSync()
-	FullReindex()
+	FullReindex(false)
 	return
 }
 
@@ -721,12 +804,16 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 	hPathsIDs := map[string]string{}
 	idPaths := map[string]string{}
 	moveIDs := map[string]string{}
-
+	assetsDone := map[string]string{}
 	if gulu.File.IsDir(localPath) { // 导入文件夹
-		// 收集所有资源文件
-		assets := map[string]string{}
+		targetPaths := map[string]string{}
+		count := 0
+		// md 转换 sy
 		filelock.Walk(localPath, func(currentPath string, d fs.DirEntry, err error) error {
-			if localPath == currentPath {
+			if err != nil {
+				return err
+			}
+			if d == nil {
 				return nil
 			}
 			if strings.HasPrefix(d.Name(), ".") {
@@ -736,21 +823,21 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 				return nil
 			}
 
-			if !strings.HasSuffix(d.Name(), ".md") && !strings.HasSuffix(d.Name(), ".markdown") {
-				assets[currentPath] = currentPath
-				return nil
-			}
-			return nil
-		})
-
-		targetPaths := map[string]string{}
-		assetsDone := map[string]string{}
-		count := 0
-		// md 转换 sy
-		filelock.Walk(localPath, func(currentPath string, d fs.DirEntry, err error) error {
-			if strings.HasPrefix(d.Name(), ".") {
-				if d.IsDir() {
-					return filepath.SkipDir
+			if !d.IsDir() && (!strings.HasSuffix(currentPath, ".md") && !strings.HasSuffix(currentPath, ".markdown") ||
+				strings.Contains(filepath.ToSlash(currentPath), "/assets/")) {
+				// 非 Markdown 文件作为资源文件处理 https://github.com/siyuan-note/siyuan/issues/13817
+				existName := assetsDone[currentPath]
+				var name string
+				if "" == existName {
+					name = filepath.Base(currentPath)
+					name = util.FilterUploadFileName(name)
+					name = util.AssetName(name, ast.NewNodeID())
+					assetTargetPath := filepath.Join(util.DataDir, "assets", name)
+					if err = filelock.Copy(currentPath, assetTargetPath); err != nil {
+						logging.LogErrorf("copy asset from [%s] to [%s] failed: %s", currentPath, assetTargetPath, err)
+						return nil
+					}
+					assetsDone[currentPath] = name
 				}
 				return nil
 			}
@@ -786,6 +873,11 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 			}
 
 			if d.IsDir() {
+				if "assets" == d.Name() {
+					// 如果是 assets 文件夹则跳过，里面的 Markdown 文件算作资源文件 https://github.com/siyuan-note/siyuan/issues/13817
+					return nil
+				}
+
 				if subMdFiles := util.GetFilePathsByExts(currentPath, []string{".md", ".markdown"}); 1 > len(subMdFiles) {
 					// 如果该文件夹中不包含 Markdown 文件则不处理 https://github.com/siyuan-note/siyuan/issues/11567
 					return nil
@@ -844,7 +936,7 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 			tree.Path = targetPath
 			targetPaths[curRelPath] = targetPath
 			tree.HPath = hPath
-			tree.Root.Spec = "1"
+			tree.Root.Spec = treenode.CurrentSpec
 
 			docDirLocalPath := filepath.Dir(filepath.Join(boxLocalPath, targetPath))
 			assetDirPath := getAssetsDir(boxLocalPath, docDirLocalPath)
@@ -866,8 +958,12 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 					return ast.WalkContinue
 				}
 
-				dest = strings.ReplaceAll(dest, "%20", " ")
-				dest = strings.ReplaceAll(dest, "%5C", "/")
+				decodedDest := string(html.DecodeDestination([]byte(dest)))
+				if decodedDest != dest {
+					dest = decodedDest
+				}
+				absolutePath := filepath.Join(currentDir, dest)
+
 				if ast.NodeLinkDest == n.Type {
 					n.Tokens = []byte(dest)
 				} else {
@@ -881,32 +977,37 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 					return ast.WalkContinue
 				}
 
-				absDest := filepath.Join(currentDir, dest)
-				fullPath, exist := assets[absDest]
-				if !exist {
-					absDest = filepath.Join(currentDir, string(html.DecodeDestination([]byte(dest))))
+				if !gulu.File.IsExist(absolutePath) {
+					return ast.WalkContinue
 				}
-				fullPath, exist = assets[absDest]
-				if exist {
-					existName := assetsDone[absDest]
-					var name string
-					if "" == existName {
-						name = filepath.Base(fullPath)
-						name = util.AssetName(name)
-						assetTargetPath := filepath.Join(assetDirPath, name)
-						if err = filelock.Copy(fullPath, assetTargetPath); err != nil {
-							logging.LogErrorf("copy asset from [%s] to [%s] failed: %s", fullPath, assetTargetPath, err)
-							return ast.WalkContinue
-						}
-						assetsDone[absDest] = name
-					} else {
-						name = existName
+
+				if strings.HasSuffix(absolutePath, ".md") || strings.HasSuffix(absolutePath, ".markdown") {
+					if !strings.Contains(filepath.ToSlash(absolutePath), "/assets/") {
+						// 链接 .md 文件的情况下只有路径中包含 assets 才算作资源文件，其他情况算作文档链接，后续在 convertMdHyperlinks2WikiLinks 中处理
+						// Supports converting relative path hyperlinks into document block references after importing Markdown https://github.com/siyuan-note/siyuan/issues/13817
+						return ast.WalkContinue
 					}
-					if ast.NodeLinkDest == n.Type {
-						n.Tokens = []byte("assets/" + name)
-					} else {
-						n.TextMarkAHref = "assets/" + name
+				}
+
+				existName := assetsDone[absolutePath]
+				var name string
+				if "" == existName {
+					name = filepath.Base(absolutePath)
+					name = util.FilterUploadFileName(name)
+					name = util.AssetName(name, ast.NewNodeID())
+					assetTargetPath := filepath.Join(assetDirPath, name)
+					if err = filelock.Copy(absolutePath, assetTargetPath); err != nil {
+						logging.LogErrorf("copy asset from [%s] to [%s] failed: %s", absolutePath, assetTargetPath, err)
+						return ast.WalkContinue
 					}
+					assetsDone[absolutePath] = name
+				} else {
+					name = existName
+				}
+				if ast.NodeLinkDest == n.Type {
+					n.Tokens = []byte("assets/" + name)
+				} else {
+					n.TextMarkAHref = "assets/" + name
 				}
 				return ast.WalkContinue
 			})
@@ -967,7 +1068,7 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 		tree.Box = boxID
 		tree.Path = targetPath
 		tree.HPath = path.Join(baseHPath, title)
-		tree.Root.Spec = "1"
+		tree.Root.Spec = treenode.CurrentSpec
 
 		docDirLocalPath := filepath.Dir(filepath.Join(boxLocalPath, targetPath))
 		assetDirPath := getAssetsDir(boxLocalPath, docDirLocalPath)
@@ -988,8 +1089,12 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 				return ast.WalkContinue
 			}
 
-			dest = strings.ReplaceAll(dest, "%20", " ")
-			dest = strings.ReplaceAll(dest, "%5C", "/")
+			decodedDest := string(html.DecodeDestination([]byte(dest)))
+			if decodedDest != dest {
+				dest = decodedDest
+			}
+			absolutePath := filepath.Join(filepath.Dir(localPath), dest)
+
 			if ast.NodeLinkDest == n.Type {
 				n.Tokens = []byte(dest)
 			} else {
@@ -1003,25 +1108,29 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 				return ast.WalkContinue
 			}
 
-			absolutePath := filepath.Join(filepath.Dir(localPath), dest)
-			exist := gulu.File.IsExist(absolutePath)
-			if !exist {
-				absolutePath = filepath.Join(filepath.Dir(localPath), string(html.DecodeDestination([]byte(dest))))
-				exist = gulu.File.IsExist(absolutePath)
+			if !gulu.File.IsExist(absolutePath) {
+				return ast.WalkContinue
 			}
-			if exist {
-				name := filepath.Base(absolutePath)
-				name = util.AssetName(name)
+
+			existName := assetsDone[absolutePath]
+			var name string
+			if "" == existName {
+				name = filepath.Base(absolutePath)
+				name = util.FilterUploadFileName(name)
+				name = util.AssetName(name, ast.NewNodeID())
 				assetTargetPath := filepath.Join(assetDirPath, name)
 				if err = filelock.Copy(absolutePath, assetTargetPath); err != nil {
 					logging.LogErrorf("copy asset from [%s] to [%s] failed: %s", absolutePath, assetTargetPath, err)
 					return ast.WalkContinue
 				}
-				if ast.NodeLinkDest == n.Type {
-					n.Tokens = []byte("assets/" + name)
-				} else {
-					n.TextMarkAHref = "assets/" + name
-				}
+				assetsDone[absolutePath] = name
+			} else {
+				name = existName
+			}
+			if ast.NodeLinkDest == n.Type {
+				n.Tokens = []byte("assets/" + name)
+			} else {
+				n.TextMarkAHref = "assets/" + name
 			}
 			return ast.WalkContinue
 		})
@@ -1039,8 +1148,9 @@ func ImportFromLocalPath(boxID, localPath string, toPath string) (err error) {
 		}
 
 		initSearchLinks()
+		convertMdHyperlinks2WikiLinks()
 		convertWikiLinksAndTags()
-		buildBlockRefInText()
+		mergeTextAndHandlerNestedInlines()
 
 		box := Conf.Box(boxID)
 		for i, tree := range importTrees {
@@ -1105,12 +1215,38 @@ func parseStdMd(markdown []byte) (ret *parse.Tree, yfmRootID, yfmTitle, yfmUpdat
 		return
 	}
 	yfmRootID, yfmTitle, yfmUpdated = normalizeTree(ret)
-	imgHtmlBlock2InlineImg(ret)
+	htmlBlock2Inline(ret)
 	parse.TextMarks2Inlines(ret) // 先将 TextMark 转换为 Inlines https://github.com/siyuan-note/siyuan/issues/13056
 	parse.NestedInlines2FlattedSpansHybrid(ret, false)
 	return
 }
 
+func processHTMLBlockSvgImg(n *ast.Node, assetDirPath string) {
+	re := regexp.MustCompile(`(?i)<svg[^>]*>(.*?)</svg>`)
+	matches := re.FindStringSubmatch(string(n.Tokens))
+	if 1 >= len(matches) {
+		return
+	}
+
+	svgContent := matches[0]
+	name := util.AssetName("image.svg", ast.NewNodeID())
+	writePath := filepath.Join(assetDirPath, name)
+	if err := filelock.WriteFile(writePath, []byte(svgContent)); err != nil {
+		logging.LogErrorf("write svg asset file [%s] failed: %s", writePath, err)
+		return
+	}
+
+	n.Type = ast.NodeParagraph
+	img := &ast.Node{Type: ast.NodeImage}
+	img.AppendChild(&ast.Node{Type: ast.NodeBang})
+	img.AppendChild(&ast.Node{Type: ast.NodeOpenBracket})
+	img.AppendChild(&ast.Node{Type: ast.NodeLinkText, Tokens: []byte("image")})
+	img.AppendChild(&ast.Node{Type: ast.NodeCloseBracket})
+	img.AppendChild(&ast.Node{Type: ast.NodeOpenParen})
+	img.AppendChild(&ast.Node{Type: ast.NodeLinkDest, Tokens: []byte("assets/" + name)})
+	img.AppendChild(&ast.Node{Type: ast.NodeCloseParen})
+	n.AppendChild(img)
+}
 func processBase64Img(n *ast.Node, dest string, assetDirPath string) {
 	base64TmpDir := filepath.Join(util.TempDir, "base64")
 	os.MkdirAll(base64TmpDir, 0755)
@@ -1133,9 +1269,16 @@ func processBase64Img(n *ast.Node, dest string, assetDirPath string) {
 	case "image/png":
 		img, decodeErr = png.Decode(dataReader)
 		ext = ".png"
+		if nil != decodeErr {
+			dataReader.Seek(0, 0)
+			img, decodeErr = jpeg.Decode(dataReader)
+			ext = ".jpg"
+		}
 	case "image/jpeg":
 		img, decodeErr = jpeg.Decode(dataReader)
 		ext = ".jpg"
+	case "image/svg+xml":
+		ext = ".svg"
 	default:
 		logging.LogWarnf("unsupported base64 image type [%s]", typ)
 		return
@@ -1151,7 +1294,7 @@ func processBase64Img(n *ast.Node, dest string, assetDirPath string) {
 		name = alt.TokensStr() + ext
 	}
 	name = util.FilterUploadFileName(name)
-	name = util.AssetName(name)
+	name = util.AssetName(name, ast.NewNodeID())
 
 	tmp := filepath.Join(base64TmpDir, name)
 	tmpFile, openErr := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE, 0644)
@@ -1166,6 +1309,8 @@ func processBase64Img(n *ast.Node, dest string, assetDirPath string) {
 		encodeErr = png.Encode(tmpFile, img)
 	case "image/jpeg":
 		encodeErr = jpeg.Encode(tmpFile, img, &jpeg.Options{Quality: 100})
+	case "image/svg+xml":
+		_, encodeErr = tmpFile.Write(unbased)
 	}
 	if nil != encodeErr {
 		logging.LogErrorf("encode base64 image failed: %s", encodeErr)
@@ -1182,8 +1327,10 @@ func processBase64Img(n *ast.Node, dest string, assetDirPath string) {
 	n.Tokens = []byte("assets/" + name)
 }
 
-func imgHtmlBlock2InlineImg(tree *parse.Tree) {
+func htmlBlock2Inline(tree *parse.Tree) {
 	imgHtmlBlocks := map[*ast.Node]*html.Node{}
+	aHtmlBlocks := map[*ast.Node]*html.Node{}
+	var unlinks []*ast.Node
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering {
 			return ast.WalkContinue
@@ -1191,12 +1338,8 @@ func imgHtmlBlock2InlineImg(tree *parse.Tree) {
 
 		if ast.NodeHTMLBlock == n.Type || (ast.NodeText == n.Type && bytes.HasPrefix(bytes.ToLower(n.Tokens), []byte("<img "))) {
 			tokens := bytes.TrimSpace(n.Tokens)
-			if bytes.HasPrefix(tokens, []byte("<div>")) {
-				tokens = bytes.TrimPrefix(tokens, []byte("<div>"))
-			}
-			if bytes.HasSuffix(tokens, []byte("</div>")) {
-				tokens = bytes.TrimSuffix(tokens, []byte("</div>"))
-			}
+			tokens, _ = bytes.CutPrefix(tokens, []byte("<div>"))
+			tokens, _ = bytes.CutSuffix(tokens, []byte("</div>"))
 			tokens = bytes.TrimSpace(tokens)
 
 			htmlNodes, pErr := html.ParseFragment(bytes.NewReader(tokens), &html.Node{Type: html.ElementNode})
@@ -1211,6 +1354,37 @@ func imgHtmlBlock2InlineImg(tree *parse.Tree) {
 			for _, htmlNode := range htmlNodes {
 				if atom.Img == htmlNode.DataAtom {
 					imgHtmlBlocks[n] = htmlNode
+					break
+				}
+			}
+		}
+		if ast.NodeHTMLBlock == n.Type || (ast.NodeText == n.Type && bytes.HasPrefix(bytes.ToLower(n.Tokens), []byte("<a "))) {
+			tokens := bytes.TrimSpace(n.Tokens)
+			tokens, _ = bytes.CutPrefix(tokens, []byte("<div>"))
+			tokens, _ = bytes.CutSuffix(tokens, []byte("</div>"))
+			tokens = bytes.TrimSpace(tokens)
+
+			if ast.NodeHTMLBlock != n.Type && nil != n.Next && nil != n.Next.Next {
+				if ast.NodeText == n.Next.Next.Type && bytes.Equal(n.Next.Next.Tokens, []byte("</a>")) {
+					tokens = append(tokens, n.Next.Tokens...)
+					tokens = append(tokens, []byte("</a>")...)
+					unlinks = append(unlinks, n.Next)
+					unlinks = append(unlinks, n.Next.Next)
+				}
+			}
+
+			htmlNodes, pErr := html.ParseFragment(bytes.NewReader(tokens), &html.Node{Type: html.ElementNode})
+			if nil != pErr {
+				logging.LogErrorf("parse html block [%s] failed: %s", n.Tokens, pErr)
+				return ast.WalkContinue
+			}
+			if 1 > len(htmlNodes) {
+				return ast.WalkContinue
+			}
+
+			for _, htmlNode := range htmlNodes {
+				if atom.A == htmlNode.DataAtom {
+					aHtmlBlocks[n] = htmlNode
 					break
 				}
 			}
@@ -1237,16 +1411,70 @@ func imgHtmlBlock2InlineImg(tree *parse.Tree) {
 			img.AppendChild(&ast.Node{Type: ast.NodeLinkTitle})
 		}
 		img.AppendChild(&ast.Node{Type: ast.NodeCloseParen})
-
-		if nil != n.Parent && ast.NodeText == n.Type {
-			// 行级 HTML 会被解析为文本，所以这里要在父级段落前面插入，避免形成段落嵌套 https://github.com/siyuan-note/siyuan/issues/13080
-			n.Parent.InsertBefore(p)
-		} else {
-			n.InsertBefore(p)
+		if width := domAttrValue(htmlImg, "width"); "" != width {
+			if util2.IsDigit(width) {
+				width += "px"
+			}
+			style := "width: " + width + ";"
+			ial := &ast.Node{Type: ast.NodeKramdownSpanIAL, Tokens: parse.IAL2Tokens([][]string{{"style", style}})}
+			img.SetIALAttr("style", style)
+			img.InsertAfter(ial)
+		} else if height := domAttrValue(htmlImg, "height"); "" != height {
+			if util2.IsDigit(height) {
+				height += "px"
+			}
+			style := "height: " + height + ";"
+			ial := &ast.Node{Type: ast.NodeKramdownSpanIAL, Tokens: parse.IAL2Tokens([][]string{{"style", style}})}
+			img.SetIALAttr("style", style)
+			img.InsertAfter(ial)
 		}
+
+		if ast.NodeHTMLBlock == n.Type {
+			n.InsertBefore(p)
+		} else if ast.NodeText == n.Type {
+			if nil != n.Parent {
+				if n.Parent.IsContainerBlock() {
+					n.InsertBefore(p)
+				} else {
+					n.InsertBefore(img)
+				}
+			} else {
+				n.InsertBefore(p)
+			}
+		}
+		unlinks = append(unlinks, n)
+	}
+
+	for n, htmlA := range aHtmlBlocks {
+		href := domAttrValue(htmlA, "href")
+		title := domAttrValue(htmlA, "title")
+		anchor := util2.DomText(htmlA)
+
+		p := treenode.NewParagraph(n.ID)
+		a := &ast.Node{Type: ast.NodeLink}
+		p.AppendChild(a)
+		a.AppendChild(&ast.Node{Type: ast.NodeOpenBracket})
+		a.AppendChild(&ast.Node{Type: ast.NodeLinkText, Tokens: []byte(anchor)})
+		a.AppendChild(&ast.Node{Type: ast.NodeCloseBracket})
+		a.AppendChild(&ast.Node{Type: ast.NodeOpenParen})
+		a.AppendChild(&ast.Node{Type: ast.NodeLinkDest, Tokens: []byte(href)})
+		if "" != title {
+			a.AppendChild(&ast.Node{Type: ast.NodeLinkSpace})
+			a.AppendChild(&ast.Node{Type: ast.NodeLinkTitle, Tokens: []byte(title)})
+		}
+		a.AppendChild(&ast.Node{Type: ast.NodeCloseParen})
+
+		if ast.NodeHTMLBlock == n.Type || (nil == n.Previous && (nil != n.Next && nil != n.Next.Next && nil == n.Next.Next.Next)) {
+			n.InsertBefore(p)
+		} else {
+			n.InsertBefore(a)
+		}
+		unlinks = append(unlinks, n)
+	}
+
+	for _, n := range unlinks {
 		n.Unlink()
 	}
-	return
 }
 
 func reassignIDUpdated(tree *parse.Tree, rootID, updated string) {
@@ -1308,6 +1536,56 @@ func initSearchLinks() {
 			searchLinks[nodePath] = n.ID
 			return ast.WalkContinue
 		})
+	}
+}
+
+func convertMdHyperlinks2WikiLinks() {
+	// Supports converting relative path hyperlinks into document block references after importing Markdown https://github.com/siyuan-note/siyuan/issues/13817
+
+	var unlinks []*ast.Node
+	for _, tree := range importTrees {
+		ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+			if !entering || ast.NodeTextMark != n.Type {
+				return ast.WalkContinue
+			}
+
+			if "a" != n.TextMarkType {
+				return ast.WalkContinue
+			}
+
+			linkText := n.TextMarkTextContent
+			if "" == linkText {
+				return ast.WalkContinue
+			}
+			linkDest := n.TextMarkAHref
+			if "" == linkDest {
+				return ast.WalkContinue
+			}
+			if strings.HasPrefix(linkDest, "assets/") {
+				return ast.WalkContinue
+			}
+			if !strings.HasSuffix(linkDest, ".md") && !strings.HasSuffix(linkDest, ".markdown") {
+				return ast.WalkContinue
+			}
+			linkDest = strings.TrimSuffix(linkDest, ".md")
+			linkDest = strings.TrimSuffix(linkDest, ".markdown")
+
+			buf := bytes.Buffer{}
+			buf.WriteString("[[")
+			buf.WriteString(linkDest)
+			buf.WriteString("|")
+			buf.WriteString(linkText)
+			buf.WriteString("]]")
+
+			wikilinkNode := &ast.Node{Type: ast.NodeText, Tokens: buf.Bytes()}
+			n.InsertBefore(wikilinkNode)
+			unlinks = append(unlinks, n)
+			return ast.WalkContinue
+		})
+	}
+
+	for _, n := range unlinks {
+		n.Unlink()
 	}
 }
 
@@ -1409,8 +1687,22 @@ func convertTags(text string) (ret string) {
 	return string(tokens)
 }
 
-// buildBlockRefInText 将文本节点进行结构化处理。
-func buildBlockRefInText() {
+func searchLinkID(link string) (id string) {
+	id = searchLinks[link]
+	if "" != id {
+		return
+	}
+
+	baseName := path.Base(link)
+	for searchLink, searchID := range searchLinks {
+		if path.Base(searchLink) == baseName {
+			return searchID
+		}
+	}
+	return
+}
+
+func mergeTextAndHandlerNestedInlines() {
 	luteEngine := NewLute()
 	luteEngine.SetHTMLTag2TextMark(true)
 	for _, tree := range importTrees {
@@ -1443,19 +1735,4 @@ func buildBlockRefInText() {
 			node.Unlink()
 		}
 	}
-}
-
-func searchLinkID(link string) (id string) {
-	id = searchLinks[link]
-	if "" != id {
-		return
-	}
-
-	baseName := path.Base(link)
-	for searchLink, searchID := range searchLinks {
-		if path.Base(searchLink) == baseName {
-			return searchID
-		}
-	}
-	return
 }

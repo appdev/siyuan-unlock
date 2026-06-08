@@ -18,10 +18,10 @@ package util
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"io/fs"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -35,6 +35,7 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/jaypipes/ghw"
 	"github.com/siyuan-note/httpclient"
 	"github.com/siyuan-note/logging"
 )
@@ -46,8 +47,14 @@ func DisableFeature(feature string) {
 	DisabledFeatures = gulu.Str.RemoveDuplicatedElem(DisabledFeatures)
 }
 
-// UseSingleLineSave 是否使用单行保存 .sy 和数据库 .json 文件。
-var UseSingleLineSave = true
+var (
+	UseSingleLineSave    = true // UseSingleLineSave 是否使用单行保存 .sy 和数据库 .json 文件。
+	LargeFileWarningSize = 8    // LargeFileWarningSize 大文件警告大小，单位：MB
+)
+
+func ExceedLargeFileWarningSize(fileSize int) bool {
+	return fileSize > LargeFileWarningSize*1024*1024
+}
 
 // IsUILoaded 是否已经加载了 UI。
 var IsUILoaded = false
@@ -99,6 +106,75 @@ func logBootInfo() {
 	if 0 < len(DisabledFeatures) {
 		logging.LogInfof("disabled features [%s]", strings.Join(DisabledFeatures, ", "))
 	}
+
+	go func() {
+		driveType := getWorkspaceDriveType()
+		if "" == driveType {
+			return
+		}
+
+		if ghw.DriveTypeSSD.String() != driveType {
+			logging.LogWarnf("workspace dir [%s] is not in SSD drive, performance may be affected", WorkspaceDir)
+			WaitForUILoaded()
+			time.Sleep(3 * time.Second)
+			PushErrMsg(Langs[Lang][278], 15000)
+		}
+	}()
+}
+
+func getWorkspaceDriveType() string {
+	if gulu.OS.IsDarwin() {
+		return ghw.DriveTypeSSD.String()
+	}
+
+	if ContainerAndroid == Container || ContainerIOS == Container || ContainerHarmony == Container {
+		return ghw.DriveTypeSSD.String()
+	}
+
+	block, err := ghw.Block()
+	if err != nil {
+		logging.LogWarnf("get block storage info failed: %s", err)
+		return ""
+	}
+
+	var maxMountPathLen int
+	var matchedDriveType string
+	parentRelPrefix := ".." + string(filepath.Separator)
+	workspacePath := filepath.Clean(WorkspaceDir)
+
+	if gulu.OS.IsWindows() {
+		vol := strings.ToLower(filepath.VolumeName(workspacePath))
+		for _, disk := range block.Disks {
+			for _, partition := range disk.Partitions {
+				if strings.EqualFold(strings.TrimSuffix(partition.MountPoint, "\\"), vol) {
+					return partition.Disk.DriveType.String()
+				}
+			}
+		}
+	} else if gulu.OS.IsLinux() {
+		for _, disk := range block.Disks {
+			for _, partition := range disk.Partitions {
+				if partition.MountPoint == "" {
+					continue
+				}
+				mountPath := filepath.Clean(partition.MountPoint)
+				rel, err := filepath.Rel(mountPath, workspacePath)
+				if err != nil {
+					continue
+				}
+				if rel == ".." || strings.HasPrefix(rel, parentRelPrefix) {
+					continue
+				}
+
+				// 选路径最长的挂载点（如 /home/data 优于 /）
+				if len(mountPath) >= maxMountPathLen {
+					maxMountPathLen = len(mountPath)
+					matchedDriveType = partition.Disk.DriveType.String()
+				}
+			}
+		}
+	}
+	return matchedDriveType
 }
 
 func RandomSleep(minMills, maxMills int) {
@@ -149,10 +225,10 @@ const (
 
 var (
 	Langs           = map[string]map[int]string{}
-	TimeLangs       = map[string]map[string]interface{}{}
-	TaskActionLangs = map[string]map[string]interface{}{}
-	TrayMenuLangs   = map[string]map[string]interface{}{}
-	AttrViewLangs   = map[string]map[string]interface{}{}
+	TimeLangs       = map[string]map[string]any{}
+	TaskActionLangs = map[string]map[string]any{}
+	TrayMenuLangs   = map[string]map[string]any{}
+	AttrViewLangs   = map[string]map[string]any{}
 )
 
 var (
@@ -421,3 +497,5 @@ const (
 	EvtSQLHistoryRebuild      = "sql.history.rebuild"
 	EvtSQLAssetContentRebuild = "sql.assetContent.rebuild"
 )
+
+var SearchCaseSensitive bool
