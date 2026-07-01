@@ -31,15 +31,14 @@ diff --git forkSrcPrefix/kernel/conf/appearance.go forkDstPrefix/kernel/conf/app
 index ebd1002acf907e4afb3524fe5adcf672a850646b..1df2f4761587468cadf8f6d43573836790473f22 100644
 --- forkSrcPrefix/kernel/conf/appearance.go
 +++ forkDstPrefix/kernel/conf/appearance.go
-@@ -47,8 +47,8 @@ func NewAppearance() *Appearance {
- 		Icon:                "material",
+@@ -48,8 +48,8 @@ func NewAppearance() *Appearance {
+ 		Icon:                "litheness",
  		CodeBlockThemeLight: "github",
  		CodeBlockThemeDark:  "base16/dracula",
--		Lang:                "en_US",
+-		Lang:                "en",
 -		CloseButtonBehavior: 0,
 +		Lang:                "zh_CN",
 +		CloseButtonBehavior: 1,
+ 		HideToolbar:         true,
  		HideStatusBar:       false,
  		StatusBar:           &util.StatusBar{},
- 	}
- }

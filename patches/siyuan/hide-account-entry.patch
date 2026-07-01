@@ -1,58 +1,37 @@
-diff --git forkSrcPrefix/app/src/config/index.ts forkDstPrefix/app/src/config/index.ts
---- forkSrcPrefix/app/src/config/index.ts
-+++ forkDstPrefix/app/src/config/index.ts
-@@ -131,6 +131,6 @@ export const openSetting = (app: App) => {
-     <li data-name="search" class="b3-list-item"><svg class="b3-list-item__graphic"><use xlink:href="#iconSearch"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.search}</span></li>
-     <li data-name="keymap" class="b3-list-item"><svg class="b3-list-item__graphic"><use xlink:href="#iconKeymap"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.keymap}</span></li>
--    <li data-name="account" class="b3-list-item"><svg class="b3-list-item__graphic"><use xlink:href="#iconAccount"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.account}</span></li>
-+    <li data-name="account" class="fn__none b3-list-item"><svg class="b3-list-item__graphic"><use xlink:href="#iconAccount"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.account}</span></li>
-     <li data-name="repos" class="b3-list-item"><svg class="b3-list-item__graphic"><use xlink:href="#iconCloud"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.cloud}</span></li>
-     <li data-name="publish" class="b3-list-item"><svg class="b3-list-item__graphic"><use xlink:href="#iconLanguage"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.publish}</span></li>
-     <li data-name="about" class="b3-list-item"><svg class="b3-list-item__graphic"><use xlink:href="#iconInfo"></use></svg><span class="b3-list-item__text">${window.siyuan.languages.about}</span></li>
-diff --git forkSrcPrefix/app/src/config/search.ts forkDstPrefix/app/src/config/search.ts
---- forkSrcPrefix/app/src/config/search.ts
-+++ forkDstPrefix/app/src/config/search.ts
-@@ -85,8 +85,7 @@ export const initConfigSearch = (element: HTMLElement, app: App) => {
-             .concat(Object.keys(Constants.SIYUAN_KEYMAP.editor.table))),
+diff --git forkSrcPrefix/app/src/config/tabs/syncTab.ts forkDstPrefix/app/src/config/tabs/syncTab.ts
+--- forkSrcPrefix/app/src/config/tabs/syncTab.ts
++++ forkDstPrefix/app/src/config/tabs/syncTab.ts
+@@ -1,5 +1,4 @@
+ import type {SettingTabBuilder} from "../setting/builder";
+-import {registerAccountGroup} from "./accountUi";
+ import {Constants} from "../../constants";
+ import {fetchPost} from "../../util/fetch";
+ import {confirmDialog} from "../../dialog/confirmDialog";
+@@ -263,7 +262,6 @@ const mountRepoKey = (root: HTMLElement) => {
+ };
  
-         // 账号
--        getLang(["accountTip", "accountName", "password", "captcha", "forgetPassword", "login", "register",
--            "twoFactorCaptcha", "account1", "account2", "account5"]),
-+        [],
- 
-         // 云端
-         getLang(["cloudStorage", "trafficStat", "sync", "backup", "cdn", "total", "sizeLimit", "cloudBackup",
+ export const registerSyncTab = (tab: SettingTabBuilder) => {
+-    registerAccountGroup(tab);
+     registerSyncGroup(tab);
+     registerRepoGroup(tab);
+ };
 diff --git forkSrcPrefix/app/src/layout/topBar.ts forkDstPrefix/app/src/layout/topBar.ts
 --- forkSrcPrefix/app/src/layout/topBar.ts
 +++ forkDstPrefix/app/src/layout/topBar.ts
-@@ -172,10 +172,6 @@ export const initBar = (app: App) => {
+@@ -10,6 +10,5 @@ import {workspaceMenu} from "../menus/workspace";
+ import {MenuItem} from "../menus/Menu";
+ import {setMode} from "../util/assets";
+-import {openSetting} from "../config";
+ import {openSearch} from "../search/spread";
+ import {App} from "../index";
+ /// #if !BROWSER
+@@ -212,9 +211,6 @@ export const initBar = (app: App) => {
                  event.stopPropagation();
                  break;
              } else if (targetId === "toolbarVIP") {
 -                if (!window.siyuan.config.readonly) {
--                    const dialogSetting = openSetting(app);
--                    dialogSetting.element.querySelector('.b3-tab-bar [data-name="account"]').dispatchEvent(new CustomEvent("click"));
+-                    openSetting(app, "sync");
 -                }
                  event.stopPropagation();
                  break;
              } else if (targetId === "barSearch") {
-diff --git forkSrcPrefix/app/src/mobile/menu/index.ts forkDstPrefix/app/src/mobile/menu/index.ts
---- forkSrcPrefix/app/src/mobile/menu/index.ts
-+++ forkDstPrefix/app/src/mobile/menu/index.ts
-@@ -39,16 +39,6 @@ export const popMenu = () => {
- export const initRightMenu = (app: App) => {
-     const menuElement = document.getElementById("menu");
-     let accountHTML = "";
--    if (window.siyuan.user && !window.siyuan.config.readonly) {
--        accountHTML = `<div class="b3-menu__item" id="menuAccount">
--    <img class="b3-menu__icon" src="${window.siyuan.user.userAvatarURL}"/>
--    <span class="b3-menu__label">${window.siyuan.user.userName}</span>
--</div>`;
--    } else if (!window.siyuan.config.readonly) {
--        accountHTML = `<div class="b3-menu__item" id="menuAccount">
--    <svg class="b3-menu__icon"><use xlink:href="#iconAccount"></use></svg><span class="b3-menu__label">${window.siyuan.languages.login}</span>
--</div>`;
--    }
- 
-     let aiHTML = `<div class="b3-menu__item${window.siyuan.config.readonly ? " fn__none" : ""}" id="menuAI">
-         <svg class="b3-menu__icon"><use xlink:href="#iconSparkles"></use></svg><span class="b3-menu__label">AI</span>

@@ -60,8 +60,8 @@ diff --git forkSrcPrefix/kernel/model/mount.go forkDstPrefix/kernel/model/mount.
 index 6ac4df43a1ca9b664b788b78da621b3c9d762613..537872e957f27e539e27d5300961d159cc40505a 100644
 --- forkSrcPrefix/kernel/model/mount.go
 +++ forkDstPrefix/kernel/model/mount.go
-@@ -236,8 +236,8 @@ func Mount(boxID string) (alreadyMount bool, err error) {
- 		task.AppendAsyncTaskWithDelay(task.PushMsg, 3*time.Second, util.PushErrMsg, Conf.Language(52), 7000)
+@@ -276,8 +276,8 @@ func Mount(boxID string) (alreadyMount bool, err error) {
+ 		task.AppendAsyncTaskWithDelay(task.PushMsg, 3*time.Second, util.PushErrMsg, Conf.Language(244), 7000)
  		go func() {
  			// 每次打开帮助文档时自动检查版本更新并提醒 https://github.com/siyuan-note/siyuan/issues/5057
 -			time.Sleep(time.Second * 10)
