@@ -1,4 +1,4 @@
-FROM node:21 AS NODE_BUILD
+FROM node:24 AS NODE_BUILD
 
 WORKDIR /go/src/github.com/siyuan-note/siyuan/
 ADD . /go/src/github.com/siyuan-note/siyuan/
@@ -18,7 +18,7 @@ RUN apt-get purge -y jq
 RUN apt-get autoremove -y
 RUN rm -rf /var/lib/apt/lists/*
 
-FROM golang:1.24-alpine AS GO_BUILD
+FROM golang:1.25-alpine AS GO_BUILD
 WORKDIR /go/src/github.com/siyuan-note/siyuan/
 COPY --from=NODE_BUILD /go/src/github.com/siyuan-note/siyuan/ /go/src/github.com/siyuan-note/siyuan/
 ENV GO111MODULE=on
