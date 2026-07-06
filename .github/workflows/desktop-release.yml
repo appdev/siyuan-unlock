@@ -199,4 +199,4 @@ jobs:
           omitBody: true
           omitName: true
           tag: ${{ github.event.inputs.version }}
-          replacesArtifacts: false
+          replacesArtifacts: true
