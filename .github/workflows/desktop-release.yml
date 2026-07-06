@@ -70,17 +70,25 @@ jobs:
           path: siyuan-note
 
       - name: clone origin and apply patches
+        shell: bash
         run: |
-          mkdir -p ${{ github.workspace }}/go
-          cd ${{ github.workspace }}/siyuan-note/
+          set -euo pipefail
 
-          git clone --branch ${{ github.event.inputs.version }} --depth=1 https://github.com/siyuan-note/siyuan.git
+          workspace="${{ github.workspace }}"
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            workspace="$(cygpath -u "${workspace}")"
+          fi
+
+          mkdir -p "${workspace}/go"
+          cd "${workspace}/siyuan-note/"
+
+          git clone --branch "${{ github.event.inputs.version }}" --depth=1 https://github.com/siyuan-note/siyuan.git
           cd siyuan
 
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/disable-update.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/default-config.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/mock-vip-user.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/hide-account-entry.patch
+          git apply "${workspace}/siyuan-note/patches/siyuan/disable-update.patch"
+          git apply "${workspace}/siyuan-note/patches/siyuan/default-config.patch"
+          git apply "${workspace}/siyuan-note/patches/siyuan/mock-vip-user.patch"
+          git apply "${workspace}/siyuan-note/patches/siyuan/hide-account-entry.patch"
 
           git status
 

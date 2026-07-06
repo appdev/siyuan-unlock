@@ -1,1 +1,2 @@
 app/stage/protyle/** linguist-vendored
+*.patch text eol=lf
