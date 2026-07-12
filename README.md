@@ -32,7 +32,7 @@
 * `--workspace`：指定工作空间文件夹路径，在宿主机上通过 `-v` 挂载到容器中
 * `--accessAuthCode`：指定访问授权码
 
-更多的参数可参考 `--help`。下面是一条启动命令示例：
+更多的参数可参考 `serve --help`。下面是一条启动命令示例：
 
 ```bash
 docker run -d \
@@ -40,6 +40,7 @@ docker run -d \
   -p 6806:6806 \
   -e PUID=1001 -e PGID=1002 \
   apkdv/siyuan-unlock \
+  serve \
   --workspace=workspace_dir_container \
   --accessAuthCode=xxx
 ```
@@ -61,6 +62,7 @@ docker run -d \
   -p 6806:6806 \
   -e PUID=1001 -e PGID=1002 \
   apkdv/siyuan-unlock \
+  serve \
   --workspace=/siyuan/workspace/ \
   --accessAuthCode=xxx
 ```
@@ -74,7 +76,7 @@ version: "3.9"
 services:
   main:
     image: apkdv/siyuan-unlock
-    command: ['--workspace=/siyuan/workspace/', '--accessAuthCode=${AuthCode}']
+    command: ['serve', '--workspace=/siyuan/workspace/', '--accessAuthCode=${AuthCode}']
     ports:
       - 6806:6806
     volumes:
