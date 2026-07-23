@@ -60,3 +60,14 @@ index 9010350078560bb298de72bc73d54e51db60f21b..dfe9ab286f50431bdb30c633b8e63886
  func logoutCloudUser(c *gin.Context) {
  	ret := gulu.Ret.NewResult()
  	defer c.JSON(http.StatusOK, ret)
+diff --git forkSrcPrefix/kernel/model/cloud_service.go forkDstPrefix/kernel/model/cloud_service.go
+--- forkSrcPrefix/kernel/model/cloud_service.go
++++ forkDstPrefix/kernel/model/cloud_service.go
+@@ -217,5 +217,4 @@ func RefreshCheckJob2H() {
+ func RefreshCheckJob2H() {
+-	go refreshSubscriptionExpirationRemind()
+-	go refreshUser()
+-	go refreshAnnouncement()
++	go refreshSubscriptionExpirationRemind()
++	go refreshAnnouncement()
+ }
