@@ -99,7 +99,7 @@ jobs:
 
       - name: Building Android Kernel
         run: |
-          gomobile bind --tags fts5 -androidapi 21 -target='android/arm64'  -ldflags '-s -w' -v -o "${{ matrix.config.kernel_path }}" ./
+          gomobile bind --tags "fts5 sqlcipher" -androidapi 21 -target='android/arm64' -ldflags '-s -w' -v -o "${{ matrix.config.kernel_path }}" ./
           ls -la "${{ matrix.config.kernel_path }}"
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel/mobile
         env:

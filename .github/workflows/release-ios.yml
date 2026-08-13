@@ -96,7 +96,7 @@ jobs:
 
       - name: Building ios Kernel
         run: |
-          gomobile bind --tags fts5 -ldflags '-s -w' -v -target=ios -o "${{ matrix.config.kernel_path }}" ./
+          gomobile bind --tags "fts5 sqlcipher" -ldflags '-s -w' -v -target=ios -o "${{ matrix.config.kernel_path }}" ./
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel/mobile
         env:
           GO111MODULE: on

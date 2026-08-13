@@ -176,7 +176,7 @@ jobs:
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan
 
       - name: Building Kernel
-        run: go build --tags fts5 -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
+        run: go build --tags "fts5 sqlcipher" -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
         env:
           GO111MODULE: on
