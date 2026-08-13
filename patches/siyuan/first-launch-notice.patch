@@ -1,0 +1,269 @@
+diff --git a/app/src/boot/firstLaunchNotice.ts b/app/src/boot/firstLaunchNotice.ts
+new file mode 100644
+index 0000000..64aa56b
+--- /dev/null
++++ b/app/src/boot/firstLaunchNotice.ts
+@@ -0,0 +1,73 @@
++import {Dialog} from "../dialog";
++import {isInMobileApp} from "../protyle/util/compatibility";
++import {isBrowser, isMobile} from "../util/functions";
++import {
++    acknowledgeNotice,
++    getNoticeRemainingSeconds,
++    hasAcknowledgedNotice,
++    isFirstLaunchNoticeEligible,
++} from "./firstLaunchNoticeState";
++
++const RELEASE_URL = "https://github.com/appdev/siyuan-unlock/releases";
++
++export const openFirstLaunchNotice = () => {
++    const eligible = isFirstLaunchNoticeEligible({
++        browser: isBrowser(),
++        mobileApp: Boolean(isInMobileApp()),
++        container: window.siyuan.config.system.container,
++        publish: window.siyuan.isPublish,
++    });
++    if (!eligible || hasAcknowledgedNotice(localStorage)) {
++        return Promise.resolve();
++    }
++
++    return new Promise<void>((resolve) => {
++        const dialog = new Dialog({
++            title: "重要声明",
++            width: isMobile() ? "92vw" : "520px",
++            disableClose: true,
++            hideCloseIcon: true,
++            content: `<div class="b3-dialog__content b3-typography">
++    <p>本项目 <strong>SiYuan Unlock</strong> 为免费开源项目，官方始终免费提供，未授权任何个人或平台收费代售本项目、安装包、激活码或所谓售后服务。</p>
++    <p>如果您通过付费渠道获得本软件，请立即向交易平台申请退款并举报相关卖家，谨防后续收费及安全风险。</p>
++    <p>请仅从官方发布页面获取版本：<br><a href="${RELEASE_URL}" target="_blank" rel="noopener noreferrer">${RELEASE_URL}</a></p>
++    <p>感谢支持开源，共同抵制倒卖。</p>
++    <div class="ft__error fn__none" data-type="noticeError">无法保存确认状态，请重试。</div>
++</div>
++<div class="b3-dialog__action">
++    <button class="b3-button b3-button--text" data-type="noticeAcknowledge" disabled>我已知晓（5）</button>
++</div>`,
++        });
++        const destroy = dialog.destroy.bind(dialog);
++        dialog.destroy = () => undefined;
++
++        const button = dialog.element.querySelector<HTMLButtonElement>("[data-type='noticeAcknowledge']");
++        const errorElement = dialog.element.querySelector<HTMLElement>("[data-type='noticeError']");
++        const startedAt = Date.now();
++        const updateButton = () => {
++            const remaining = getNoticeRemainingSeconds(startedAt, Date.now());
++            if (remaining > 0) {
++                button.textContent = `我已知晓（${remaining}）`;
++                return;
++            }
++            window.clearInterval(timer);
++            button.textContent = "我已知晓";
++            button.disabled = false;
++        };
++        const timer = window.setInterval(updateButton, 250);
++        updateButton();
++
++        button.addEventListener("click", () => {
++            if (button.disabled) {
++                return;
++            }
++            if (!acknowledgeNotice(localStorage)) {
++                errorElement.classList.remove("fn__none");
++                return;
++            }
++            window.clearInterval(timer);
++            destroy();
++            resolve();
++        });
++    });
++};
+diff --git a/app/src/boot/firstLaunchNoticeState.test.ts b/app/src/boot/firstLaunchNoticeState.test.ts
+new file mode 100644
+index 0000000..767b55e
+--- /dev/null
++++ b/app/src/boot/firstLaunchNoticeState.test.ts
+@@ -0,0 +1,69 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import {
++    NOTICE_DELAY_MS,
++    NOTICE_STORAGE_KEY,
++    acknowledgeNotice,
++    getNoticeRemainingSeconds,
++    hasAcknowledgedNotice,
++    isFirstLaunchNoticeEligible,
++} from "./firstLaunchNoticeState.ts";
++
++class MemoryStorage {
++    private values = new Map<string, string>();
++
++    getItem(key: string) {
++        return this.values.get(key) ?? null;
++    }
++
++    setItem(key: string, value: string) {
++        this.values.set(key, value);
++    }
++}
++
++test("limits the notice to packaged desktop, Android, and iOS clients", () => {
++    assert.equal(isFirstLaunchNoticeEligible({browser: false, mobileApp: false, container: "desktop", publish: false}), true);
++    assert.equal(isFirstLaunchNoticeEligible({browser: true, mobileApp: true, container: "android", publish: false}), true);
++    assert.equal(isFirstLaunchNoticeEligible({browser: true, mobileApp: true, container: "ios", publish: false}), true);
++    assert.equal(isFirstLaunchNoticeEligible({browser: true, mobileApp: false, container: "docker", publish: false}), false);
++    assert.equal(isFirstLaunchNoticeEligible({browser: true, mobileApp: true, container: "harmony", publish: false}), false);
++    assert.equal(isFirstLaunchNoticeEligible({browser: false, mobileApp: false, container: "desktop", publish: true}), false);
++});
++
++test("keeps acknowledgement disabled for five elapsed seconds", () => {
++    assert.equal(NOTICE_DELAY_MS, 5_000);
++    assert.equal(getNoticeRemainingSeconds(1_000, 1_000), 5);
++    assert.equal(getNoticeRemainingSeconds(1_000, 5_999), 1);
++    assert.equal(getNoticeRemainingSeconds(1_000, 6_000), 0);
++    assert.equal(getNoticeRemainingSeconds(1_000, 7_000), 0);
++});
++
++test("persists acknowledgement under the versioned device key", () => {
++    const storage = new MemoryStorage();
++    assert.equal(NOTICE_STORAGE_KEY, "siyuanUnlockAntiResaleNoticeV1");
++    assert.equal(hasAcknowledgedNotice(storage), false);
++    assert.equal(acknowledgeNotice(storage), true);
++    assert.equal(storage.getItem(NOTICE_STORAGE_KEY), "acknowledged");
++    assert.equal(hasAcknowledgedNotice(storage), true);
++});
++
++test("treats storage read and write failures as unacknowledged", () => {
++    const readFailure = {
++        getItem() {
++            throw new Error("read failed");
++        },
++        setItem() {},
++    };
++    const writeFailure = {
++        getItem() {
++            return null;
++        },
++        setItem() {
++            throw new Error("write failed");
++        },
++    };
++
++    assert.equal(hasAcknowledgedNotice(readFailure), false);
++    assert.equal(acknowledgeNotice(writeFailure), false);
++    assert.equal(hasAcknowledgedNotice(writeFailure), false);
++});
+diff --git a/app/src/boot/firstLaunchNoticeState.ts b/app/src/boot/firstLaunchNoticeState.ts
+new file mode 100644
+index 0000000..fbb6870
+--- /dev/null
++++ b/app/src/boot/firstLaunchNoticeState.ts
+@@ -0,0 +1,47 @@
++export const NOTICE_STORAGE_KEY = "siyuanUnlockAntiResaleNoticeV1";
++export const NOTICE_DELAY_MS = 5_000;
++const NOTICE_STORAGE_VALUE = "acknowledged";
++
++export interface NoticeRuntime {
++    browser: boolean;
++    mobileApp: boolean;
++    container: string;
++    publish: boolean;
++}
++
++interface NoticeStorage {
++    getItem(key: string): string | null;
++    setItem(key: string, value: string): void;
++}
++
++export const isFirstLaunchNoticeEligible = (runtime: NoticeRuntime) => {
++    if (runtime.publish) {
++        return false;
++    }
++    if (!runtime.browser) {
++        return true;
++    }
++    return runtime.mobileApp && ["android", "ios"].includes(runtime.container);
++};
++
++export const getNoticeRemainingSeconds = (startedAt: number, now: number) => {
++    const remaining = Math.ceil((NOTICE_DELAY_MS - (now - startedAt)) / 1_000);
++    return Math.min(NOTICE_DELAY_MS / 1_000, Math.max(0, remaining));
++};
++
++export const hasAcknowledgedNotice = (storage: NoticeStorage) => {
++    try {
++        return storage.getItem(NOTICE_STORAGE_KEY) === NOTICE_STORAGE_VALUE;
++    } catch {
++        return false;
++    }
++};
++
++export const acknowledgeNotice = (storage: NoticeStorage) => {
++    try {
++        storage.setItem(NOTICE_STORAGE_KEY, NOTICE_STORAGE_VALUE);
++        return true;
++    } catch {
++        return false;
++    }
++};
+diff --git a/app/src/boot/onGetConfig.ts b/app/src/boot/onGetConfig.ts
+index 09b0748..cd16d2c 100644
+--- a/app/src/boot/onGetConfig.ts
++++ b/app/src/boot/onGetConfig.ts
+@@ -23,7 +23,6 @@ import {initStatus} from "../layout/status";
+ import {showMessage} from "../dialog/message";
+ import {replaceLocalPath} from "../editor/rename";
+ import {initBar} from "../layout/topBar";
+-import {openChangelog} from "./openChangelog";
+ import type {App} from "../index";
+ import {initWindowEvent} from "./globalEvent/event";
+ import {sendGlobalShortcut} from "./globalEvent/keydown";
+@@ -70,7 +69,6 @@ export const onGetConfig = (isStart: boolean, app: App) => {
+                     /// #if !BROWSER
+                     sendGlobalShortcut(app);
+                     /// #endif
+-                    openChangelog();
+                 } catch (e) {
+                     resetLayout();
+                 }
+diff --git a/app/src/index.ts b/app/src/index.ts
+index 2492119..f2cdab4 100644
+--- a/app/src/index.ts
++++ b/app/src/index.ts
+@@ -54,6 +54,8 @@ import {setTitle} from "./util/processTitle";
+ import {ensureUILayout} from "./util/ensureUILayout";
+ import {applyEntryVisibility} from "./config/entryVisibility/runtime";
+ import {removeBlockPanelEditors} from "./block/panelRemoval";
++import {openChangelog} from "./boot/openChangelog";
++import {openFirstLaunchNotice} from "./boot/firstLaunchNotice";
+ 
+ export class App {
+     public plugins: import("./plugin").Plugin[] = [];
+@@ -293,6 +295,8 @@ export class App {
+                         await ensureOnboarding();
+                         await setNoteBook();
+                         await onGetConfig(response.data.start, this);
++                        await openFirstLaunchNotice();
++                        openChangelog();
+                         onSetaccount();
+                         setTitle("", true);
+                         initMessage();
+diff --git a/app/src/mobile/index.ts b/app/src/mobile/index.ts
+index ccb004c..5c237ae 100644
+--- a/app/src/mobile/index.ts
++++ b/app/src/mobile/index.ts
+@@ -55,6 +55,7 @@ import {initTouchDragBridge} from "../util/touchDragBridge";
+ import {appearanceConfigApi} from "../config/tabs/appearanceRuntime";
+ import {openByMobile} from "../editor/openLink";
+ import {initHarmonyTextSelectionMenu} from "../util/harmonyTextSelectionMenu";
++import {openFirstLaunchNotice} from "../boot/firstLaunchNotice";
+ 
+ class App {
+     public plugins: import("../plugin").Plugin[] = [];
+@@ -206,6 +207,7 @@ class App {
+                             try {
+                                 await initFramework(this, confResponse.data.start);
+                                 initRightMenu(this);
++                                await openFirstLaunchNotice();
+                                 openChangelog();
+                                 window.siyuan.isReady = true;
+                                 mainWs.flushMainMessages();
