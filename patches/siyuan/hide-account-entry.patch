@@ -23,7 +23,7 @@ diff --git forkSrcPrefix/app/src/layout/topBar.ts forkDstPrefix/app/src/layout/t
  import {setMode} from "../util/assets";
 -import {openSetting} from "../config";
  import {openSearch} from "../search/spread";
- import {App} from "../index";
+ import type {App} from "../index";
  /// #if !BROWSER
 @@ -212,9 +211,6 @@ export const initBar = (app: App) => {
                  event.stopPropagation();

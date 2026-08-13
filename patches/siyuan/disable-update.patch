@@ -2,15 +2,15 @@ diff --git forkSrcPrefix/kernel/conf/system.go forkDstPrefix/kernel/conf/system.
 index 58b0475a23d93b94fe662e57ba8d09b932ee2d59..614602a8df3b7c83a20902e75d724059cb227112 100644
 --- forkSrcPrefix/kernel/conf/system.go
 +++ forkDstPrefix/kernel/conf/system.go
-@@ -54,7 +54,7 @@ func NewSystem() *System {
+@@ -76,6 +76,6 @@ func NewSystem() *System {
  		Name:               util.GetDeviceName(),
  		KernelVersion:      util.Ver,
  		NetworkProxy:       &NetworkProxy{},
 -		DownloadInstallPkg: true,
 +		DownloadInstallPkg: false,
+ 		UpdateChannel:      UpdateChannelStable,
  	}
- }
- 
+
 diff --git forkSrcPrefix/kernel/model/updater.go forkDstPrefix/kernel/model/updater.go
 index e29a756371ea8236de2d5c5e80771b83359be42c..13597c729a42f8975e3b631a209ed95b946e3bb5 100644
 --- forkSrcPrefix/kernel/model/updater.go

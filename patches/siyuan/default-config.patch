@@ -2,7 +2,7 @@ diff --git forkSrcPrefix/kernel/conf/sync.go forkDstPrefix/kernel/conf/sync.go
 index 488cb9e5701adc964635376373202516656b1f9a..4e2a457fe7ff2dec817c2e0ae9de610d1412cbd3 100644
 --- forkSrcPrefix/kernel/conf/sync.go
 +++ forkDstPrefix/kernel/conf/sync.go
-@@ -36,8 +36,8 @@ func NewSync() *Sync {
+@@ -38,8 +38,8 @@ func NewSync() *Sync {
  		Enabled:             false,
  		Perception:          false,
  		Mode:                1,
@@ -11,8 +11,9 @@ index 488cb9e5701adc964635376373202516656b1f9a..4e2a457fe7ff2dec817c2e0ae9de610d
 +		GenerateConflictDoc: true,
 +		Provider:            ProviderS3,
  		Interval:            30,
+ 		LAN:                 &LANSync{MaxConcurrentReqs: 16},
  	}
- }
+
 diff --git forkSrcPrefix/kernel/conf/account.go forkDstPrefix/kernel/conf/account.go
 index 5e3b51fb8f9d2944a2cacef66cdc3bc9bd365c5a..d4f4e00dea010730b557f7c122b624fb015b1021 100644
 --- forkSrcPrefix/kernel/conf/account.go
