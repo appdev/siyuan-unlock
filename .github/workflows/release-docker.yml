@@ -17,6 +17,16 @@ jobs:
       contents: read
 
     steps:
+      - name: Verify official repository
+        shell: bash
+        env:
+          OFFICIAL_BUILD_MARKER: ${{ secrets.SIYUAN_UNLOCK_OFFICIAL_BUILD }}
+        run: |
+          if [[ "${GITHUB_REPOSITORY}" != "appdev/siyuan-unlock" || -z "${OFFICIAL_BUILD_MARKER}" ]]; then
+            echo "::error::This release workflow can only run in the official repository."
+            exit 1
+          fi
+
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
         with:
