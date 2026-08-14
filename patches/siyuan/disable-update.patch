@@ -1,8 +1,8 @@
-diff --git forkSrcPrefix/kernel/conf/system.go forkDstPrefix/kernel/conf/system.go
-index 58b0475a23d93b94fe662e57ba8d09b932ee2d59..614602a8df3b7c83a20902e75d724059cb227112 100644
---- forkSrcPrefix/kernel/conf/system.go
-+++ forkDstPrefix/kernel/conf/system.go
-@@ -76,6 +76,6 @@ func NewSystem() *System {
+diff --git a/kernel/conf/system.go b/kernel/conf/system.go
+index 8bf0031..8fd9ba5 100644
+--- a/kernel/conf/system.go
++++ b/kernel/conf/system.go
+@@ -77,7 +77,7 @@ func NewSystem() *System {
  		Name:               util.GetDeviceName(),
  		KernelVersion:      util.Ver,
  		NetworkProxy:       &NetworkProxy{},
@@ -10,12 +10,12 @@ index 58b0475a23d93b94fe662e57ba8d09b932ee2d59..614602a8df3b7c83a20902e75d724059
 +		DownloadInstallPkg: false,
  		UpdateChannel:      UpdateChannelStable,
  	}
-
-diff --git forkSrcPrefix/kernel/model/updater.go forkDstPrefix/kernel/model/updater.go
-index e29a756371ea8236de2d5c5e80771b83359be42c..13597c729a42f8975e3b631a209ed95b946e3bb5 100644
---- forkSrcPrefix/kernel/model/updater.go
-+++ forkDstPrefix/kernel/model/updater.go
-@@ -308,6 +308,10 @@ func isVersionUpToDate(releaseVer string) bool {
+ }
+diff --git a/kernel/model/updater.go b/kernel/model/updater.go
+index 8a39a62..6db50b9 100644
+--- a/kernel/model/updater.go
++++ b/kernel/model/updater.go
+@@ -267,6 +267,10 @@ func isVersionUpToDate(releaseVer string) bool {
  var skipInstallPkgPlatformCached = -1
  
  func skipNewVerInstallPkg() bool {
@@ -26,48 +26,78 @@ index e29a756371ea8236de2d5c5e80771b83359be42c..13597c729a42f8975e3b631a209ed95b
  	if skipInstallPkgPlatformCached == -1 {
  		skipInstallPkgPlatformCached = 0
  		if !gulu.OS.IsWindows() && !gulu.OS.IsDarwin() {
-diff --git forkSrcPrefix/kernel/api/system.go forkDstPrefix/kernel/api/system.go
-index a903f12ad254f327c2e925f6c9e3d06f10056839..0586dc065b61790ae971e7c6f298a19afa1825f8 100644
---- forkSrcPrefix/kernel/api/system.go
-+++ forkDstPrefix/kernel/api/system.go
-@@ -264,16 +264,17 @@ func addCustomEmoji(name string, items *[]map[string]interface{}) {
- }
+diff --git a/kernel/model/updater_release.go b/kernel/model/updater_release.go
+index 1be67f8..b92a259 100644
+--- a/kernel/model/updater_release.go
++++ b/kernel/model/updater_release.go
+@@ -39,8 +39,8 @@ import (
+ )
  
- func checkUpdate(c *gin.Context) {
--	ret := gulu.Ret.NewResult()
--	defer c.JSON(http.StatusOK, ret)
-+	// ret := gulu.Ret.NewResult()
-+	// defer c.JSON(http.StatusOK, ret)
+ const (
+-	githubReleasesURL            = "https://api.github.com/repos/siyuan-note/siyuan/releases?per_page=100"
+-	githubReleaseURLPrefix       = "https://github.com/siyuan-note/siyuan/releases/tag/v"
++	githubReleasesURL            = "https://api.github.com/repos/appdev/siyuan-unlock/releases?per_page=100"
++	githubReleaseURLPrefix       = "https://github.com/appdev/siyuan-unlock/releases/tag/v"
+ 	githubAPIReleaseCacheSeconds = int64(6 * 60 * 60)
+ 	maxChecksumManifestSize      = int64(1024 * 1024)
+ )
+@@ -80,9 +80,6 @@ var (
  
--	arg, ok := util.JsonArg(c, ret)
--	if !ok {
--		return
+ func getUpdateRelease(force bool) (*updateRelease, error) {
+ 	channel := Conf.System.UpdateChannel
+-	if conf.UpdateChannelStable == channel {
+-		return getStableUpdateRelease(force)
 -	}
-+	// arg, ok := util.JsonArg(c, ret)
-+	// if !ok {
-+	// 	return
-+	// }
- 
--	showMsg := arg["showMsg"].(bool)
--	model.CheckUpdate(showMsg)
-+	// showMsg := arg["showMsg"].(bool)
-+	// model.CheckUpdate(showMsg)
-+	return
- }
- 
- func exportLog(c *gin.Context) {
-diff --git forkSrcPrefix/kernel/model/mount.go forkDstPrefix/kernel/model/mount.go
-index 6ac4df43a1ca9b664b788b78da621b3c9d762613..537872e957f27e539e27d5300961d159cc40505a 100644
---- forkSrcPrefix/kernel/model/mount.go
-+++ forkDstPrefix/kernel/model/mount.go
-@@ -276,8 +276,8 @@ func Mount(boxID string) (alreadyMount bool, err error) {
- 		task.AppendAsyncTaskWithDelay(task.PushMsg, 3*time.Second, util.PushErrMsg, Conf.Language(244), 7000)
- 		go func() {
- 			// 每次打开帮助文档时自动检查版本更新并提醒 https://github.com/siyuan-note/siyuan/issues/5057
--			time.Sleep(time.Second * 10)
--			CheckUpdate(true)
-+			// time.Sleep(time.Second * 10)
-+			// CheckUpdate(true)
- 		}()
+ 	if !isValidUpdateChannel(channel) {
+ 		return nil, errors.New("update channel is invalid")
  	}
+diff --git a/kernel/model/updater_release_test.go b/kernel/model/updater_release_test.go
+index f1ebd35..2c561f3 100644
+--- a/kernel/model/updater_release_test.go
++++ b/kernel/model/updater_release_test.go
+@@ -21,10 +21,45 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 	"testing"
++	"time"
  
+ 	"github.com/siyuan-note/siyuan/kernel/conf"
+ )
+ 
++func TestStableUpdateUsesUnlockGitHubRelease(t *testing.T) {
++	originalConf := Conf
++	Conf = NewAppConf()
++	Conf.System = conf.NewSystem()
++	Conf.System.UpdateChannel = conf.UpdateChannelStable
++
++	githubReleasesLock.Lock()
++	originalReleases := cachedGitHubReleases
++	originalCacheTime := githubReleasesCacheTime
++	cachedGitHubReleases = []*githubRelease{{TagName: "v9.9.9"}}
++	githubReleasesCacheTime = time.Now().Unix()
++	githubReleasesLock.Unlock()
++
++	t.Cleanup(func() {
++		Conf = originalConf
++		githubReleasesLock.Lock()
++		cachedGitHubReleases = originalReleases
++		githubReleasesCacheTime = originalCacheTime
++		githubReleasesLock.Unlock()
++	})
++
++	release, err := getUpdateRelease(false)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if "9.9.9" != release.Version {
++		t.Fatalf("unexpected stable version: %q", release.Version)
++	}
++	const wantURL = "https://github.com/appdev/siyuan-unlock/releases/tag/v9.9.9"
++	if wantURL != release.ReleaseURL {
++		t.Fatalf("unexpected stable release URL: %q", release.ReleaseURL)
++	}
++}
++
+ func TestIsReleaseAllowed(t *testing.T) {
+ 	tests := []struct {
+ 		channel string
