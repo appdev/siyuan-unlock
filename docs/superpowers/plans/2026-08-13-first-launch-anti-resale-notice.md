@@ -4,9 +4,20 @@
 
 **Goal:** Show a non-dismissible five-second anti-resale notice once per installed PC, Android, or iOS client.
 
-**Architecture:** Add a dedicated downstream frontend patch with a pure state module, focused Node tests, and a Dialog-based UI module. Call the same module from desktop and mobile startup, persist acknowledgement in the installed client's `localStorage`, and apply the patch only in desktop, Android, and iOS release workflows.
+**Architecture:** Add a dedicated downstream patch with focused Node/Go tests and a Dialog-based UI module. Call the same module from desktop and mobile startup, persist acknowledgement through authenticated kernel APIs in `<HomeDir>/.config/siyuan/siyuan-unlock.json`, and apply the patch only in desktop, Android, and iOS release workflows.
 
-**Tech Stack:** TypeScript, SiYuan `Dialog`, browser `localStorage`, Node.js 24 test runner, Git unified patches, GitHub Actions YAML
+**Tech Stack:** TypeScript, Go, SiYuan `Dialog`, installation-scoped JSON state, Node.js 24 and Go test runners, Git unified patches, GitHub Actions YAML
+
+## Approved persistence correction (2026-08-14)
+
+The original `localStorage` assumption is invalid on desktop because each
+kernel launch and parallel workspace uses a random HTTPS port, producing a new
+origin. Replace the browser-storage implementation with installation-scoped
+kernel persistence. Add model and API regression tests proving that the state
+survives workspace changes; keep read failures as unread and keep the dialog
+open when acknowledgement cannot be written. This correction supersedes only
+the persistence mechanism below; the approved copy, eligibility, five-second
+lock, workflows, and interaction remain unchanged.
 
 ## Global Constraints
 

@@ -52,10 +52,12 @@ SiYuan patches. The Docker workflow does not apply it.
 
 ## Device-level Persistence
 
-Store a versioned acknowledgement key in the client WebView/Electron
-`localStorage`. This storage belongs to the installed application's browser
-profile rather than a SiYuan workspace, so switching workspaces does not show
-the notice again.
+Store a versioned acknowledgement in
+`<HomeDir>/.config/siyuan/siyuan-unlock.json`, exposed through authenticated
+kernel APIs. `HomeDir` is installation-scoped on desktop, Android, and iOS and
+does not change with the kernel's random desktop port or the active workspace.
+The frontend must not use origin-scoped WebView/Electron `localStorage` for
+this state.
 
 The acknowledgement is written only after the user clicks the enabled
 acknowledgement button. Closing or terminating the application before that
@@ -81,9 +83,10 @@ which is acceptable for an installation-scoped notice.
 
 ## Error Handling
 
-If reading `localStorage` fails, treat the notice as unread and show it. If
-writing the acknowledgement fails, keep the dialog open and do not silently
-mark it as read; the user can retry or will see it again after restarting.
+If reading the installation state fails, treat the notice as unread and show
+it. If writing the acknowledgement fails, keep the dialog open and do not
+silently mark it as read; the user can retry or will see it again after
+restarting.
 
 The countdown uses elapsed wall-clock time rather than trusting only an
 interval count, preventing background timer throttling from shortening the

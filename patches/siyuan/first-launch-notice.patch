@@ -1,11 +1,12 @@
 diff --git a/app/src/boot/firstLaunchNotice.ts b/app/src/boot/firstLaunchNotice.ts
 new file mode 100644
-index 0000000..64aa56b
+index 0000000..552bb40
 --- /dev/null
 +++ b/app/src/boot/firstLaunchNotice.ts
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,78 @@
 +import {Dialog} from "../dialog";
 +import {isInMobileApp} from "../protyle/util/compatibility";
++import {fetchSyncPost} from "../util/fetch";
 +import {isBrowser, isMobile} from "../util/functions";
 +import {
 +    acknowledgeNotice,
@@ -16,15 +17,17 @@ index 0000000..64aa56b
 +
 +const RELEASE_URL = "https://github.com/appdev/siyuan-unlock/releases";
 +
-+export const openFirstLaunchNotice = () => {
++const requestNotice = (path: string) => fetchSyncPost(path, {}, undefined, false);
++
++export const openFirstLaunchNotice = async () => {
 +    const eligible = isFirstLaunchNoticeEligible({
 +        browser: isBrowser(),
 +        mobileApp: Boolean(isInMobileApp()),
 +        container: window.siyuan.config.system.container,
 +        publish: window.siyuan.isPublish,
 +    });
-+    if (!eligible || hasAcknowledgedNotice(localStorage)) {
-+        return Promise.resolve();
++    if (!eligible || await hasAcknowledgedNotice(requestNotice)) {
++        return;
 +    }
 +
 +    return new Promise<void>((resolve) => {
@@ -63,12 +66,14 @@ index 0000000..64aa56b
 +        const timer = window.setInterval(updateButton, 250);
 +        updateButton();
 +
-+        button.addEventListener("click", () => {
++        button.addEventListener("click", async () => {
 +            if (button.disabled) {
 +                return;
 +            }
-+            if (!acknowledgeNotice(localStorage)) {
++            button.disabled = true;
++            if (!await acknowledgeNotice(requestNotice)) {
 +                errorElement.classList.remove("fn__none");
++                button.disabled = false;
 +                return;
 +            }
 +            window.clearInterval(timer);
@@ -79,32 +84,21 @@ index 0000000..64aa56b
 +};
 diff --git a/app/src/boot/firstLaunchNoticeState.test.ts b/app/src/boot/firstLaunchNoticeState.test.ts
 new file mode 100644
-index 0000000..767b55e
+index 0000000..c253eb6
 --- /dev/null
 +++ b/app/src/boot/firstLaunchNoticeState.test.ts
-@@ -0,0 +1,69 @@
-+import assert from "node:assert/strict";
+@@ -0,0 +1,62 @@
++import * as assert from "node:assert/strict";
 +import test from "node:test";
 +import {
++    NOTICE_ACKNOWLEDGE_API,
 +    NOTICE_DELAY_MS,
-+    NOTICE_STORAGE_KEY,
++    NOTICE_STATUS_API,
 +    acknowledgeNotice,
 +    getNoticeRemainingSeconds,
 +    hasAcknowledgedNotice,
 +    isFirstLaunchNoticeEligible,
-+} from "./firstLaunchNoticeState.ts";
-+
-+class MemoryStorage {
-+    private values = new Map<string, string>();
-+
-+    getItem(key: string) {
-+        return this.values.get(key) ?? null;
-+    }
-+
-+    setItem(key: string, value: string) {
-+        this.values.set(key, value);
-+    }
-+}
++} from "./firstLaunchNoticeState";
 +
 +test("limits the notice to packaged desktop, Android, and iOS clients", () => {
 +    assert.equal(isFirstLaunchNoticeEligible({browser: false, mobileApp: false, container: "desktop", publish: false}), true);
@@ -123,44 +117,48 @@ index 0000000..767b55e
 +    assert.equal(getNoticeRemainingSeconds(1_000, 7_000), 0);
 +});
 +
-+test("persists acknowledgement under the versioned device key", () => {
-+    const storage = new MemoryStorage();
-+    assert.equal(NOTICE_STORAGE_KEY, "siyuanUnlockAntiResaleNoticeV1");
-+    assert.equal(hasAcknowledgedNotice(storage), false);
-+    assert.equal(acknowledgeNotice(storage), true);
-+    assert.equal(storage.getItem(NOTICE_STORAGE_KEY), "acknowledged");
-+    assert.equal(hasAcknowledgedNotice(storage), true);
++test("reads acknowledgement from the installation-scoped API", async () => {
++    const calls: string[] = [];
++    const acknowledged = await hasAcknowledgedNotice(async (path) => {
++        calls.push(path);
++        return {code: 0, data: {acknowledged: true}};
++    });
++
++    assert.equal(acknowledged, true);
++    assert.deepEqual(calls, [NOTICE_STATUS_API]);
 +});
 +
-+test("treats storage read and write failures as unacknowledged", () => {
-+    const readFailure = {
-+        getItem() {
-+            throw new Error("read failed");
-+        },
-+        setItem() {},
-+    };
-+    const writeFailure = {
-+        getItem() {
-+            return null;
-+        },
-+        setItem() {
-+            throw new Error("write failed");
-+        },
-+    };
++test("writes acknowledgement through the installation-scoped API", async () => {
++    const calls: string[] = [];
++    const acknowledged = await acknowledgeNotice(async (path) => {
++        calls.push(path);
++        return {code: 0};
++    });
 +
-+    assert.equal(hasAcknowledgedNotice(readFailure), false);
-+    assert.equal(acknowledgeNotice(writeFailure), false);
-+    assert.equal(hasAcknowledgedNotice(writeFailure), false);
++    assert.equal(acknowledged, true);
++    assert.deepEqual(calls, [NOTICE_ACKNOWLEDGE_API]);
++});
++
++test("treats API failures as unacknowledged", async () => {
++    assert.equal(await hasAcknowledgedNotice(async () => ({code: 0, data: {acknowledged: false}})), false);
++    assert.equal(await hasAcknowledgedNotice(async () => ({code: -1})), false);
++    assert.equal(await hasAcknowledgedNotice(async () => {
++        throw new Error("read failed");
++    }), false);
++    assert.equal(await acknowledgeNotice(async () => ({code: -1})), false);
++    assert.equal(await acknowledgeNotice(async () => {
++        throw new Error("write failed");
++    }), false);
 +});
 diff --git a/app/src/boot/firstLaunchNoticeState.ts b/app/src/boot/firstLaunchNoticeState.ts
 new file mode 100644
-index 0000000..fbb6870
+index 0000000..fecf173
 --- /dev/null
 +++ b/app/src/boot/firstLaunchNoticeState.ts
-@@ -0,0 +1,47 @@
-+export const NOTICE_STORAGE_KEY = "siyuanUnlockAntiResaleNoticeV1";
+@@ -0,0 +1,52 @@
 +export const NOTICE_DELAY_MS = 5_000;
-+const NOTICE_STORAGE_VALUE = "acknowledged";
++export const NOTICE_STATUS_API = "/api/system/getFirstLaunchNotice";
++export const NOTICE_ACKNOWLEDGE_API = "/api/system/acknowledgeFirstLaunchNotice";
 +
 +export interface NoticeRuntime {
 +    browser: boolean;
@@ -169,10 +167,14 @@ index 0000000..fbb6870
 +    publish: boolean;
 +}
 +
-+interface NoticeStorage {
-+    getItem(key: string): string | null;
-+    setItem(key: string, value: string): void;
++interface NoticeAPIResponse {
++    code: number;
++    data?: {
++        acknowledged?: boolean;
++    };
 +}
++
++export type NoticeRequest = (path: string) => Promise<NoticeAPIResponse>;
 +
 +export const isFirstLaunchNoticeEligible = (runtime: NoticeRuntime) => {
 +    if (runtime.publish) {
@@ -189,18 +191,19 @@ index 0000000..fbb6870
 +    return Math.min(NOTICE_DELAY_MS / 1_000, Math.max(0, remaining));
 +};
 +
-+export const hasAcknowledgedNotice = (storage: NoticeStorage) => {
++export const hasAcknowledgedNotice = async (request: NoticeRequest) => {
 +    try {
-+        return storage.getItem(NOTICE_STORAGE_KEY) === NOTICE_STORAGE_VALUE;
++        const response = await request(NOTICE_STATUS_API);
++        return response.code === 0 && response.data?.acknowledged === true;
 +    } catch {
 +        return false;
 +    }
 +};
 +
-+export const acknowledgeNotice = (storage: NoticeStorage) => {
++export const acknowledgeNotice = async (request: NoticeRequest) => {
 +    try {
-+        storage.setItem(NOTICE_STORAGE_KEY, NOTICE_STORAGE_VALUE);
-+        return true;
++        const response = await request(NOTICE_ACKNOWLEDGE_API);
++        return response.code === 0;
 +    } catch {
 +        return false;
 +    }
@@ -267,3 +270,241 @@ index ccb004c..5c237ae 100644
                                  openChangelog();
                                  window.siyuan.isReady = true;
                                  mainWs.flushMainMessages();
+diff --git a/kernel/api/router.go b/kernel/api/router.go
+index e94f77f..f129e14 100644
+--- a/kernel/api/router.go
++++ b/kernel/api/router.go
+@@ -89,6 +89,8 @@ func ServeAPI(ginServer *gin.Engine) {
+ 	ginServer.Handle("POST", "/api/system/checkUpdate", model.CheckAuth, model.CheckAdminRole, checkUpdate)
+ 	ginServer.Handle("POST", "/api/system/exportLog", model.CheckAuth, model.CheckAdminRole, exportLog)
+ 	ginServer.Handle("POST", "/api/system/getChangelog", model.CheckAuth, getChangelog)
++	ginServer.Handle("POST", "/api/system/getFirstLaunchNotice", model.CheckAuth, getFirstLaunchNotice)
++	ginServer.Handle("POST", "/api/system/acknowledgeFirstLaunchNotice", model.CheckAuth, model.CheckAdminRole, acknowledgeFirstLaunchNotice)
+ 	ginServer.Handle("POST", "/api/system/getNetwork", model.CheckAuth, model.CheckAdminRole, getNetwork)
+ 	ginServer.Handle("POST", "/api/system/exportConf", model.CheckAuth, model.CheckAdminRole, exportConf)
+ 	ginServer.Handle("POST", "/api/system/importConf", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, importConf)
+diff --git a/kernel/api/system.go b/kernel/api/system.go
+index 93f5876..d8ca99c 100644
+--- a/kernel/api/system.go
++++ b/kernel/api/system.go
+@@ -165,6 +165,25 @@ func getChangelog(c *gin.Context) {
+ 	ret.Data = data
+ }
+ 
++func getFirstLaunchNotice(c *gin.Context) {
++	ret := gulu.Ret.NewResult()
++	defer c.JSON(http.StatusOK, ret)
++
++	ret.Data = map[string]any{
++		"acknowledged": model.FirstLaunchNoticeAcknowledged(),
++	}
++}
++
++func acknowledgeFirstLaunchNotice(c *gin.Context) {
++	ret := gulu.Ret.NewResult()
++	defer c.JSON(http.StatusOK, ret)
++
++	if err := model.AcknowledgeFirstLaunchNotice(); err != nil {
++		ret.Code = -1
++		ret.Msg = err.Error()
++	}
++}
++
+ func getEmojiConf(c *gin.Context) {
+ 	ret := gulu.Ret.NewResult()
+ 	defer c.JSON(http.StatusOK, ret)
+diff --git a/kernel/api/system_test.go b/kernel/api/system_test.go
+index a332d97..4f9c9c1 100644
+--- a/kernel/api/system_test.go
++++ b/kernel/api/system_test.go
+@@ -188,6 +188,55 @@ func TestSetAccessAuthCodeAllowsClearingOnMobileWithoutOIDC(t *testing.T) {
+ 	}
+ }
+ 
++func TestFirstLaunchNoticeAPIUsesInstallationState(t *testing.T) {
++	gin.SetMode(gin.TestMode)
++	originalHomeDir := util.HomeDir
++	util.HomeDir = t.TempDir()
++	t.Cleanup(func() { util.HomeDir = originalHomeDir })
++
++	engine := gin.New()
++	engine.POST("/api/system/getFirstLaunchNotice", getFirstLaunchNotice)
++	engine.POST("/api/system/acknowledgeFirstLaunchNotice", acknowledgeFirstLaunchNotice)
++
++	getAcknowledged := func() bool {
++		recorder := httptest.NewRecorder()
++		request := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/api/system/getFirstLaunchNotice", nil)
++		engine.ServeHTTP(recorder, request)
++		response := &struct {
++			Code int `json:"code"`
++			Data struct {
++				Acknowledged bool `json:"acknowledged"`
++			} `json:"data"`
++		}{}
++		if err := json.Unmarshal(recorder.Body.Bytes(), response); err != nil {
++			t.Fatalf("unmarshal first-launch notice response failed: %v", err)
++		}
++		if response.Code != 0 {
++			t.Fatalf("get first-launch notice failed: %s", recorder.Body.String())
++		}
++		return response.Data.Acknowledged
++	}
++
++	if getAcknowledged() {
++		t.Fatal("new installation was already acknowledged")
++	}
++	recorder := httptest.NewRecorder()
++	request := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/api/system/acknowledgeFirstLaunchNotice", nil)
++	engine.ServeHTTP(recorder, request)
++	response := &struct {
++		Code int `json:"code"`
++	}{}
++	if err := json.Unmarshal(recorder.Body.Bytes(), response); err != nil {
++		t.Fatalf("unmarshal acknowledge response failed: %v", err)
++	}
++	if response.Code != 0 {
++		t.Fatalf("acknowledge first-launch notice failed: %s", recorder.Body.String())
++	}
++	if !getAcknowledged() {
++		t.Fatal("acknowledgement was not returned by the API")
++	}
++}
++
+ func TestGetConfUILayoutByRole(t *testing.T) {
+ 	gin.SetMode(gin.TestMode)
+ 
+diff --git a/kernel/model/first_launch_notice.go b/kernel/model/first_launch_notice.go
+new file mode 100644
+index 0000000..b7c564d
+--- /dev/null
++++ b/kernel/model/first_launch_notice.go
+@@ -0,0 +1,56 @@
++// SiYuan - From thought to insight, with agents
++// Copyright (c) 2020-present, b3log.org
++
++package model
++
++import (
++	"os"
++	"path/filepath"
++
++	"github.com/88250/gulu"
++	"github.com/siyuan-note/filelock"
++	"github.com/siyuan-note/logging"
++	"github.com/siyuan-note/siyuan/kernel/util"
++)
++
++const firstLaunchNoticeVersion = 1
++
++type firstLaunchNoticeState struct {
++	AntiResaleNotice int `json:"antiResaleNotice"`
++}
++
++func FirstLaunchNoticeAcknowledged() bool {
++	statePath := firstLaunchNoticeStatePath()
++	data, err := filelock.ReadFile(statePath)
++	if err != nil {
++		if !os.IsNotExist(err) {
++			logging.LogWarnf("read SiYuan Unlock state [%s] failed: %s", statePath, err)
++		}
++		return false
++	}
++
++	state := &firstLaunchNoticeState{}
++	if err = gulu.JSON.UnmarshalJSON(data, state); err != nil {
++		logging.LogWarnf("parse SiYuan Unlock state [%s] failed: %s", statePath, err)
++		return false
++	}
++	return state.AntiResaleNotice >= firstLaunchNoticeVersion
++}
++
++func AcknowledgeFirstLaunchNotice() error {
++	state := &firstLaunchNoticeState{AntiResaleNotice: firstLaunchNoticeVersion}
++	data, err := gulu.JSON.MarshalIndentJSON(state, "", "  ")
++	if err != nil {
++		return err
++	}
++
++	statePath := firstLaunchNoticeStatePath()
++	if err = os.MkdirAll(filepath.Dir(statePath), 0755); err != nil {
++		return err
++	}
++	return filelock.WriteFile(statePath, data)
++}
++
++func firstLaunchNoticeStatePath() string {
++	return filepath.Join(util.HomeDir, ".config", "siyuan", "siyuan-unlock.json")
++}
+diff --git a/kernel/model/first_launch_notice_test.go b/kernel/model/first_launch_notice_test.go
+new file mode 100644
+index 0000000..5896216
+--- /dev/null
++++ b/kernel/model/first_launch_notice_test.go
+@@ -0,0 +1,67 @@
++// SiYuan - From thought to insight, with agents
++// Copyright (c) 2020-present, b3log.org
++
++package model
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/siyuan-note/siyuan/kernel/util"
++)
++
++func TestFirstLaunchNoticeAcknowledgementUsesInstallationHome(t *testing.T) {
++	originalHomeDir := util.HomeDir
++	originalWorkspaceDir := util.WorkspaceDir
++	installationHome := t.TempDir()
++	util.HomeDir = installationHome
++	util.WorkspaceDir = filepath.Join(t.TempDir(), "workspace-a")
++	t.Cleanup(func() {
++		util.HomeDir = originalHomeDir
++		util.WorkspaceDir = originalWorkspaceDir
++	})
++
++	if FirstLaunchNoticeAcknowledged() {
++		t.Fatal("new installation was already acknowledged")
++	}
++	if err := AcknowledgeFirstLaunchNotice(); err != nil {
++		t.Fatalf("acknowledge notice failed: %v", err)
++	}
++	if !FirstLaunchNoticeAcknowledged() {
++		t.Fatal("acknowledgement was not persisted")
++	}
++
++	util.WorkspaceDir = filepath.Join(t.TempDir(), "workspace-b")
++	if !FirstLaunchNoticeAcknowledged() {
++		t.Fatal("acknowledgement changed after switching workspace")
++	}
++
++	statePath := filepath.Join(installationHome, ".config", "siyuan", "siyuan-unlock.json")
++	if _, err := os.Stat(statePath); err != nil {
++		t.Fatalf("installation state file missing: %v", err)
++	}
++}
++
++func TestFirstLaunchNoticeAcknowledgementRepairsInvalidState(t *testing.T) {
++	originalHomeDir := util.HomeDir
++	util.HomeDir = t.TempDir()
++	t.Cleanup(func() { util.HomeDir = originalHomeDir })
++
++	statePath := filepath.Join(util.HomeDir, ".config", "siyuan", "siyuan-unlock.json")
++	if err := os.MkdirAll(filepath.Dir(statePath), 0755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(statePath, []byte("invalid"), 0644); err != nil {
++		t.Fatal(err)
++	}
++	if FirstLaunchNoticeAcknowledged() {
++		t.Fatal("invalid state was treated as acknowledged")
++	}
++	if err := AcknowledgeFirstLaunchNotice(); err != nil {
++		t.Fatalf("repair invalid state failed: %v", err)
++	}
++	if !FirstLaunchNoticeAcknowledged() {
++		t.Fatal("repaired state was not acknowledged")
++	}
++}
