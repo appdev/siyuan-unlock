@@ -28,4 +28,18 @@
 - Focused `go test ./model ./api -run 'TestFirstLaunchNotice|TestGetGitHubUpdateReleaseForStableChannel' -count=1` passed.
 - Broad `go test ./model ./api` was attempted and failed in unrelated existing macOS path-resolution tests (`/var` versus `/private/var`) plus unrelated baseline assertions; no first-launch test failed.
 
-Release and device verification results will be appended after publication.
+- Fix commit and release tag: `a2c9ffae95426c378cb427994f1c664a479e6688`.
+- Recreated public `v3.8.0` Release: <https://github.com/appdev/siyuan-unlock/releases/tag/v3.8.0>, with all eight expected assets.
+- Release workflows succeeded: orchestrator `31789509631`, Android `31789522994`, desktop `31789524269`, iOS `31789526797`, and Docker `31789525515` (Docker completed in `1h7m25s`).
+- Downloaded Android arm64 APK and macOS arm64 DMG; local SHA-256 values matched GitHub Release digests:
+  - APK: `85892774f936f21f9bca419644ec4faa4665a99d96559ca5cc6e2c6dc60c814d`
+  - DMG: `5064a424a8aa074417d4611c34c5b764a3d90a73bdc6474b65704dd37352e8ca`
+- Android runtime verification on `emulator-5554`:
+  - removed a stale app-external test directory owned by the prior package UID, reinstalled version `3.8.0` (`versionCode=348`), and cold-launched successfully;
+  - the notice appeared on first launch, acknowledgement created `HomeDir/.config/siyuan/siyuan-unlock.json` with `{"antiResaleNotice":1}`, and a subsequent cold launch did not show the notice;
+  - no fatal, permission-denied, or log-directory errors remained after the clean reinstall.
+- macOS runtime verification from the downloaded arm64 DMG:
+  - `workspace-a` showed the complete Simplified Chinese notice and accepted `我已知晓`;
+  - a cold launch with `workspace-b` did not show the notice, confirming installation-level persistence across workspaces;
+  - the DMG, app, and kernel were stopped after verification, and the exact test-created marker in the real account HomeDir was removed.
+- Handoff: Android remains installed on the emulator for optional manual inspection; downloaded artifacts and screenshots remain under `/tmp/siyuan-v3.8.0-test.V9GgU5/`.
