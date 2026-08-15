@@ -17,7 +17,8 @@ jobs:
         config:
           - os: ubuntu-22.04
             kernel_path: "../app/kernel-linux/SiYuan-Kernel"
-            build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
+            build_mode: "-buildmode=pie"
+            build_args: "-s -w -extldflags -static-pie -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
             electron_args: "dist-linux"
             goos: "linux"
             goarch: "amd64"
@@ -26,7 +27,8 @@ jobs:
           - os: ubuntu-22.04
             name: ubuntu build linux.AppImage
             kernel_path: "../app/kernel-linux/SiYuan-Kernel"
-            build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
+            build_mode: "-buildmode=pie"
+            build_args: "-s -w -extldflags -static-pie -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
             electron_args: "dist-linux"
             goos: "linux"
             goarch: "amd64"
@@ -34,7 +36,8 @@ jobs:
             suffix: "linux.AppImage"
           - os: ubuntu-22.04
             kernel_path: "../app/kernel-linux-arm64/SiYuan-Kernel"
-            build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
+            build_mode: "-buildmode=pie"
+            build_args: "-s -w -extldflags -static-pie -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
             electron_args: "dist-linux-arm64"
             goos: "linux"
             goarch: "arm64"
@@ -42,6 +45,7 @@ jobs:
             suffix: "linux-arm64.tar.gz"
           - os: macos-latest
             kernel_path: "../app/kernel-darwin/SiYuan-Kernel"
+            build_mode: ""
             build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
             electron_args: "dist-darwin"
             goos: "darwin"
@@ -49,6 +53,7 @@ jobs:
             suffix: "mac.dmg"
           - os: macos-latest
             kernel_path: "../app/kernel-darwin-arm64/SiYuan-Kernel"
+            build_mode: ""
             build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
             electron_args: "dist-darwin-arm64"
             goos: "darwin"
@@ -56,6 +61,7 @@ jobs:
             suffix: "mac-arm64.dmg"
           - os: windows-latest
             kernel_path: "../app/kernel/SiYuan-Kernel.exe"
+            build_mode: ""
             build_args: "-s -w -H=windowsgui -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
             electron_args: "dist"
             goos: "windows"
@@ -176,7 +182,7 @@ jobs:
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan
 
       - name: Building Kernel
-        run: go build --tags "fts5 sqlcipher" -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
+        run: go build ${{ matrix.config.build_mode }} --tags "fts5 sqlcipher" -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
         env:
           GO111MODULE: on
@@ -186,6 +192,32 @@ jobs:
           GOARCH: ${{ matrix.config.goarch }}
           GOPROXY: https://proxy.golang.org,direct
           CC: ${{ runner.os == 'Linux' && format('/usr/local/musl/{0}', matrix.config.cc_path) || '' }}
+
+      - name: Verify Linux kernel is static PIE
+        if: contains(matrix.config.goos, 'linux')
+        shell: bash
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
+        run: |
+          set -euo pipefail
+          kernel_path="${{ matrix.config.kernel_path }}"
+          file "${kernel_path}"
+          build_info="$(go version -m "${kernel_path}")"
+          program_headers="$(readelf -lW "${kernel_path}")"
+          dynamic_section="$(readelf -dW "${kernel_path}" 2>/dev/null || true)"
+          printf '%s\n' "${build_info}"
+          printf '%s\n' "${program_headers}"
+          printf '%s\n' "${dynamic_section}"
+
+          if grep -Fq ' INTERP ' <<<"${program_headers}"; then
+            echo "::error::Linux kernel contains an ELF interpreter"
+            exit 1
+          fi
+          if grep -Fq '(NEEDED)' <<<"${dynamic_section}"; then
+            echo "::error::Linux kernel contains dynamic dependencies"
+            exit 1
+          fi
+          grep -F $'build\t-buildmode=pie' <<<"${build_info}"
+          grep -F -- '-extldflags -static-pie' <<<"${build_info}"
 
       - name: Building Electron
         run: pnpm run ${{ matrix.config.electron_args }}
