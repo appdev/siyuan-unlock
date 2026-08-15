@@ -83,5 +83,10 @@
   `-extldflags -static-pie` in Go build metadata.
 - Residual warning: GitHub currently forces Node.js 20-based actions to run on
   Node.js 24. This warning did not affect any build or upload result.
-- Rollback assets remain in `/tmp/siyuan-linux-static-rollback.uJ0FCU` until
-  the final documentation commit and frozen-state check succeed.
+- Final frozen-state checks passed: local and remote `master` matched, the
+  `v3.8.0` tag remained `a2c9ffae95426c378cb427994f1c664a479e6688`, Actions
+  remained successful, and all eight Release assets remained uploaded with the
+  recorded digests.
+- After the frozen check, the task-created rollback directory
+  `/tmp/siyuan-linux-static-rollback.uJ0FCU` and artifact verification directory
+  `/tmp/siyuan-linux-static-verify.l2u7Zf` were deleted and confirmed absent.

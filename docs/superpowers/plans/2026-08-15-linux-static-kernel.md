@@ -268,13 +268,13 @@ git commit -m "docs: record Linux static kernel verification"
 git push origin master
 ```
 
-- [ ] **Step 4: Perform the final frozen check**
+- [x] **Step 4: Perform the final frozen check**
 
 Confirm the working tree is clean, local `HEAD` equals remote `master`, the
 v3.8.0 tag is unchanged, the Actions conclusion is `success`, the Release has
 eight assets, and the three published Linux kernels satisfy every ELF gate.
 
-- [ ] **Step 5: Remove temporary rollback and extraction data**
+- [x] **Step 5: Remove temporary rollback and extraction data**
 
 Only after the frozen check succeeds, delete the exact task-created temporary
 directories and verify they no longer exist. Do not touch unrelated downloads,
