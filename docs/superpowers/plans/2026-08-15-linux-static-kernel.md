@@ -181,7 +181,7 @@ whitespace errors.
 Record RED/GREEN commands, rollback directory, original asset digests, and any
 non-blocking warnings without storing credentials or raw logs.
 
-- [ ] **Step 2: Review and commit the exact scope**
+- [x] **Step 2: Review and commit the exact scope**
 
 Run:
 
@@ -198,12 +198,12 @@ git commit -m "fix: statically link Linux kernels"
 git push origin master
 ```
 
-- [ ] **Step 3: Verify the frozen push**
+- [x] **Step 3: Verify the frozen push**
 
 Confirm local `HEAD` equals `refs/heads/master` on origin and that
 `refs/tags/v3.8.0` is unchanged.
 
-- [ ] **Step 4: Dispatch and identify the exact run**
+- [x] **Step 4: Dispatch and identify the exact run**
 
 Use the package manager from upstream v3.8.0:
 
@@ -216,7 +216,7 @@ gh workflow run desktop-release.yml \
 Resolve the new run whose `headSha` equals the pushed commit, then watch it to
 completion with `gh run watch RUN_ID --exit-status`.
 
-- [ ] **Step 5: Handle failures without compounding them**
+- [x] **Step 5: Handle failures without compounding them**
 
 If Actions fails, inspect the exact failed job logs before changing code. If no
 asset was replaced, preserve the current Release. If replacement was partial,
@@ -232,13 +232,13 @@ restore all six rollback files with their original names using
 - Consumes: successful Actions run and replaced v3.8.0 desktop assets.
 - Produces: published ELF evidence, final task trace, and a clean synchronized repository.
 
-- [ ] **Step 1: Verify Release completeness**
+- [x] **Step 1: Verify Release completeness**
 
 Confirm all eight v3.8.0 assets remain present, the six desktop assets have
 successful upload state and SHA-256 digests, and Android/iOS assets were not
 replaced.
 
-- [ ] **Step 2: Download and inspect all three new Linux packages**
+- [x] **Step 2: Download and inspect all three new Linux packages**
 
 Download the amd64 tar, amd64 AppImage, and arm64 tar to a fresh temporary
 directory. Extract tar kernels directly. Locate the AppImage SquashFS `hsqs`
@@ -256,7 +256,7 @@ go version -m SiYuan-Kernel
 Expected: static PIE, no musl loader string, no `INTERP`, no `NEEDED`, and Go
 build information contains both required flags.
 
-- [ ] **Step 3: Append verification and handoff evidence**
+- [x] **Step 3: Append verification and handoff evidence**
 
 Record the pushed commit, run ID and conclusion, final Release digests, all
 three ELF results, rollback disposition, and residual warnings in the task
