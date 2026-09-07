@@ -158,6 +158,7 @@ jobs:
           asset_name: siyuan-unlock-${{ github.event.inputs.version }}-android-arm64.apk
           asset_path: ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/googleplay/release/siyuan-*.apk
           asset_content_type: application/octet-stream
+          overwrite: true
       - name: Upload AppDev Android
         uses: shogo82148/actions-upload-release-asset@v1
         env:
@@ -167,3 +168,4 @@ jobs:
           asset_name: siyuan-unlock-${{ github.event.inputs.version }}-android-arm64-appdev.apk
           asset_path: ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/appdev/release/siyuan-*.apk
           asset_content_type: application/octet-stream
+          overwrite: true
