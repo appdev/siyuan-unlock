@@ -1,0 +1,45 @@
+diff --git a/app/build.gradle b/app/build.gradle
+index de7774c..1b23ba8 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -46,2 +46,3 @@ android {
+         versionName siyuanVersionName
++        resValue "string", "app_package_name", "org.b3log.siyuan"
+     }
+@@ -69,4 +70,2 @@ android {
+             // resValue "string", "app_name", "SiYuan"
+-            resValue "string", "app_package_name", "org.b3log.siyuan"
+-
+             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index fcd8ab7..bc99fa9 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -122,3 +122,3 @@
+             android:launchMode="singleTask"
+-            android:taskAffinity="org.b3log.siyuan.shorthand"
++            android:taskAffinity="${applicationId}.shorthand"
+             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
+diff --git a/app/src/main/res/xml/shortcuts.xml b/app/src/main/res/xml/shortcuts.xml
+index e257e52..8825f79 100644
+--- a/app/src/main/res/xml/shortcuts.xml
++++ b/app/src/main/res/xml/shortcuts.xml
+@@ -12,3 +12,3 @@
+             android:targetClass="org.b3log.siyuan.ShortcutActivity"
+-            android:targetPackage="org.b3log.siyuan" />
++            android:targetPackage="@string/app_package_name" />
+     </shortcut>
+diff --git a/flavors.gradle b/flavors.gradle
+index eeaed73..928a831 100644
+--- a/flavors.gradle
++++ b/flavors.gradle
+@@ -35 +35,9 @@ android {
++    // AppDev
++    appdev profileLqr() >> {
++      applicationId "com.appdev.siyuan"
++      buildConfigField "String", "CHANNEL", '"appdev"'
++      resValue "string", "app_name", "SiYuan"
++      resValue "string", "app_package_name", "com.appdev.siyuan"
++    }
++
+     // 华为

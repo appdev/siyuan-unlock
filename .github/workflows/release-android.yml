@@ -56,6 +56,7 @@ jobs:
           cd siyuan-android
 
           git apply --ignore-whitespace --verbose ${{ github.workspace }}/siyuan-note/patches/siyuan-android/debug-build.patch
+          git apply --ignore-whitespace --verbose ${{ github.workspace }}/siyuan-note/patches/siyuan-android/dual-package.patch
 
           mkdir -p app/src/main/assets/
           mkdir -p app/libs/
@@ -123,9 +124,20 @@ jobs:
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan-android
         run: |
           chmod 777 ./gradlew
-          ./gradlew :app:assembleRelease
+          ./gradlew :app:assembleGoogleplayRelease :app:assembleAppdevRelease
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+
+      - name: Verify Android package IDs
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan-android
+        run: |
+          original_apk=$(find app/build/outputs/apk/googleplay/release -maxdepth 1 -type f -name 'siyuan-*.apk' -print -quit)
+          appdev_apk=$(find app/build/outputs/apk/appdev/release -maxdepth 1 -type f -name 'siyuan-*.apk' -print -quit)
+          aapt=$(find "${ANDROID_HOME}/build-tools" -type f -name aapt -print | sort -V | tail -n 1)
+
+          test -n "${original_apk}" && test -n "${appdev_apk}" && test -n "${aapt}"
+          "${aapt}" dump badging "${original_apk}" | grep -Fq "package: name='org.b3log.siyuan'"
+          "${aapt}" dump badging "${appdev_apk}" | grep -Fq "package: name='com.appdev.siyuan'"
 
       - uses: joutvhu/get-release@v1
         id: get_current_release
@@ -134,8 +146,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: List generated APK files
-        run: ls -la ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/googleplay/release/
-      - name: Upload Android
+        run: |
+          ls -la ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/googleplay/release/
+          ls -la ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/appdev/release/
+      - name: Upload original Android
         uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -143,4 +157,13 @@ jobs:
           upload_url: ${{ steps.get_current_release.outputs.upload_url }}
           asset_name: siyuan-unlock-${{ github.event.inputs.version }}-android-arm64.apk
           asset_path: ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/googleplay/release/siyuan-*.apk
+          asset_content_type: application/octet-stream
+      - name: Upload AppDev Android
+        uses: shogo82148/actions-upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.get_current_release.outputs.upload_url }}
+          asset_name: siyuan-unlock-${{ github.event.inputs.version }}-android-arm64-appdev.apk
+          asset_path: ${{ github.workspace }}/siyuan-note/siyuan-android/app/build/outputs/apk/appdev/release/siyuan-*.apk
           asset_content_type: application/octet-stream
