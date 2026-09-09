@@ -58,7 +58,9 @@ jobs:
           git clone --depth=1 https://github.com/siyuan-note/siyuan-ios.git
           cd siyuan-ios
 
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan-ios/xcode-26-load-item.patch
+          if [[ "${{ github.event.inputs.version }}" == "v3.8.3" ]]; then echo "Skipping xcode-26-load-item.patch for v3.8.3: patch targets pre-update iOS sources"; else
+            git apply ${{ github.workspace }}/siyuan-note/patches/siyuan-ios/xcode-26-load-item.patch
+          fi
 
           # https://github.com/siyuan-note/siyuan-ios/commit/d72cd11a6d78df88b56a2850f0f46c2b905a5433 
           # ASSETCATALOG_COMPILER_APPICON_NAME = logo;
