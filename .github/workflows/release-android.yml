@@ -45,8 +45,12 @@ jobs:
           git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/disable-update.patch
           git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/default-config.patch
           git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/mock-vip-user.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/hide-account-entry.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/first-launch-notice.patch
+          if [[ "${{ github.event.inputs.version }}" == "v3.8.3" ]]; then echo "Skipping hide-account-entry.patch for v3.8.3: patch targets pre-3.8.3 sources"; else
+            git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/hide-account-entry.patch
+          fi
+          if [[ "${{ github.event.inputs.version }}" == "v3.8.3" ]]; then echo "Skipping first-launch-notice.patch for v3.8.3: patch targets pre-3.8.3 sources"; else
+            git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/first-launch-notice.patch
+          fi
 
           git status
 
