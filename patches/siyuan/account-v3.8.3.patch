@@ -1,0 +1,95 @@
+diff --git a/app/src/config/tabs/syncTab.ts b/app/src/config/tabs/syncTab.ts
+--- a/app/src/config/tabs/syncTab.ts
++++ b/app/src/config/tabs/syncTab.ts
+@@ -1,5 +1,4 @@
+ import type {SettingTabBuilder} from "../setting/builder";
+-import {registerAccountGroup} from "./accountUi";
+ import {Constants} from "../../constants";
+ import {fetchPost} from "../../util/fetch";
+ import {confirmDialog} from "../../dialog/confirmDialog";
+@@ -280,7 +279,6 @@
+ };
+ 
+ export const registerSyncTab = (tab: SettingTabBuilder) => {
+-    registerAccountGroup(tab);
+     registerSyncGroup(tab);
+     registerRepoGroup(tab);
+ };
+diff --git a/app/src/layout/topBar.ts b/app/src/layout/topBar.ts
+--- a/app/src/layout/topBar.ts
++++ b/app/src/layout/topBar.ts
+@@ -9,7 +9,6 @@
+ import {workspaceMenu} from "../menus/workspace";
+ import {MenuItem} from "../menus/Menu";
+ import {setMode} from "../util/assets";
+-import {openSetting} from "../config";
+ import {openSearch} from "../search/spread";
+ import type {App} from "../index";
+ /// #if !BROWSER
+@@ -233,9 +232,6 @@
+                 event.stopPropagation();
+                 break;
+             } else if (targetId === "toolbarVIP" || targetId === "toolbarTitle") {
+-                if (!window.siyuan.config.readonly) {
+-                    openSetting(app, "sync");
+-                }
+                 event.stopPropagation();
+                 break;
+             } else if (targetId === "barSearch") {
+diff --git a/kernel/api/setting.go b/kernel/api/setting.go
+--- a/kernel/api/setting.go
++++ b/kernel/api/setting.go
+@@ -1156,7 +1156,7 @@
+ 		UserSiYuanOneTimePayStatus:      1,
+ 	}
+ 
+-	model.Conf.User = user
++	model.Conf.SetUser(user)
+ 	data, _ := gulu.JSON.MarshalJSON(user)
+ 	model.Conf.UserData = util.AESEncrypt(string(data))
+ 	model.Conf.Save()
+diff --git a/kernel/model/cloud_account_auth.go b/kernel/model/cloud_account_auth.go
+--- a/kernel/model/cloud_account_auth.go
++++ b/kernel/model/cloud_account_auth.go
+@@ -20,6 +20,10 @@
+ 	server := util.GetCloudServer()
+ 	requestedUser := Conf.GetUser()
+ 	if requestedUser == nil {
++		return func() {}
++	}
++	// The local unlock identity has no cloud session for a 401 to invalidate.
++	if requestedUser.UserId == "0" && requestedUser.UserToken == "token" {
+ 		return func() {}
+ 	}
+ 	return func() {
+diff --git a/kernel/model/unlock_cloud_account_test.go b/kernel/model/unlock_cloud_account_test.go
+new file mode 100644
+--- /dev/null
++++ b/kernel/model/unlock_cloud_account_test.go
+@@ -0,0 +1,26 @@
++package model
++
++import (
++	"net/http"
++	"testing"
++
++	"github.com/siyuan-note/siyuan/kernel/conf"
++)
++
++func TestUnlockAccountSurvivesCloudAuthenticationFailure(t *testing.T) {
++	setupCloudAccountAuthTest(t)
++	Conf.Sync.Provider = conf.ProviderS3
++	user := &conf.User{UserId: "0", UserToken: "token", UserSiYuanOneTimePayStatus: 1}
++	Conf.SetUser(user)
++	called := false
++	mockCloudAuthResponse(t, func(request *http.Request) (*http.Response, error) {
++		called = true
++		return cloudAuthResponse(request, http.StatusUnauthorized, ""), nil
++	})
++	if _, err := GetCloudShorthands(1); err == nil || !called {
++		t.Fatal("cloud request must still report authentication failure")
++	}
++	if Conf.GetUser() != user || !IsPaidUser() || Conf.UserData != "persisted-user" {
++		t.Fatal("cloud authentication failure removed local unlock state and blocked S3 sync")
++	}
++}
