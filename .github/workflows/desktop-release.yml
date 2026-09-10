@@ -24,6 +24,7 @@ jobs:
             goarch: "amd64"
             cc_path: "x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc"
             suffix: "linux.tar.gz"
+            deb_suffix: "linux.deb"
           - os: ubuntu-22.04
             name: ubuntu build linux.AppImage
             kernel_path: "../app/kernel-linux/SiYuan-Kernel"
@@ -34,6 +35,7 @@ jobs:
             goarch: "amd64"
             cc_path: "x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc"
             suffix: "linux.AppImage"
+            deb_suffix: ""
           - os: ubuntu-22.04
             kernel_path: "../app/kernel-linux-arm64/SiYuan-Kernel"
             build_mode: "-buildmode=pie"
@@ -43,6 +45,7 @@ jobs:
             goarch: "arm64"
             cc_path: "aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
             suffix: "linux-arm64.tar.gz"
+            deb_suffix: "linux-arm64.deb"
           - os: macos-latest
             kernel_path: "../app/kernel-darwin/SiYuan-Kernel"
             build_mode: ""
@@ -51,6 +54,7 @@ jobs:
             goos: "darwin"
             goarch: "amd64"
             suffix: "mac.dmg"
+            deb_suffix: ""
           - os: macos-latest
             kernel_path: "../app/kernel-darwin-arm64/SiYuan-Kernel"
             build_mode: ""
@@ -59,6 +63,7 @@ jobs:
             goos: "darwin"
             goarch: "arm64"
             suffix: "mac-arm64.dmg"
+            deb_suffix: ""
           - os: windows-latest
             kernel_path: "../app/kernel/SiYuan-Kernel.exe"
             build_mode: ""
@@ -69,6 +74,7 @@ jobs:
             mingwsys: "MINGW64"
             goarch: "amd64"
             suffix: "win.exe"
+            deb_suffix: ""
 
     steps:
       - name: Verify official repository
@@ -244,6 +250,20 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-${{ matrix.config.suffix }}
           name: siyuan-unlock-${{ github.event.inputs.version }}-${{ matrix.config.suffix }}
+          allowUpdates: true
+          omitBody: true
+          omitName: true
+          tag: ${{ github.event.inputs.version }}
+          replacesArtifacts: true
+
+      - name: Upload .deb packages
+        if: ${{ matrix.config.deb_suffix != '' }}
+        uses: ncipollo/release-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-${{ matrix.config.deb_suffix }}
           allowUpdates: true
           omitBody: true
           omitName: true
