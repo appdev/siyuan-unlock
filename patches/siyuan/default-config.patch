@@ -1,8 +1,23 @@
-diff --git forkSrcPrefix/kernel/conf/sync.go forkDstPrefix/kernel/conf/sync.go
-index b076c5e7ea71d154591320d7313c81549fcb5804..662b300d433c1dde19e63815b09faaded29c08bc 100644
---- forkSrcPrefix/kernel/conf/sync.go
-+++ forkDstPrefix/kernel/conf/sync.go
-@@ -38,8 +38,8 @@ func NewSync() *Sync {
+diff --git a/kernel/conf/appearance.go b/kernel/conf/appearance.go
+index 6c79d4d..0ff0a64 100644
+--- a/kernel/conf/appearance.go
++++ b/kernel/conf/appearance.go
+@@ -64,8 +64,8 @@ func NewAppearance() *Appearance {
+ 		Icon:                "litheness",
+ 		CodeBlockThemeLight: "github",
+ 		CodeBlockThemeDark:  "base16/dracula",
+-		Lang:                "en",
+-		CloseButtonBehavior: 0,
++		Lang:                "zh_CN",
++		CloseButtonBehavior: 1,
+ 		HideToolbar:         true,
+ 		HideStatusBar:       false,
+ 		StatusBar:           util.NewStatusBar(util.IsMobileContainer()),
+diff --git a/kernel/conf/sync.go b/kernel/conf/sync.go
+index 2fdeb79..3156dad 100644
+--- a/kernel/conf/sync.go
++++ b/kernel/conf/sync.go
+@@ -39,8 +39,8 @@ func NewSync() *Sync {
  		Enabled:             false,
  		Perception:          false,
  		Mode:                1,
@@ -13,32 +28,3 @@ index b076c5e7ea71d154591320d7313c81549fcb5804..662b300d433c1dde19e63815b09faade
  		Interval:            30,
  		LAN:                 &LANSync{MaxConcurrentReqs: 16},
  	}
-
-diff --git forkSrcPrefix/kernel/conf/account.go forkDstPrefix/kernel/conf/account.go
-index c4590e22e5883934ece21538099022b3bfc054a3..133208f71bae33243001149bea13c169ea40e78d 100644
---- forkSrcPrefix/kernel/conf/account.go
-+++ forkDstPrefix/kernel/conf/account.go
-@@ -23,7 +23,7 @@ type Account struct {
- 
- func NewAccount() *Account {
- 	return &Account{
--		DisplayTitle: true,
--		DisplayVIP:   true,
-+		DisplayTitle: false,
-+		DisplayVIP:   false,
- 	}
- }
-diff --git forkSrcPrefix/kernel/conf/appearance.go forkDstPrefix/kernel/conf/appearance.go
-index 1bc316a22d6ed34020d5c7149a3c4fa8109302c0..fd9f81a7f02da9acbe821924d10862dc81a56127 100644
---- forkSrcPrefix/kernel/conf/appearance.go
-+++ forkDstPrefix/kernel/conf/appearance.go
-@@ -50,7 +50,7 @@ func NewAppearance() *Appearance {
- 		Icon:                "litheness",
- 		CodeBlockThemeLight: "github",
- 		CodeBlockThemeDark:  "base16/dracula",
--		Lang:                "en",
--		CloseButtonBehavior: 0,
-+		Lang:                "zh_CN",
-+		CloseButtonBehavior: 1,
- 		HideToolbar:         true,
- 		HideStatusBar:       false,

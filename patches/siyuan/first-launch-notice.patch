@@ -209,20 +209,18 @@ index 0000000..fecf173
 +    }
 +};
 diff --git a/app/src/boot/onGetConfig.ts b/app/src/boot/onGetConfig.ts
-index a1f6713..7f51a30 100644
+index bb0d375..e195a1c 100644
 --- a/app/src/boot/onGetConfig.ts
 +++ b/app/src/boot/onGetConfig.ts
-@@ -23,9 +23,8 @@ import {initStatus} from "../layout/status";
- import {showMessage} from "../dialog/message";
- import {replaceLocalPath} from "../editor/rename";
+@@ -25,7 +25,6 @@ import {replaceLocalPath} from "../editor/rename";
  import {initBar} from "../layout/topBar";
  import {openSetting} from "../config";
  import {mountHelp} from "../util/mount";
 -import {openChangelog} from "./openChangelog";
  import type {App} from "../index";
  import {initWindowEvent} from "./globalEvent/event";
- import {sendGlobalShortcut} from "./globalEvent/keydown";
-@@ -73,7 +72,6 @@ export const onGetConfig = (isStart: boolean, app: App) => {
+ import {sendGlobalShortcut} from "./globalEvent/globalShortcut";
+@@ -99,7 +98,6 @@ export const onGetConfig = (isStart: boolean, app: App) => {
                      /// #if !BROWSER
                      sendGlobalShortcut(app);
                      /// #endif
@@ -231,19 +229,19 @@ index a1f6713..7f51a30 100644
                      resetLayout();
                  }
 diff --git a/app/src/index.ts b/app/src/index.ts
-index 2da6535..b9229ee 100644
+index ee9a4a2..5c7c209 100644
 --- a/app/src/index.ts
 +++ b/app/src/index.ts
-@@ -56,6 +56,8 @@ import {setTitle} from "./util/processTitle";
+@@ -62,6 +62,8 @@ import {setTitle} from "./util/processTitle";
  import {ensureUILayout} from "./util/ensureUILayout";
  import {applyEntryVisibility} from "./config/entryVisibility/runtime";
  import {removeBlockPanelEditors} from "./block/panelRemoval";
 +import {openChangelog} from "./boot/openChangelog";
 +import {openFirstLaunchNotice} from "./boot/firstLaunchNotice";
+ import {initializeEnglishCommandTranslations} from "./command/english";
+ import {installPluginStorageFetchAppId} from "./util/fetchAppId";
  
- export class App {
-     public plugins: import("./plugin").Plugin[] = [];
-@@ -309,6 +311,8 @@ export class App {
+@@ -331,6 +333,8 @@ export class App {
                          await ensureOnboarding();
                          await setNoteBook();
                          await onGetConfig(response.data.start, this);
@@ -253,20 +251,18 @@ index 2da6535..b9229ee 100644
                          setTitle("", true);
                          initMessage();
 diff --git a/app/src/mobile/index.ts b/app/src/mobile/index.ts
-index 2039da2..3cb3332 100644
+index 3454d0d..06634d1 100644
 --- a/app/src/mobile/index.ts
 +++ b/app/src/mobile/index.ts
-@@ -58,8 +58,9 @@ import {initTouchDragBridge} from "../util/touchDragBridge";
- import {appearanceConfigApi} from "../config/tabs/appearanceRuntime";
- import {openByMobile} from "../editor/openLink";
+@@ -67,6 +67,7 @@ import {openByMobile} from "../editor/openLink";
  import {initHarmonyTextSelectionMenu} from "../util/harmonyTextSelectionMenu";
  import {updateMobileTopBarLayout} from "./util/mobileTopBar";
  import {showMobileBars} from "./util/mobileBars";
 +import {openFirstLaunchNotice} from "../boot/firstLaunchNotice";
- 
- class App {
-     public plugins: import("../plugin").Plugin[] = [];
-@@ -213,6 +214,7 @@ class App {
+ import {initializeEnglishCommandTranslations} from "../command/english";
+ import {scrollInputIntoView} from "./util/visibleViewport";
+ import {installPluginStorageFetchAppId} from "../util/fetchAppId";
+@@ -227,6 +228,7 @@ class App {
                              try {
                                  await initFramework(this, confResponse.data.start);
                                  initRightMenu(this);
@@ -275,10 +271,10 @@ index 2039da2..3cb3332 100644
                                  window.siyuan.isReady = true;
                                  mainWs.flushMainMessages();
 diff --git a/kernel/api/router.go b/kernel/api/router.go
-index ad9c686..26a1c7d 100644
+index 32cece9..9797059 100644
 --- a/kernel/api/router.go
 +++ b/kernel/api/router.go
-@@ -90,6 +90,8 @@ func ServeAPI(ginServer *gin.Engine) {
+@@ -89,6 +89,8 @@ func ServeAPI(ginServer *gin.Engine) {
  	ginServer.Handle("POST", "/api/system/checkUpdate", model.CheckAuth, model.CheckAdminRole, checkUpdate)
  	ginServer.Handle("POST", "/api/system/exportLog", model.CheckAuth, model.CheckAdminRole, exportLog)
  	ginServer.Handle("POST", "/api/system/getChangelog", model.CheckAuth, getChangelog)
@@ -288,95 +284,31 @@ index ad9c686..26a1c7d 100644
  	ginServer.Handle("POST", "/api/system/exportConf", model.CheckAuth, model.CheckAdminRole, exportConf)
  	ginServer.Handle("POST", "/api/system/importConf", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, importConf)
 diff --git a/kernel/api/system.go b/kernel/api/system.go
-index ed9c9cd..9c010e0 100644
+index 9075ef0..34f4882 100644
 --- a/kernel/api/system.go
 +++ b/kernel/api/system.go
-@@ -166,6 +166,25 @@ func getChangelog(c *gin.Context) {
- 	ret.Data = data
- }
+@@ -146,6 +146,21 @@ var getChangelog = contractHandler(apicontract.SystemGetChangelog, func(c *gin.C
+ 	return
+ })
  
 +func getFirstLaunchNotice(c *gin.Context) {
 +	ret := gulu.Ret.NewResult()
 +	defer c.JSON(http.StatusOK, ret)
-+
-+	ret.Data = map[string]any{
-+		"acknowledged": model.FirstLaunchNoticeAcknowledged(),
-+	}
++	ret.Data = map[string]any{"acknowledged": model.FirstLaunchNoticeAcknowledged()}
 +}
 +
 +func acknowledgeFirstLaunchNotice(c *gin.Context) {
 +	ret := gulu.Ret.NewResult()
 +	defer c.JSON(http.StatusOK, ret)
-+
 +	if err := model.AcknowledgeFirstLaunchNotice(); err != nil {
 +		ret.Code = -1
 +		ret.Msg = err.Error()
 +	}
 +}
 +
- func getEmojiConf(c *gin.Context) {
- 	ret := gulu.Ret.NewResult()
- 	defer c.JSON(http.StatusOK, ret)
-diff --git a/kernel/api/system_test.go b/kernel/api/system_test.go
-index a332d97..4f9c9c1 100644
---- a/kernel/api/system_test.go
-+++ b/kernel/api/system_test.go
-@@ -188,6 +188,55 @@ func TestSetAccessAuthCodeAllowsClearingOnMobileWithoutOIDC(t *testing.T) {
- 	}
- }
- 
-+func TestFirstLaunchNoticeAPIUsesInstallationState(t *testing.T) {
-+	gin.SetMode(gin.TestMode)
-+	originalHomeDir := util.HomeDir
-+	util.HomeDir = t.TempDir()
-+	t.Cleanup(func() { util.HomeDir = originalHomeDir })
-+
-+	engine := gin.New()
-+	engine.POST("/api/system/getFirstLaunchNotice", getFirstLaunchNotice)
-+	engine.POST("/api/system/acknowledgeFirstLaunchNotice", acknowledgeFirstLaunchNotice)
-+
-+	getAcknowledged := func() bool {
-+		recorder := httptest.NewRecorder()
-+		request := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/api/system/getFirstLaunchNotice", nil)
-+		engine.ServeHTTP(recorder, request)
-+		response := &struct {
-+			Code int `json:"code"`
-+			Data struct {
-+				Acknowledged bool `json:"acknowledged"`
-+			} `json:"data"`
-+		}{}
-+		if err := json.Unmarshal(recorder.Body.Bytes(), response); err != nil {
-+			t.Fatalf("unmarshal first-launch notice response failed: %v", err)
-+		}
-+		if response.Code != 0 {
-+			t.Fatalf("get first-launch notice failed: %s", recorder.Body.String())
-+		}
-+		return response.Data.Acknowledged
-+	}
-+
-+	if getAcknowledged() {
-+		t.Fatal("new installation was already acknowledged")
-+	}
-+	recorder := httptest.NewRecorder()
-+	request := httptest.NewRequest(http.MethodPost, "http://127.0.0.1/api/system/acknowledgeFirstLaunchNotice", nil)
-+	engine.ServeHTTP(recorder, request)
-+	response := &struct {
-+		Code int `json:"code"`
-+	}{}
-+	if err := json.Unmarshal(recorder.Body.Bytes(), response); err != nil {
-+		t.Fatalf("unmarshal acknowledge response failed: %v", err)
-+	}
-+	if response.Code != 0 {
-+		t.Fatalf("acknowledge first-launch notice failed: %s", recorder.Body.String())
-+	}
-+	if !getAcknowledged() {
-+		t.Fatal("acknowledgement was not returned by the API")
-+	}
-+}
-+
- func TestGetConfUILayoutByRole(t *testing.T) {
- 	gin.SetMode(gin.TestMode)
- 
+ func getChangelogPath(changelogsDir, ver string) string {
+ 	verDir := filepath.Join(changelogsDir, "v"+ver)
+ 	changelogPath := filepath.Join(verDir, "v"+ver+"."+model.Conf.Lang+".md")
 diff --git a/kernel/model/first_launch_notice.go b/kernel/model/first_launch_notice.go
 new file mode 100644
 index 0000000..b7c564d
