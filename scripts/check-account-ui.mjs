@@ -15,6 +15,7 @@ const group = new Proxy({}, {get: () => () => {}});
 const context = {
     window: {siyuan: {languages: {}, config: {system: {container: 'docker'}}}},
     getSyncProviderConfigKeywords: () => [],
+    mountSyncProvider() {},
     mountSyncAssetDownloadMode() {},
     mountLANSyncStatus() {},
     getLANSyncSearchAvailability() {},
