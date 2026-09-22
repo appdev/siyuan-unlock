@@ -62,6 +62,22 @@ jobs:
 
           git status
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ github.workspace }}/siyuan-note/siyuan/kernel/go.mod
+          cache-dependency-path: "**/*.sum"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify account-free sync
+        shell: bash
+        working-directory: ${{ github.workspace }}/siyuan-note
+        run: bash scripts/check-account-free.sh siyuan
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 

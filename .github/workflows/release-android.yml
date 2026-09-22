@@ -77,6 +77,11 @@ jobs:
         run: npm install -g ${{ github.event.inputs.packageManager }}
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
 
+      - name: Verify account-free sync
+        shell: bash
+        working-directory: ${{ github.workspace }}/siyuan-note
+        run: bash scripts/check-account-free.sh siyuan
+
       - name: Install Node Dependencies
         run: pnpm install --no-frozen-lockfile
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
