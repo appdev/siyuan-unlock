@@ -232,16 +232,17 @@ diff --git a/app/src/index.ts b/app/src/index.ts
 index ee9a4a2..5c7c209 100644
 --- a/app/src/index.ts
 +++ b/app/src/index.ts
-@@ -62,6 +62,8 @@ import {setTitle} from "./util/processTitle";
+@@ -62,7 +62,9 @@ import {setTitle} from "./util/processTitle";
  import {ensureUILayout} from "./util/ensureUILayout";
  import {applyEntryVisibility} from "./config/entryVisibility/runtime";
  import {removeBlockPanelEditors} from "./block/panelRemoval";
 +import {openChangelog} from "./boot/openChangelog";
 +import {openFirstLaunchNotice} from "./boot/firstLaunchNotice";
  import {initializeEnglishCommandTranslations} from "./command/english";
+ import {loadLanguages} from "./boot/loadLanguages";
  import {installPluginStorageFetchAppId} from "./util/fetchAppId";
  
-@@ -331,6 +333,8 @@ export class App {
+@@ -340,6 +342,8 @@ export class App {
                          await ensureOnboarding();
                          await setNoteBook();
                          await onGetConfig(response.data.start, this);
@@ -254,15 +255,16 @@ diff --git a/app/src/mobile/index.ts b/app/src/mobile/index.ts
 index 3454d0d..06634d1 100644
 --- a/app/src/mobile/index.ts
 +++ b/app/src/mobile/index.ts
-@@ -67,6 +67,7 @@ import {openByMobile} from "../editor/openLink";
+@@ -67,7 +67,8 @@ import {openByMobile} from "../editor/openLink";
  import {initHarmonyTextSelectionMenu} from "../util/harmonyTextSelectionMenu";
  import {updateMobileTopBarLayout} from "./util/mobileTopBar";
  import {showMobileBars} from "./util/mobileBars";
 +import {openFirstLaunchNotice} from "../boot/firstLaunchNotice";
  import {initializeEnglishCommandTranslations} from "../command/english";
+ import {loadLanguages} from "../boot/loadLanguages";
  import {scrollInputIntoView} from "./util/visibleViewport";
  import {installPluginStorageFetchAppId} from "../util/fetchAppId";
-@@ -227,6 +228,7 @@ class App {
+@@ -231,6 +232,7 @@ class App {
                              try {
                                  await initFramework(this, confResponse.data.start);
                                  initRightMenu(this);
@@ -274,7 +276,7 @@ diff --git a/kernel/api/router.go b/kernel/api/router.go
 index 32cece9..9797059 100644
 --- a/kernel/api/router.go
 +++ b/kernel/api/router.go
-@@ -89,6 +89,8 @@ func ServeAPI(ginServer *gin.Engine) {
+@@ -103,6 +103,8 @@ func ServeAPI(ginServer *gin.Engine) {
  	ginServer.Handle("POST", "/api/system/checkUpdate", model.CheckAuth, model.CheckAdminRole, checkUpdate)
  	ginServer.Handle("POST", "/api/system/exportLog", model.CheckAuth, model.CheckAdminRole, exportLog)
  	ginServer.Handle("POST", "/api/system/getChangelog", model.CheckAuth, getChangelog)

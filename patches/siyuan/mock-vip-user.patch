@@ -2,11 +2,11 @@ diff --git a/kernel/api/setting.go b/kernel/api/setting.go
 index c6fe820..150ae62 100644
 --- a/kernel/api/setting.go
 +++ b/kernel/api/setting.go
-@@ -822,18 +822,23 @@ var getPublish = contractHandler(apicontract.GetPublish, func(c *gin.Context, re
+@@ -830,18 +830,23 @@ var getPublish = contractHandler(apicontract.GetPublish, func(c *gin.Context, re
  })
  
  var getCloudUser = contractHandler(apicontract.GetCloudUser, func(c *gin.Context, request apicontract.SettingCloudUserRequest) apicontract.Response[*apicontract.SettingUser] {
--	user, err := model.RefreshUser(request.Token)
+-	user, err := model.GetCloudUser(request.Token, request.Cached)
 -	data := settingUserPayload(user)
 -	if err == nil {
 -		return apicontract.Success(data)
@@ -42,7 +42,7 @@ diff --git a/kernel/model/cloud_account_auth.go b/kernel/model/cloud_account_aut
 index 8c5330c..814e4f8 100644
 --- a/kernel/model/cloud_account_auth.go
 +++ b/kernel/model/cloud_account_auth.go
-@@ -22,6 +22,10 @@ func cloudAccountAuthFailureHandler(token string) func() {
+@@ -25,6 +25,10 @@ func cloudAccountAuthFailureHandler(token string) func() {
  	if requestedUser == nil {
  		return func() {}
  	}
@@ -57,7 +57,7 @@ diff --git a/kernel/model/cloud_service.go b/kernel/model/cloud_service.go
 index b236e60..96ad7ee 100644
 --- a/kernel/model/cloud_service.go
 +++ b/kernel/model/cloud_service.go
-@@ -270,7 +270,6 @@ var (
+@@ -271,7 +271,6 @@ var (
  
  func RefreshCheckJob2H() {
  	go refreshSubscriptionExpirationRemind()
