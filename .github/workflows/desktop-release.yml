@@ -17,6 +17,7 @@ jobs:
       matrix:
         config:
           - os: ubuntu-22.04
+            verify_account_free: true
             kernel_path: "../app/kernel-linux/SiYuan-Kernel"
             build_mode: "-buildmode=pie"
             build_args: "-s -w -extldflags -static-pie -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
@@ -173,6 +174,7 @@ jobs:
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
 
       - name: Verify account-free sync
+        if: matrix.config.verify_account_free == true
         shell: bash
         working-directory: ${{ github.workspace }}/siyuan-note
         run: bash scripts/check-account-free.sh siyuan
