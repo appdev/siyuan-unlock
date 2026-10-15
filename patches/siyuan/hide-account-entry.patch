@@ -29,9 +29,7 @@ index 5cfe820..e41846b 100644
  import {openSearch} from "../search/spread";
  import type {App} from "../index";
  /// #if !BROWSER
-@@ -257,9 +256,6 @@ ${isInMobileApp() ? `<div id="barExit" data-topbar-entry="barExit" class="ft__er
-                 event.stopPropagation();
-                 break;
+@@ -257,7 +256,4 @@ ${isInMobileApp() ? `<div id="barExit" data-topbar-entry="barExit" class="ft__er
              } else if (targetId === "toolbarVIP" || targetId === "toolbarTitle") {
 -                if (!window.siyuan.config.readonly) {
 -                    openSetting(app, "sync");

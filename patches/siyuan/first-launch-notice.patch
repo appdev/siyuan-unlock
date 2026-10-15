@@ -232,20 +232,13 @@ diff --git a/app/src/index.ts b/app/src/index.ts
 index ee9a4a2..5c7c209 100644
 --- a/app/src/index.ts
 +++ b/app/src/index.ts
-@@ -62,7 +62,9 @@ import {setTitle} from "./util/processTitle";
- import {ensureUILayout} from "./util/ensureUILayout";
- import {applyEntryVisibility} from "./config/entryVisibility/runtime";
+@@ -78,2 +78,4 @@
  import {removeBlockPanelEditors} from "./block/panelRemoval";
 +import {openChangelog} from "./boot/openChangelog";
 +import {openFirstLaunchNotice} from "./boot/firstLaunchNotice";
  import {initializeEnglishCommandTranslations} from "./command/english";
- import {loadLanguages} from "./boot/loadLanguages";
- import {installPluginStorageFetchAppId} from "./util/fetchAppId";
- 
-@@ -340,6 +342,8 @@ export class App {
-                         await ensureOnboarding();
-                         await setNoteBook();
-                         await onGetConfig(response.data.start, this);
+@@ -355,4 +357,6 @@
+                         await initWindowWithLoading(() => onGetConfig(response.data.start, this), setTabPosition);
 +                        await openFirstLaunchNotice();
 +                        openChangelog();
                          onSetaccount();
@@ -255,36 +248,38 @@ diff --git a/app/src/mobile/index.ts b/app/src/mobile/index.ts
 index 3454d0d..06634d1 100644
 --- a/app/src/mobile/index.ts
 +++ b/app/src/mobile/index.ts
-@@ -67,7 +67,8 @@ import {openByMobile} from "../editor/openLink";
- import {initHarmonyTextSelectionMenu} from "../util/harmonyTextSelectionMenu";
- import {updateMobileTopBarLayout} from "./util/mobileTopBar";
+@@ -82,5 +82,6 @@
  import {showMobileBars} from "./util/mobileBars";
 +import {openFirstLaunchNotice} from "../boot/firstLaunchNotice";
  import {initializeEnglishCommandTranslations} from "../command/english";
  import {loadLanguages} from "../boot/loadLanguages";
  import {scrollInputIntoView} from "./util/visibleViewport";
  import {installPluginStorageFetchAppId} from "../util/fetchAppId";
-@@ -231,6 +232,7 @@ class App {
-                             try {
+@@ -255,6 +255,7 @@
                                  await initFramework(this, confResponse.data.start);
                                  initRightMenu(this);
 +                                await openFirstLaunchNotice();
                                  openChangelog();
                                  window.siyuan.isReady = true;
+                                 finishMobileSystemUris(this);
                                  mainWs.flushMainMessages();
 diff --git a/kernel/api/router.go b/kernel/api/router.go
 index 32cece9..9797059 100644
 --- a/kernel/api/router.go
 +++ b/kernel/api/router.go
-@@ -103,6 +103,8 @@ func ServeAPI(ginServer *gin.Engine) {
- 	ginServer.Handle("POST", "/api/system/checkUpdate", model.CheckAuth, model.CheckAdminRole, checkUpdate)
- 	ginServer.Handle("POST", "/api/system/exportLog", model.CheckAuth, model.CheckAdminRole, exportLog)
- 	ginServer.Handle("POST", "/api/system/getChangelog", model.CheckAuth, getChangelog)
+@@ -17,6 +17,7 @@ import (
+ 	"fmt"
+ 	"github.com/siyuan-note/siyuan/kernel/apicontract"
++	"github.com/siyuan-note/siyuan/kernel/model"
+ 
+ 	"github.com/gin-gonic/gin"
+ 	"github.com/siyuan-note/logging"
+ )
+@@ -181,2 +182,4 @@ func registerSystemRoutes(ginServer *gin.Engine) {
+ 	ginServer.Handle("POST", "/api/system/getChangelog", contractRouteHandlers(apicontract.SystemGetChangelog, getChangelog)...)
 +	ginServer.Handle("POST", "/api/system/getFirstLaunchNotice", model.CheckAuth, getFirstLaunchNotice)
 +	ginServer.Handle("POST", "/api/system/acknowledgeFirstLaunchNotice", model.CheckAuth, model.CheckAdminRole, acknowledgeFirstLaunchNotice)
- 	ginServer.Handle("POST", "/api/system/getNetwork", model.CheckAuth, model.CheckAdminRole, getNetwork)
- 	ginServer.Handle("POST", "/api/system/exportConf", model.CheckAuth, model.CheckAdminRole, exportConf)
- 	ginServer.Handle("POST", "/api/system/importConf", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, importConf)
+ 	ginServer.Handle("POST", "/api/system/getNetwork", contractRouteHandlers(apicontract.GetNetwork, getNetwork)...)
 diff --git a/kernel/api/system.go b/kernel/api/system.go
 index 9075ef0..34f4882 100644
 --- a/kernel/api/system.go

@@ -12,7 +12,7 @@ index 6c79d4d..0ff0a64 100644
 +		CloseButtonBehavior: 1,
  		HideToolbar:         true,
  		HideStatusBar:       false,
- 		StatusBar:           util.NewStatusBar(util.IsMobileContainer()),
+ 		StatusBar:           util.NewStatusBar(mobile),
 diff --git a/kernel/conf/sync.go b/kernel/conf/sync.go
 index 2fdeb79..3156dad 100644
 --- a/kernel/conf/sync.go

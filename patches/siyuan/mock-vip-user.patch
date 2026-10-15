@@ -144,7 +144,7 @@ new file mode 100644
 index 0000000..197fd36
 --- /dev/null
 +++ b/kernel/model/unlock_cloud_account_test.go
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,30 @@
 +package model
 +
 +import (
@@ -157,7 +157,9 @@ index 0000000..197fd36
 +func TestUnlockAccountSurvivesCloudAuthenticationFailure(t *testing.T) {
 +	for _, provider := range []int{conf.ProviderS3, conf.ProviderWebDAV} {
 +		setupCloudAccountAuthTest(t)
-+		Conf.Sync.Provider = provider
++		syncConfig := Conf.Sync.Load()
++		syncConfig.Provider = provider
++		Conf.Sync.Store(syncConfig)
 +		user := &conf.User{UserId: "0", UserToken: "token", UserSiYuanOneTimePayStatus: 1}
 +		Conf.SetUser(user)
 +		called := false

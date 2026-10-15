@@ -1,39 +1,20 @@
 diff --git a/kernel/conf/system.go b/kernel/conf/system.go
-index 8bf0031..8fd9ba5 100644
+index 0000000..0000000 100644
 --- a/kernel/conf/system.go
 +++ b/kernel/conf/system.go
-@@ -77,7 +77,7 @@ func NewSystem() *System {
- 		Name:               util.GetDeviceName(),
- 		KernelVersion:      util.Ver,
+@@ -70,6 +70,6 @@ func NewSystem() *System {
+ 	return &System{
  		NetworkProxy:       &NetworkProxy{},
 -		DownloadInstallPkg: true,
 +		DownloadInstallPkg: false,
  		UpdateChannel:      UpdateChannelStable,
  	}
  }
-diff --git a/kernel/model/updater.go b/kernel/model/updater.go
-index 8a39a62..6db50b9 100644
---- a/kernel/model/updater.go
-+++ b/kernel/model/updater.go
-@@ -267,6 +267,10 @@ func isVersionUpToDate(releaseVer string) bool {
- var skipInstallPkgPlatformCached = -1
- 
- func skipNewVerInstallPkg() bool {
-+	// Conf.System.DownloadInstallPkg(自动下载更新安装包) 强制赋值为false
-+	Conf.System.DownloadInstallPkg = false
-+	Conf.Save()
-+
- 	if skipInstallPkgPlatformCached == -1 {
- 		skipInstallPkgPlatformCached = 0
- 		if !gulu.OS.IsWindows() && !gulu.OS.IsDarwin() {
 diff --git a/kernel/model/updater_release.go b/kernel/model/updater_release.go
-index 1be67f8..b92a259 100644
+index 0000000..0000000 100644
 --- a/kernel/model/updater_release.go
 +++ b/kernel/model/updater_release.go
-@@ -39,8 +39,8 @@ import (
- )
- 
- const (
+@@ -39,5 +39,5 @@ const (
 -	githubReleasesURL            = "https://api.github.com/repos/siyuan-note/siyuan/releases?per_page=100"
 -	githubReleaseURLPrefix       = "https://github.com/siyuan-note/siyuan/releases/tag/v"
 +	githubReleasesURL            = "https://api.github.com/repos/appdev/siyuan-unlock/releases?per_page=100"
@@ -41,10 +22,8 @@ index 1be67f8..b92a259 100644
  	githubAPIReleaseCacheSeconds = int64(6 * 60 * 60)
  	maxChecksumManifestSize      = int64(1024 * 1024)
  )
-@@ -80,9 +80,6 @@ var (
- 
- func getUpdateRelease(force bool) (*updateRelease, error) {
- 	channel := Conf.System.UpdateChannel
+@@ -80,7 +80,4 @@ func getUpdateRelease(force bool) (*updateRelease, error) {
+ 	channel := Conf.System.Load().UpdateChannel
 -	if conf.UpdateChannelStable == channel {
 -		return getStableUpdateRelease(force)
 -	}
@@ -52,10 +31,10 @@ index 1be67f8..b92a259 100644
  		return nil, errors.New("update channel is invalid")
  	}
 diff --git a/kernel/model/updater_release_test.go b/kernel/model/updater_release_test.go
-index f1ebd35..2c561f3 100644
+index 0000000..0000000 100644
 --- a/kernel/model/updater_release_test.go
 +++ b/kernel/model/updater_release_test.go
-@@ -21,10 +21,45 @@ import (
+@@ -18,8 +18,45 @@ import (
  	"path/filepath"
  	"strings"
  	"testing"
@@ -67,8 +46,9 @@ index f1ebd35..2c561f3 100644
 +func TestStableUpdateUsesUnlockGitHubRelease(t *testing.T) {
 +	originalConf := Conf
 +	Conf = NewAppConf()
-+	Conf.System = conf.NewSystem()
-+	Conf.System.UpdateChannel = conf.UpdateChannelStable
++	system := conf.NewSystem()
++	system.UpdateChannel = conf.UpdateChannelStable
++	Conf.System.Store(system)
 +
 +	githubReleasesLock.Lock()
 +	originalReleases := cachedGitHubReleases
@@ -96,8 +76,7 @@ index f1ebd35..2c561f3 100644
 +	if wantURL != release.ReleaseURL {
 +		t.Fatalf("unexpected stable release URL: %q", release.ReleaseURL)
 +	}
++
 +}
 +
  func TestIsReleaseAllowed(t *testing.T) {
- 	tests := []struct {
- 		channel string
