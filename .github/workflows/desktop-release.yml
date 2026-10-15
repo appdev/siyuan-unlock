@@ -13,6 +13,7 @@ jobs:
   build:
     runs-on: ${{ matrix.config.os }}
     strategy:
+      fail-fast: false
       matrix:
         config:
           - os: ubuntu-22.04
@@ -234,6 +235,15 @@ jobs:
           fi
           grep -F $'build\t-buildmode=pie' <<<"${build_info}"
           grep -F -- '-extldflags -static-pie' <<<"${build_info}"
+
+      - name: Install ARM64 OCR cross-compiler
+        if: matrix.config.goos == 'linux' && matrix.config.goarch == 'arm64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo 'SIYUAN_OCR_CC_ARM64=aarch64-linux-gnu-gcc' >> "$GITHUB_ENV"
 
       - name: Building Electron
         run: pnpm run ${{ matrix.config.electron_args }}
