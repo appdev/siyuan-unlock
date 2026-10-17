@@ -13,6 +13,7 @@ jobs:
   build:
     runs-on: ${{ matrix.config.os }}
     strategy:
+      fail-fast: false
       matrix:
         config:
           - os: ubuntu-22.04
@@ -124,6 +125,8 @@ jobs:
             wget https://github.com/appdev/musl-archive/releases/download/latest/x86_64-linux-musl-cross.tgz
             sudo tar -xzf x86_64-linux-musl-cross.tgz -C /usr/local/musl
           elif [ "${{ matrix.config.goarch }}" = "arm64" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross
             wget https://github.com/appdev/musl-archive/releases/download/latest/aarch64-linux-musl-cross.tgz
             sudo tar -xzf aarch64-linux-musl-cross.tgz -C /usr/local/musl
           fi
