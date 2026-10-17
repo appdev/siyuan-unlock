@@ -7,26 +7,34 @@ on:
         description: "release version/tag"
         required: true
 
+# This is the configuration used by the successful official v3.8.7 release
+# (siyuan-note/siyuan/actions/runs/38717437695), separate from release source.
+env:
+  DOCKER_CONFIGURATION_COMMIT: a5ed54310cc2b8daf2fb39e31cd25e54d57f7a43
+
 jobs:
   build:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    outputs:
+      source_commit: ${{ steps.source.outputs.commit }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux/amd64
-            suffix: linux-amd64
+            id: amd64
             runner: ubuntu-24.04
           - platform: linux/arm64
-            suffix: linux-arm64
+            id: arm64
             runner: ubuntu-24.04-arm
           - platform: linux/arm/v7
-            suffix: linux-arm-v7
-            runner: ubuntu-24.04-arm
+            id: armv7
+            runner: ubuntu-24.04
           - platform: linux/arm/v8
-            suffix: linux-arm-v8
-            runner: ubuntu-24.04-arm
+            id: armv8
+            runner: ubuntu-24.04
 
     permissions:
       packages: write
@@ -63,21 +71,40 @@ jobs:
         with:
           path: siyuan-note
 
-      - name: clone origin and apply patches
+      - name: Checkout verified official Docker configuration
+        uses: actions/checkout@v4
+        with:
+          repository: siyuan-note/siyuan
+          ref: ${{ env.DOCKER_CONFIGURATION_COMMIT }}
+          path: docker-config
+          sparse-checkout: |
+            Dockerfile
+            .dockerignore
+            scripts/verify-docker-release.py
+            scripts/testdata/docker-ocr
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Clone release source, apply patches and official build configuration
+        id: source
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          mkdir -p ${{ github.workspace }}/go
-          cd ${{ github.workspace }}/siyuan-note/
-
-          git clone --branch ${{ github.event.inputs.version }} --depth=1 https://github.com/siyuan-note/siyuan.git
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          cd "$GITHUB_WORKSPACE/siyuan-note"
+          git clone --branch "$VERSION" --depth=1 https://github.com/siyuan-note/siyuan.git
           cd siyuan
-
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/disable-update.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/default-config.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/mock-vip-user.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/hide-account-entry.patch
-          git apply ${{ github.workspace }}/siyuan-note/patches/siyuan/docker-build.patch
-
-          git status
+          test "$(jq -er .version app/package.json)" = "${VERSION#v}"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          for patch in disable-update default-config mock-vip-user hide-account-entry; do
+            git apply "$GITHUB_WORKSPACE/siyuan-note/patches/siyuan/$patch.patch"
+          done
+          cp "$GITHUB_WORKSPACE/docker-config/Dockerfile" Dockerfile
+          cp "$GITHUB_WORKSPACE/docker-config/.dockerignore" .dockerignore
+          echo "Source commit: $(git rev-parse HEAD); configuration commit: $DOCKER_CONFIGURATION_COMMIT"
+          sha256sum Dockerfile .dockerignore
+          git status --short
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -97,13 +124,15 @@ jobs:
 
       - name: Set up QEMU
         if: startsWith(matrix.platform, 'linux/arm/')
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm
 
       - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_HUB_PWD }}
@@ -115,63 +144,97 @@ jobs:
           context: ${{ github.workspace }}/siyuan-note/siyuan
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=${{ secrets.DOCKER_HUB_USER }}/siyuan-unlock,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=siyuan-unlock-${{ matrix.suffix }}
-          cache-to: type=gha,mode=max,scope=siyuan-unlock-${{ matrix.suffix }}
+          provenance: mode=min
+          cache-from: |
+            type=registry,ref=b3log/siyuan:buildcache-release-v2-${{ matrix.id }}
+            type=gha,scope=siyuan-unlock-official-${{ matrix.id }}
+          cache-to: type=gha,mode=max,scope=siyuan-unlock-official-${{ matrix.id }}
 
-      - name: Export digest
+      - name: Verify kernel and real OCR using official release checks
         shell: bash
         env:
+          IMAGE: ${{ secrets.DOCKER_HUB_USER }}/siyuan-unlock
           DIGEST: ${{ steps.build.outputs.digest }}
+          VERSION: ${{ inputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
         run: |
-          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
-          mkdir -p "${RUNNER_TEMP}/digests"
-          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+          python3 docker-config/scripts/verify-docker-release.py verify \
+            --image "$IMAGE@$DIGEST" --version "${VERSION#v}" --platform "$PLATFORM" \
+            --source-commit "$SOURCE_COMMIT" --configuration-commit "$DOCKER_CONFIGURATION_COMMIT" \
+            --run-id "$GITHUB_RUN_ID" --report "$RUNNER_TEMP/docker-verification/report.json"
 
-      - name: Upload digest
+      - name: Upload successful verification
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.suffix }}
-          path: ${{ runner.temp }}/digests/*
+          name: docker-verification-${{ matrix.id }}
+          path: ${{ runner.temp }}/docker-verification/report.json
           if-no-files-found: error
+          overwrite: true
+          retention-days: 1
+
+      - name: Preserve verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-diagnostics-${{ github.run_attempt }}-${{ matrix.id }}
+          path: ${{ runner.temp }}/docker-verification
+          if-no-files-found: ignore
           retention-days: 1
 
   merge:
-    name: Publish multi-platform image
+    name: Publish verified multi-platform image
     needs: build
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - name: Download digests
+      - name: Checkout official release verification
+        uses: actions/checkout@v4
+        with:
+          repository: siyuan-note/siyuan
+          ref: ${{ env.DOCKER_CONFIGURATION_COMMIT }}
+          sparse-checkout: scripts/verify-docker-release.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Download successful verification reports
         uses: actions/download-artifact@v4
         with:
-          path: ${{ runner.temp }}/digests
-          pattern: digests-*
-          merge-multiple: true
+          path: ${{ runner.temp }}/platform-reports
+          pattern: docker-verification-*
 
       - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_HUB_PWD }}
 
-      - name: Merge and push version tags
+      - name: Assemble and publish verified version tags
         shell: bash
-        working-directory: ${{ runner.temp }}/digests
         env:
           IMAGE: ${{ secrets.DOCKER_HUB_USER }}/siyuan-unlock
           VERSION: ${{ inputs.version }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
         run: |
-          shopt -s nullglob
-          digests=(*)
-          [[ ${#digests[@]} -eq 4 ]]
-          sources=()
-          for digest in "${digests[@]}"; do
-            [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
-            sources+=("${IMAGE}@sha256:${digest}")
-          done
-          docker buildx imagetools create -t "${IMAGE}:latest" -t "${IMAGE}:${VERSION}" "${sources[@]}"
-          docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+          python3 scripts/verify-docker-release.py assemble \
+            --repository "$IMAGE" --candidate-tag "build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-verified" \
+            --version "${VERSION#v}" --source-commit "$SOURCE_COMMIT" \
+            --configuration-commit "$DOCKER_CONFIGURATION_COMMIT" --run-id "$GITHUB_RUN_ID" \
+            --reports "$RUNNER_TEMP/platform-reports" --report "$RUNNER_TEMP/docker-verification.json"
+          RELEASE_IMAGE=$(jq -er .image "$RUNNER_TEMP/docker-verification.json")
+          python3 scripts/verify-docker-release.py promote \
+            --image "$RELEASE_IMAGE" --version "${VERSION#v}" \
+            --report "$RUNNER_TEMP/docker-verification.json"
+
+      - name: Preserve release verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-release-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/docker-verification.json
+          if-no-files-found: ignore
+          retention-days: 1
