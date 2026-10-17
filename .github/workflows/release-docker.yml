@@ -9,8 +9,24 @@ on:
 
 jobs:
   build:
-    name: build
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            suffix: linux-amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            suffix: linux-arm64
+            runner: ubuntu-24.04-arm
+          - platform: linux/arm/v7
+            suffix: linux-arm-v7
+            runner: ubuntu-24.04-arm
+          - platform: linux/arm/v8
+            suffix: linux-arm-v8
+            runner: ubuntu-24.04-arm
 
     permissions:
       packages: write
@@ -80,6 +96,7 @@ jobs:
         run: bash scripts/check-account-free.sh siyuan
 
       - name: Set up QEMU
+        if: startsWith(matrix.platform, 'linux/arm/')
         uses: docker/setup-qemu-action@v3
 
       - name: Setup Docker buildx
@@ -91,9 +108,70 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_HUB_PWD }}
 
-      - name: Build the Docker image
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan
-        run: |
-          docker buildx build --push --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8 -t ${{ env.DOCKER_HUB_USER }}/siyuan-unlock:latest -t ${{ env.DOCKER_HUB_USER }}/siyuan-unlock:${{ github.event.inputs.version }} .
+      - name: Build and push platform by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ github.workspace }}/siyuan-note/siyuan
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ secrets.DOCKER_HUB_USER }}/siyuan-unlock,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=siyuan-unlock-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=siyuan-unlock-${{ matrix.suffix }}
+
+      - name: Export digest
+        shell: bash
         env:
-          DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          mkdir -p "${RUNNER_TEMP}/digests"
+          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.suffix }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Publish multi-platform image
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_PWD }}
+
+      - name: Merge and push version tags
+        shell: bash
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ secrets.DOCKER_HUB_USER }}/siyuan-unlock
+          VERSION: ${{ inputs.version }}
+        run: |
+          shopt -s nullglob
+          digests=(*)
+          [[ ${#digests[@]} -eq 4 ]]
+          sources=()
+          for digest in "${digests[@]}"; do
+            [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
+            sources+=("${IMAGE}@sha256:${digest}")
+          done
+          docker buildx imagetools create -t "${IMAGE}:latest" -t "${IMAGE}:${VERSION}" "${sources[@]}"
+          docker buildx imagetools inspect "${IMAGE}:${VERSION}"
