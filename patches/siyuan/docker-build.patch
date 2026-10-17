@@ -9,7 +9,7 @@ diff --git a/Dockerfile b/Dockerfile
  RUN <<EORUN
  #!/bin/bash -e
  apt-get update
-@@ -48,12 +49,15 @@
+@@ -48,12 +49,17 @@
  FROM go-build AS ocr-build
  ARG TARGETARCH
  # 容器保留 Alpine 基础镜像，使用 musl 构建原生运行时和识别辅助进程。
@@ -18,7 +18,10 @@ diff --git a/Dockerfile b/Dockerfile
  RUN git clone --no-checkout https://github.com/microsoft/onnxruntime /onnxruntime \
      && cd /onnxruntime \
      && git checkout 3a728b75062256951b6e19ce718907cf1a1d4cf0 \
-     && git submodule update --init --recursive
+-    && git submodule update --init --recursive
++    && git submodule update --init --recursive \
++    && sed -i 's/^#if !defined(__ANDROID__)/#if !defined(NDEBUG) \&\& !defined(__ANDROID__)/' \
++        /onnxruntime/onnxruntime/core/platform/posix/stacktrace.cc
 -RUN python3 /onnxruntime/tools/ci_build/build.py --build_dir /onnxruntime/build \
 +# ARM32 containers on ARM64 hosts inherit aarch64 from uname unless the
 +# execution personality is set. Keep CMake and cpuinfo on the target ABI.
