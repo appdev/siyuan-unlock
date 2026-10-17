@@ -1,7 +1,7 @@
 diff --git a/Dockerfile b/Dockerfile
 --- a/Dockerfile
 +++ b/Dockerfile
-@@ -14,6 +14,7 @@ EORUN
+@@ -15,6 +15,7 @@
  
  ADD app/ .
  ADD scripts/prepare-ocr.py scripts/ocr-assets.json /scripts/
@@ -9,7 +9,7 @@ diff --git a/Dockerfile b/Dockerfile
  RUN <<EORUN
  #!/bin/bash -e
  apt-get update
-@@ -48,7 +49,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg
+@@ -48,12 +49,15 @@
  FROM go-build AS ocr-build
  ARG TARGETARCH
  # 容器保留 Alpine 基础镜像，使用 musl 构建原生运行时和识别辅助进程。
@@ -18,3 +18,12 @@ diff --git a/Dockerfile b/Dockerfile
  RUN git clone --no-checkout https://github.com/microsoft/onnxruntime /onnxruntime \
      && cd /onnxruntime \
      && git checkout 3a728b75062256951b6e19ce718907cf1a1d4cf0 \
+     && git submodule update --init --recursive
+-RUN python3 /onnxruntime/tools/ci_build/build.py --build_dir /onnxruntime/build \
++# ARM32 containers on ARM64 hosts inherit aarch64 from uname unless the
++# execution personality is set. Keep CMake and cpuinfo on the target ABI.
++RUN if [ "$TARGETARCH" = arm ]; then apk add --no-cache setarch; set -- setarch linux32; else set --; fi; \
++    "$@" python3 /onnxruntime/tools/ci_build/build.py --build_dir /onnxruntime/build \
+     --config Release --update --build --parallel 2 --build_shared_lib \
+     --skip_tests --allow_running_as_root --compile_no_warning_as_error
+ RUN mkdir -p /ocr/linux-${TARGETARCH} \
