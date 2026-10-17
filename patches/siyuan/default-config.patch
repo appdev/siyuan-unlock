@@ -1,8 +1,8 @@
 diff --git a/kernel/conf/appearance.go b/kernel/conf/appearance.go
-index 6c79d4d..0ff0a64 100644
+index a941a56..018b23a 100644
 --- a/kernel/conf/appearance.go
 +++ b/kernel/conf/appearance.go
-@@ -64,8 +64,8 @@ func NewAppearance() *Appearance {
+@@ -69,8 +69,8 @@ func NewAppearanceForContainer(mobile bool) *Appearance {
  		Icon:                "litheness",
  		CodeBlockThemeLight: "github",
  		CodeBlockThemeDark:  "base16/dracula",
@@ -12,7 +12,7 @@ index 6c79d4d..0ff0a64 100644
 +		CloseButtonBehavior: 1,
  		HideToolbar:         true,
  		HideStatusBar:       false,
- 		StatusBar:           util.NewStatusBar(util.IsMobileContainer()),
+ 		StatusBar:           util.NewStatusBar(mobile),
 diff --git a/kernel/conf/sync.go b/kernel/conf/sync.go
 index 2fdeb79..3156dad 100644
 --- a/kernel/conf/sync.go

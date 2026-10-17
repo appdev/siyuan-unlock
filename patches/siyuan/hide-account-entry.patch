@@ -1,5 +1,5 @@
 diff --git a/app/src/config/tabs/syncTab.ts b/app/src/config/tabs/syncTab.ts
-index 9bef15f..219d253 100644
+index 7cebed7..8e5756c 100644
 --- a/app/src/config/tabs/syncTab.ts
 +++ b/app/src/config/tabs/syncTab.ts
 @@ -1,6 +1,5 @@
@@ -9,7 +9,7 @@ index 9bef15f..219d253 100644
  import {Constants} from "../../constants";
  import {fetchPost} from "../../util/fetch";
  import {confirmDialog} from "../../dialog/confirmDialog";
-@@ -261,7 +260,6 @@ const mountRepoKey = (root: HTMLElement) => {
+@@ -342,7 +341,6 @@ const mountRepoKey = (root: HTMLElement) => {
  };
  
  export const registerSyncTab = (tab: SettingTabBuilder) => {
@@ -18,10 +18,10 @@ index 9bef15f..219d253 100644
      registerRepoGroup(tab);
  };
 diff --git a/app/src/layout/topBar.ts b/app/src/layout/topBar.ts
-index 5cfe820..e41846b 100644
+index 0bedff0..c8ed5a6 100644
 --- a/app/src/layout/topBar.ts
 +++ b/app/src/layout/topBar.ts
-@@ -11,7 +11,6 @@ import {initTopBarMenu} from "../menus/topBar";
+@@ -12,7 +12,6 @@ import {initTopBarMenu} from "../menus/topBar";
  import {MenuItem} from "../menus/Menu";
  import {hideTooltip} from "../dialog/tooltip";
  import {setMode} from "../util/assets";
@@ -29,8 +29,8 @@ index 5cfe820..e41846b 100644
  import {openSearch} from "../search/spread";
  import type {App} from "../index";
  /// #if !BROWSER
-@@ -257,9 +256,6 @@ ${isInMobileApp() ? `<div id="barExit" data-topbar-entry="barExit" class="ft__er
-                 event.stopPropagation();
+@@ -260,9 +259,6 @@ ${isInMobileApp() ? `<div id="barExit" data-topbar-entry="barExit" class="ft__er
+             event.stopPropagation();
                  break;
              } else if (targetId === "toolbarVIP" || targetId === "toolbarTitle") {
 -                if (!window.siyuan.config.readonly) {

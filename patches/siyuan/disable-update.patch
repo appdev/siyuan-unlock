@@ -1,10 +1,10 @@
 diff --git a/kernel/conf/system.go b/kernel/conf/system.go
-index 8bf0031..8fd9ba5 100644
+index c1f30b5..24eca99 100644
 --- a/kernel/conf/system.go
 +++ b/kernel/conf/system.go
-@@ -77,7 +77,7 @@ func NewSystem() *System {
- 		Name:               util.GetDeviceName(),
- 		KernelVersion:      util.Ver,
+@@ -73,7 +73,7 @@ type Onboarding struct {
+ func NewSystem() *System {
+ 	return &System{
  		NetworkProxy:       &NetworkProxy{},
 -		DownloadInstallPkg: true,
 +		DownloadInstallPkg: false,
@@ -12,22 +12,32 @@ index 8bf0031..8fd9ba5 100644
  	}
  }
 diff --git a/kernel/model/updater.go b/kernel/model/updater.go
-index 8a39a62..6db50b9 100644
+index 480277b..f87d9d7 100644
 --- a/kernel/model/updater.go
 +++ b/kernel/model/updater.go
-@@ -267,6 +267,10 @@ func isVersionUpToDate(releaseVer string) bool {
- var skipInstallPkgPlatformCached = -1
+@@ -31,6 +31,7 @@ import (
+ 	"github.com/88250/gulu"
+ 	"github.com/imroc/req/v3"
+ 	"github.com/siyuan-note/logging"
++	"github.com/siyuan-note/siyuan/kernel/conf"
+ 	"github.com/siyuan-note/siyuan/kernel/util"
+ 	"golang.org/x/mod/semver"
+ )
+@@ -287,6 +288,12 @@ var skipInstallPkgPlatformCached = -1
  
  func skipNewVerInstallPkg() bool {
-+	// Conf.System.DownloadInstallPkg(自动下载更新安装包) 强制赋值为false
-+	Conf.System.DownloadInstallPkg = false
-+	Conf.Save()
-+
+ 	confSystemSnapshot := Conf.LoadSystem()
++	// 强制关闭官方安装包自动下载，配置按快照更新。
++	if confSystemSnapshot.DownloadInstallPkg {
++		confSystemSnapshot = UpdateSystemConf(func(system *conf.System) {
++			system.DownloadInstallPkg = false
++		})
++	}
+ 
  	if skipInstallPkgPlatformCached == -1 {
  		skipInstallPkgPlatformCached = 0
- 		if !gulu.OS.IsWindows() && !gulu.OS.IsDarwin() {
 diff --git a/kernel/model/updater_release.go b/kernel/model/updater_release.go
-index 1be67f8..b92a259 100644
+index a06ec7b..5c56880 100644
 --- a/kernel/model/updater_release.go
 +++ b/kernel/model/updater_release.go
 @@ -39,8 +39,8 @@ import (
@@ -41,10 +51,10 @@ index 1be67f8..b92a259 100644
  	githubAPIReleaseCacheSeconds = int64(6 * 60 * 60)
  	maxChecksumManifestSize      = int64(1024 * 1024)
  )
-@@ -80,9 +80,6 @@ var (
+@@ -81,9 +81,6 @@ var (
  
  func getUpdateRelease(force bool) (*updateRelease, error) {
- 	channel := Conf.System.UpdateChannel
+ 	channel := Conf.System.Load().UpdateChannel
 -	if conf.UpdateChannelStable == channel {
 -		return getStableUpdateRelease(force)
 -	}
@@ -52,10 +62,10 @@ index 1be67f8..b92a259 100644
  		return nil, errors.New("update channel is invalid")
  	}
 diff --git a/kernel/model/updater_release_test.go b/kernel/model/updater_release_test.go
-index f1ebd35..2c561f3 100644
+index f1ebd35..7a2dabd 100644
 --- a/kernel/model/updater_release_test.go
 +++ b/kernel/model/updater_release_test.go
-@@ -21,10 +21,45 @@ import (
+@@ -21,10 +21,46 @@ import (
  	"path/filepath"
  	"strings"
  	"testing"
@@ -67,8 +77,9 @@ index f1ebd35..2c561f3 100644
 +func TestStableUpdateUsesUnlockGitHubRelease(t *testing.T) {
 +	originalConf := Conf
 +	Conf = NewAppConf()
-+	Conf.System = conf.NewSystem()
-+	Conf.System.UpdateChannel = conf.UpdateChannelStable
++	system := conf.NewSystem()
++	system.UpdateChannel = conf.UpdateChannelStable
++	Conf.System.Store(system)
 +
 +	githubReleasesLock.Lock()
 +	originalReleases := cachedGitHubReleases

@@ -9,5 +9,5 @@ test -f "$upstream/kernel/api/unlock_cloud_account_test.go"
 node "$scripts/check-account-ui.mjs" "$upstream"
 cd "$upstream/kernel"
 go test -tags "fts5 sqlcipher" ./model ./api \
-  -run '^(TestUnlock|TestCloudAccount|TestCloudRepoAuthFailure|TestCloudUserRefresh|TestAPIContractSettingErrorsAndAdmission)' \
+  -run '^(TestUnlock|TestCloudAccount|TestCloudRepoAuthFailure|TestCloudUserRefresh|TestAPIContractSettingErrorsAndAdmission|TestStableUpdateUsesUnlockGitHubRelease|TestFirstLaunchNotice)' \
   -count=1

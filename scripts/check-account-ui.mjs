@@ -15,6 +15,7 @@ const group = new Proxy({}, {get: () => () => {}});
 const context = {
     window: {siyuan: {languages: {}, config: {system: {container: 'docker'}}}},
     getSyncProviderConfigKeywords: () => [],
+    getSyncProviderConfigRowKeywords: () => [],
     mountSyncProvider() {},
     mountSyncAssetDownloadMode() {},
     mountLANSyncStatus() {},
@@ -27,21 +28,24 @@ assert.deepEqual(groups, ['sync', 'repo'], 'Sync settings must contain no accoun
 console.log('PASS: sync settings register only sync and local repository groups');
 
 const panel = {innerHTML: '', querySelector: () => null, querySelectorAll: () => [], addEventListener() {}};
+const configRow = {...panel, classList: {toggle() {}}};
 const syncContext = {
     window: {siyuan: {user: {userSiYuanOneTimePayStatus: 1}, languages: {_kernel: {214: 'LOGIN_REQUIRED'}},
         config: {sync: {provider: 2, s3: {}, webdav: {}}}}},
     getCloudURL: () => '',
     getHostCapabilities: () => ({importExport: false}),
-    root: {querySelector: () => panel},
+    escapeHtmlTextAndAttr: value => String(value ?? '').replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`),
+    root: {querySelector: selector => selector === '#syncProviderConfigRow' ? configRow : panel},
 };
 const renderSource = load('app/src/util/needSubscribe.ts') + '\n' + load('app/src/config/tabs/syncUi.ts');
 for (const provider of [2, 3]) {
     syncContext.window.siyuan.config.sync.provider = provider;
     runInNewContext(`${renderSource}\nrenderProviderConfig(root);`, {...syncContext});
-    assert.match(panel.innerHTML, /id="endpoint"/, 'Third-party sync configuration must be editable');
+    assert.match(configRow.innerHTML, /data-action="configureSync"/, 'Third-party sync configuration must be editable');
     assert.doesNotMatch(panel.innerHTML, /LOGIN_REQUIRED/);
 }
 syncContext.window.siyuan.user = null;
 runInNewContext(`${renderSource}\nrenderProviderConfig(root);`, {...syncContext});
 assert.match(panel.innerHTML, /LOGIN_REQUIRED/, 'Control case must detect the reported missing-user regression');
+assert.equal(configRow.innerHTML, '', 'Missing-user control must hide the provider configuration row');
 console.log('PASS: S3/WebDAV configuration renders for local unlock state; missing-user control is blocked');

@@ -1,8 +1,8 @@
 diff --git a/kernel/api/setting.go b/kernel/api/setting.go
-index c6fe820..150ae62 100644
+index d5470a9..4762f3e 100644
 --- a/kernel/api/setting.go
 +++ b/kernel/api/setting.go
-@@ -830,18 +830,23 @@ var getPublish = contractHandler(apicontract.GetPublish, func(c *gin.Context, re
+@@ -699,18 +699,23 @@ var getPublish = contractHandler(apicontract.GetPublish, func(c *gin.Context, re
  })
  
  var getCloudUser = contractHandler(apicontract.GetCloudUser, func(c *gin.Context, request apicontract.SettingCloudUserRequest) apicontract.Response[*apicontract.SettingUser] {
@@ -38,33 +38,6 @@ index c6fe820..150ae62 100644
  }, func(c *gin.Context) *apicontract.Response[*apicontract.SettingUser] {
  	if model.IsAdminRoleContext(c) {
  		return nil
-diff --git a/kernel/model/cloud_account_auth.go b/kernel/model/cloud_account_auth.go
-index 8c5330c..814e4f8 100644
---- a/kernel/model/cloud_account_auth.go
-+++ b/kernel/model/cloud_account_auth.go
-@@ -25,6 +25,10 @@ func cloudAccountAuthFailureHandler(token string) func() {
- 	if requestedUser == nil {
- 		return func() {}
- 	}
-+	// 本地免登录身份没有云端会话，云端认证失败不能清除其同步权限。
-+	if requestedUser.UserId == "0" && requestedUser.UserToken == "token" {
-+		return func() {}
-+	}
- 	return func() {
- 		cloudAccountMu.Lock()
- 		defer cloudAccountMu.Unlock()
-diff --git a/kernel/model/cloud_service.go b/kernel/model/cloud_service.go
-index b236e60..96ad7ee 100644
---- a/kernel/model/cloud_service.go
-+++ b/kernel/model/cloud_service.go
-@@ -271,7 +271,6 @@ var (
- 
- func RefreshCheckJob2H() {
- 	go refreshSubscriptionExpirationRemind()
--	go refreshUser()
- 	go refreshAnnouncement()
- }
- 
 diff --git a/kernel/api/unlock_cloud_account_test.go b/kernel/api/unlock_cloud_account_test.go
 new file mode 100644
 index 0000000..e9ecd33
@@ -139,9 +112,36 @@ index 0000000..e9ecd33
 +		t.Fatalf("persisted local identity cannot survive restart: %v", err)
 +	}
 +}
+diff --git a/kernel/model/cloud_account_auth.go b/kernel/model/cloud_account_auth.go
+index 48ce468..59157ac 100644
+--- a/kernel/model/cloud_account_auth.go
++++ b/kernel/model/cloud_account_auth.go
+@@ -22,6 +22,10 @@ func cloudAccountAuthFailureHandler(token string) func() {
+ 	if requestedUser == nil {
+ 		return func() {}
+ 	}
++	// 本地免登录身份没有云端会话，云端认证失败不能清除其同步权限。
++	if requestedUser.UserId == "0" && requestedUser.UserToken == "token" {
++		return func() {}
++	}
+ 	return func() {
+ 		cloudAccountMu.Lock()
+ 		defer cloudAccountMu.Unlock()
+diff --git a/kernel/model/cloud_service.go b/kernel/model/cloud_service.go
+index ac78720..9f8f085 100644
+--- a/kernel/model/cloud_service.go
++++ b/kernel/model/cloud_service.go
+@@ -276,7 +276,6 @@ var (
+ 
+ func RefreshCheckJob2H() {
+ 	go refreshSubscriptionExpirationRemind()
+-	go refreshUser()
+ 	go refreshAnnouncement()
+ }
+ 
 diff --git a/kernel/model/unlock_cloud_account_test.go b/kernel/model/unlock_cloud_account_test.go
 new file mode 100644
-index 0000000..197fd36
+index 0000000..c3095b5
 --- /dev/null
 +++ b/kernel/model/unlock_cloud_account_test.go
 @@ -0,0 +1,28 @@
@@ -157,7 +157,7 @@ index 0000000..197fd36
 +func TestUnlockAccountSurvivesCloudAuthenticationFailure(t *testing.T) {
 +	for _, provider := range []int{conf.ProviderS3, conf.ProviderWebDAV} {
 +		setupCloudAccountAuthTest(t)
-+		Conf.Sync.Provider = provider
++		UpdateSyncConf(func(sync *conf.Sync) { sync.Provider = provider })
 +		user := &conf.User{UserId: "0", UserToken: "token", UserSiYuanOneTimePayStatus: 1}
 +		Conf.SetUser(user)
 +		called := false
