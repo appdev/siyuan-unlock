@@ -25,15 +25,19 @@ jobs:
         include:
           - platform: linux/amd64
             id: amd64
+            upstream-cache: sha256:6d990db2c9cd299983f1366b0984d398c39f4d07736102731fea2586ad27678e
             runner: ubuntu-24.04
           - platform: linux/arm64
             id: arm64
+            upstream-cache: sha256:4c04549db739755d7670519560b30547084ff292d91bae13de1946b1ea650a43
             runner: ubuntu-24.04-arm
           - platform: linux/arm/v7
             id: armv7
+            upstream-cache: sha256:a49927b20fb5e02f8c1db81042c4e9fbec9c465e9ee5215e207b0965edb11ece
             runner: ubuntu-24.04
           - platform: linux/arm/v8
             id: armv8
+            upstream-cache: sha256:f927df7d816bd4aa9929549c4f195af3a2bc6744fc018d9fc8b9cc4933c405f9
             runner: ubuntu-24.04
 
     permissions:
@@ -145,8 +149,9 @@ jobs:
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=${{ secrets.DOCKER_HUB_USER }}/siyuan-unlock,push-by-digest=true,name-canonical=true,push=true
           provenance: mode=min
+          # Pin caches from the same verified official run; mutable cache tags drift.
           cache-from: |
-            type=registry,ref=b3log/siyuan:buildcache-release-v2-${{ matrix.id }}
+            type=registry,ref=b3log/siyuan@${{ matrix.upstream-cache }}
             type=gha,scope=siyuan-unlock-official-${{ matrix.id }}
           cache-to: type=gha,mode=max,scope=siyuan-unlock-official-${{ matrix.id }}
 
