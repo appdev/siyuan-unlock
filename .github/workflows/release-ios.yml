@@ -16,7 +16,7 @@ jobs:
     env:
       # Keep the Go build cache in the workspace temp dir so it can be cached
       # and shared with other macOS workflows on the same OS/arch/toolchain.
-      GOCACHE: ${{ runner.temp }}/go-build
+      GOCACHE: ${{ github.workspace }}/.gocache
     strategy:
       matrix:
         config:
@@ -83,7 +83,7 @@ jobs:
       - name: Cache Go build output
         uses: actions/cache@v4
         with:
-          path: ${{ runner.temp }}/go-build
+          path: ${{ github.workspace }}/.gocache
           # Repository-scoped: any workflow using the same key and path can restore it.
           key: go-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
