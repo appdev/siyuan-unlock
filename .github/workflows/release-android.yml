@@ -133,7 +133,7 @@ jobs:
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
 
-      - name: Verify Android package IDs
+      - name: Verify Android package IDs and shortcuts
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan-android
         run: |
           original_apk=$(find app/build/outputs/apk/googleplay/release -maxdepth 1 -type f -name 'siyuan-*.apk' -print -quit)
@@ -143,6 +143,30 @@ jobs:
           test -n "${original_apk}" && test -n "${appdev_apk}" && test -n "${aapt}"
           "${aapt}" dump badging "${original_apk}" | grep -Fq "package: name='org.b3log.siyuan'"
           "${aapt}" dump badging "${appdev_apk}" | grep -Fq "package: name='com.appdev.siyuan'"
+
+          check_shortcut() {
+            local apk="$1" expected_package="$2" shortcut_path shortcut_dump
+            shortcut_path=$("${aapt}" dump --values resources "${apk}" | awk '
+              /^[[:space:]]*resource .*:xml\/shortcuts:/ {
+                getline
+                if ($1 == "(string8)") {
+                  gsub(/"/, "", $2)
+                  print $2
+                  exit
+                }
+              }')
+            test -n "${shortcut_path}"
+            shortcut_dump=$("${aapt}" dump xmltree "${apk}" "${shortcut_path}")
+            # Shortcut intents require literal strings, not resource references.
+            printf '%s\n' "${shortcut_dump}" | grep -Fq "android:targetPackage(0x01010021)=\"${expected_package}\""
+            printf '%s\n' "${shortcut_dump}" | grep -Fq 'android:targetClass(0x0101002f)="org.b3log.siyuan.ShortcutActivity"'
+            printf '%s\n' "${shortcut_dump}" | grep -Fq 'android:action(0x0101002d)="android.intent.action.VIEW"'
+            printf '%s\n' "${shortcut_dump}" | grep -Fq 'android:data(0x0101002e)="shorthand"'
+            echo "Verified shortcut: ${expected_package} -> org.b3log.siyuan.ShortcutActivity"
+          }
+
+          check_shortcut "${original_apk}" org.b3log.siyuan
+          check_shortcut "${appdev_apk}" com.appdev.siyuan
 
       - uses: joutvhu/get-release@v1
         id: get_current_release
