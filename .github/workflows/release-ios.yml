@@ -157,3 +157,5 @@ jobs:
           asset_name: siyuan-${{ github.event.inputs.version }}-ios.ipa
           asset_path: ${{ github.workspace }}/siyuan-note/siyuan-ios-out/siyuan.ipa
           asset_content_type: application/octet-stream
+          # Replace the ipa when rebuilding the same version.
+          overwrite: true
