@@ -13,12 +13,17 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.config.os }}
+    env:
+      # Keep the Go build cache in the workspace temp dir so it can be cached
+      # and shared with other macOS workflows on the same OS/arch/toolchain.
+      GOCACHE: ${{ runner.temp }}/go-build
     strategy:
       matrix:
         config:
           - os: macos-latest
             kernel_path: "../ios/iosk.xcframework"
-            target: "ios"
+            # Device arm64 only: the Xcode build below targets -sdk iphoneos.
+            target: "ios/arm64"
 
     steps:
       - name: Verify official repository
@@ -75,6 +80,15 @@ jobs:
           cache-dependency-path: "**/*.sum"
       - run: go version
 
+      - name: Cache Go build output
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/go-build
+          # Repository-scoped: any workflow using the same key and path can restore it.
+          key: go-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-build-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -105,7 +119,7 @@ jobs:
 
       - name: Building ios Kernel
         run: |
-          gomobile bind --tags "fts5 sqlcipher" -ldflags '-s -w' -v -target=ios -o "${{ matrix.config.kernel_path }}" ./
+          gomobile bind --tags "fts5 sqlcipher" -ldflags '-s -w' -v -target=${{ matrix.config.target }} -o "${{ matrix.config.kernel_path }}" ./
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel/mobile
         env:
           GO111MODULE: on
