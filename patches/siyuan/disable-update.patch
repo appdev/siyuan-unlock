@@ -12,7 +12,7 @@ index c1f30b5..24eca99 100644
  	}
  }
 diff --git a/kernel/model/updater.go b/kernel/model/updater.go
-index 480277b..f87d9d7 100644
+index 449ad20..024ec22 100644
 --- a/kernel/model/updater.go
 +++ b/kernel/model/updater.go
 @@ -31,6 +31,7 @@ import (
@@ -23,7 +23,7 @@ index 480277b..f87d9d7 100644
  	"github.com/siyuan-note/siyuan/kernel/util"
  	"golang.org/x/mod/semver"
  )
-@@ -287,6 +288,12 @@ var skipInstallPkgPlatformCached = -1
+@@ -301,6 +302,12 @@ var skipInstallPkgPlatformCached = -1
  
  func skipNewVerInstallPkg() bool {
  	confSystemSnapshot := Conf.LoadSystem()
@@ -37,7 +37,7 @@ index 480277b..f87d9d7 100644
  	if skipInstallPkgPlatformCached == -1 {
  		skipInstallPkgPlatformCached = 0
 diff --git a/kernel/model/updater_release.go b/kernel/model/updater_release.go
-index a06ec7b..5c56880 100644
+index 3a9fd93..535e449 100644
 --- a/kernel/model/updater_release.go
 +++ b/kernel/model/updater_release.go
 @@ -39,8 +39,8 @@ import (
@@ -62,17 +62,20 @@ index a06ec7b..5c56880 100644
  		return nil, errors.New("update channel is invalid")
  	}
 diff --git a/kernel/model/updater_release_test.go b/kernel/model/updater_release_test.go
-index f1ebd35..7a2dabd 100644
+index 0c00cf7..d0361f9 100644
 --- a/kernel/model/updater_release_test.go
 +++ b/kernel/model/updater_release_test.go
-@@ -21,10 +21,46 @@ import (
- 	"path/filepath"
+@@ -22,6 +22,7 @@ import (
+ 	"slices"
  	"strings"
  	"testing"
 +	"time"
  
  	"github.com/siyuan-note/siyuan/kernel/conf"
- )
+ 	"github.com/siyuan-note/siyuan/kernel/util"
+@@ -62,6 +63,41 @@ func TestGetUpdatePackageURLsPreservesReleaseAssetURL(t *testing.T) {
+ 	}
+ }
  
 +func TestStableUpdateUsesUnlockGitHubRelease(t *testing.T) {
 +	originalConf := Conf

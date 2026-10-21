@@ -209,7 +209,7 @@ index 0000000..fecf173
 +    }
 +};
 diff --git a/app/src/boot/onGetConfig.ts b/app/src/boot/onGetConfig.ts
-index e003a69..0e89486 100644
+index c9fdf3e..c14934d 100644
 --- a/app/src/boot/onGetConfig.ts
 +++ b/app/src/boot/onGetConfig.ts
 @@ -26,7 +26,6 @@ import {replaceLocalPath} from "../editor/rename";
@@ -229,10 +229,10 @@ index e003a69..0e89486 100644
                      resetLayout();
                  }
 diff --git a/app/src/index.ts b/app/src/index.ts
-index 6b61620..f943480 100644
+index fda355f..c963b1b 100644
 --- a/app/src/index.ts
 +++ b/app/src/index.ts
-@@ -69,6 +69,8 @@ import {ensureUILayout} from "./util/ensureUILayout";
+@@ -68,6 +68,8 @@ import {ensureUILayout} from "./util/ensureUILayout";
  import {applyEntryVisibility} from "./config/entryVisibility/runtime";
  import {removeBlockPanelEditors} from "./block/panelRemoval";
  import {initializeEnglishCommandTranslations} from "./command/english";
@@ -241,7 +241,7 @@ index 6b61620..f943480 100644
  import {loadLanguages} from "./boot/loadLanguages";
  import {installPluginStorageFetchAppId} from "./util/fetchAppId";
  import {initWindowWithLoading} from "./boot/loading";
-@@ -357,6 +359,8 @@ export class App {
+@@ -354,6 +356,8 @@ export class App {
                          await ensureOnboarding();
                          await setNoteBook();
                          await initWindowWithLoading(() => onGetConfig(response.data.start, this), setTabPosition);
@@ -251,10 +251,10 @@ index 6b61620..f943480 100644
                          setTitle("", true);
                          initMessage();
 diff --git a/app/src/mobile/index.ts b/app/src/mobile/index.ts
-index ecb4cf6..432443b 100644
+index 9f4ab5a..9afe4a6 100644
 --- a/app/src/mobile/index.ts
 +++ b/app/src/mobile/index.ts
-@@ -76,6 +76,7 @@ import {updateMobileTopBarLayout} from "./util/mobileTopBar";
+@@ -79,6 +79,7 @@ import {updateMobileTopBarLayout} from "./util/mobileTopBar";
  import {bindMobileOrientationChange} from "./util/orientation";
  import {showMobileBars} from "./util/mobileBars";
  import {initializeEnglishCommandTranslations} from "../command/english";
@@ -262,27 +262,27 @@ index ecb4cf6..432443b 100644
  import {loadLanguages} from "../boot/loadLanguages";
  import {scrollInputIntoView} from "./util/visibleViewport";
  import {installPluginStorageFetchAppId} from "../util/fetchAppId";
-@@ -257,6 +258,7 @@ class App {
-                             try {
-                                 await initFramework(this, confResponse.data.start);
-                                 initRightMenu(this);
-+                                await openFirstLaunchNotice();
-                                 openChangelog();
-                                 window.siyuan.isReady = true;
-                                 finishMobileSystemUris(this);
+@@ -266,6 +267,7 @@ class App {
+                             await setNoteBook();
+                             await initFramework(this, confResponse.data.start);
+                             initRightMenu(this);
++                            await openFirstLaunchNotice();
+                             openChangelog();
+                             window.siyuan.isReady = true;
+                             finishMobileSystemUris(this);
 diff --git a/kernel/api/router.go b/kernel/api/router.go
-index 40e65da..8009bd6 100644
+index bc7f244..50ee313 100644
 --- a/kernel/api/router.go
 +++ b/kernel/api/router.go
-@@ -19,6 +19,7 @@ package api
+@@ -18,6 +18,7 @@ package api
+ 
  import (
- 	"fmt"
  	"github.com/siyuan-note/siyuan/kernel/apicontract"
 +	"github.com/siyuan-note/siyuan/kernel/model"
  
  	"github.com/gin-gonic/gin"
- 	"github.com/siyuan-note/logging"
-@@ -168,6 +169,8 @@ func registerSystemRoutes(ginServer *gin.Engine) {
+ )
+@@ -149,6 +150,8 @@ func registerSystemRoutes(ginServer *gin.Engine) {
  	ginServer.Handle("POST", "/api/system/checkUpdate", contractRouteHandlers(apicontract.SystemCheckUpdate, checkUpdate)...)
  	ginServer.Handle("POST", "/api/system/exportLog", contractRouteHandlers(apicontract.SystemExportLog, exportLog)...)
  	ginServer.Handle("POST", "/api/system/getChangelog", contractRouteHandlers(apicontract.SystemGetChangelog, getChangelog)...)
@@ -292,7 +292,7 @@ index 40e65da..8009bd6 100644
  	ginServer.Handle("POST", "/api/system/exportConf", contractRouteHandlers(apicontract.SystemExportConf, exportConf)...)
  	ginServer.Handle("POST", "/api/system/importConf", contractRouteHandlers(apicontract.SystemImportConf, importConf)...)
 diff --git a/kernel/api/system.go b/kernel/api/system.go
-index edf151e..20381f3 100644
+index 3a673f4..56b42b7 100644
 --- a/kernel/api/system.go
 +++ b/kernel/api/system.go
 @@ -149,6 +149,21 @@ var getChangelog = contractHandler(apicontract.SystemGetChangelog, func(c *gin.C
