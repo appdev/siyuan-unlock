@@ -51,8 +51,12 @@ jobs:
 
           cd ..
 
-          git clone --depth=1 https://github.com/siyuan-note/siyuan-ios.git
+          git clone https://github.com/siyuan-note/siyuan-ios.git
           cd siyuan-ios
+          # Pin the iOS shell to the v3.8.8 window so release builds are reproducible.
+          git checkout 05280f32ba89705e3ba55c233037db02c93cdea8
+          # Keep iOS 15 support: @available is illegal on lazy stored properties.
+          git apply "${{ github.workspace }}/siyuan-note/patches/siyuan-ios/text-menu-availability.patch"
 
           # https://github.com/siyuan-note/siyuan-ios/commit/d72cd11a6d78df88b56a2850f0f46c2b905a5433 
           # ASSETCATALOG_COMPILER_APPICON_NAME = logo;
