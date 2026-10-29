@@ -18,6 +18,27 @@ index deb7ee8..cd6bfc1 100644
  
              proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
          }
+diff --git a/app/src/appdev/res/xml/shortcuts.xml b/app/src/appdev/res/xml/shortcuts.xml
+new file mode 100644
+index 0000000..f085b99
+--- /dev/null
++++ b/app/src/appdev/res/xml/shortcuts.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
++    <shortcut
++        android:enabled="true"
++        android:icon="@mipmap/shorthand_icon"
++        android:shortcutId="shorthand"
++        android:shortcutLongLabel="@string/shortcut_shorthand"
++        android:shortcutShortLabel="@string/shortcut_shorthand">
++        <intent
++            android:action="android.intent.action.VIEW"
++            android:data="shorthand"
++            android:targetClass="org.b3log.siyuan.ShortcutActivity"
++            android:targetPackage="com.appdev.siyuan" />
++    </shortcut>
++</shortcuts>
 diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
 index fcd8ab7..bc99fa9 100644
 --- a/app/src/main/AndroidManifest.xml
