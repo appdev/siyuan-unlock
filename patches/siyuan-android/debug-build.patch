@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle b/app/build.gradle
-index e0ec580..93c1c43 100644
+index a1c406b..deb7ee8 100644
 --- a/app/build.gradle
 +++ b/app/build.gradle
 @@ -5,7 +5,7 @@ plugins {
@@ -11,11 +11,10 @@ index e0ec580..93c1c43 100644
  apply from: rootProject.file('buildRelease.gradle')
  
  // 1. 配置 App Bundle (.aab) 的基础文件名
-@@ -45,7 +45,14 @@ android {
-         versionCode siyuanVersionCode
-         versionName siyuanVersionName
+@@ -30,6 +30,14 @@ android {
+         versionCode = rootProject.siyuanVersionCode
+         versionName = rootProject.siyuanVersionName
      }
--
 +    signingConfigs {
 +        release {
 +            storeFile = file("../keystore/siyuan.jks")
@@ -24,15 +23,15 @@ index e0ec580..93c1c43 100644
 +            keyPassword System.getenv("KEYSTORE_PASSWORD")
 +        }
 +    }
+ 
      buildFeatures {
-         buildConfig true
-     }
-@@ -53,7 +60,7 @@ android {
+         buildConfig = true
+@@ -39,7 +47,7 @@ android {
      buildTypes {
          release {
              // 正式版打包时指定签名证书
--            signingConfig signingConfigs.siyuanConfig
-+            signingConfig signingConfigs.release
+-            signingConfig = signingConfigs.siyuanConfig
++            signingConfig = signingConfigs.release
  
-             minifyEnabled true
-             shrinkResources true
+             minifyEnabled = true
+             shrinkResources = true
