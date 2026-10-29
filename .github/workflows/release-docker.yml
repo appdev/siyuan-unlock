@@ -265,19 +265,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
-            if python3 docker-config/scripts/verify-docker-release.py verify \
-              --image "$IMAGE@$DIGEST" --version "${VERSION#v}" --platform "$PLATFORM" \
-              --source-commit "$SOURCE_COMMIT" --configuration-commit "$DOCKER_CONFIGURATION_COMMIT" \
-              --run-id "$GITHUB_RUN_ID" --report "$RUNNER_TEMP/docker-verification/report.json"; then
-              exit 0
-            fi
-            if [[ "$attempt" -lt 30 ]]; then
-              echo "Verification not ready; retrying in 10 seconds (attempt $((attempt + 1))/30)"
-              sleep 10
-            fi
-          done
-          exit 1
-
       - name: Upload successful verification
         uses: actions/upload-artifact@v4
         with:
