@@ -1,50 +1,44 @@
 diff --git a/app/build.gradle b/app/build.gradle
-index de7774c..1b23ba8 100644
+index deb7ee8..cd6bfc1 100644
 --- a/app/build.gradle
 +++ b/app/build.gradle
-@@ -46,2 +46,3 @@ android {
-         versionName siyuanVersionName
+@@ -29,6 +29,7 @@ android {
+         targetSdk = 36
+         versionCode = rootProject.siyuanVersionCode
+         versionName = rootProject.siyuanVersionName
 +        resValue "string", "app_package_name", "org.b3log.siyuan"
      }
-@@ -69,4 +70,2 @@ android {
+     signingConfigs {
+         release {
+@@ -54,7 +55,6 @@ android {
+ 
+             // 此处优先级太高，渠道处配置 resValue 不会生效，故放到了 productFlavors 多渠道打包处处理
              // resValue "string", "app_name", "SiYuan"
 -            resValue "string", "app_package_name", "org.b3log.siyuan"
--
+ 
              proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+         }
 diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
 index fcd8ab7..bc99fa9 100644
 --- a/app/src/main/AndroidManifest.xml
 +++ b/app/src/main/AndroidManifest.xml
-@@ -122,3 +122,3 @@
+@@ -120,7 +120,7 @@
+             android:name=".ShortcutActivity"
+             android:exported="true"
              android:launchMode="singleTask"
 -            android:taskAffinity="org.b3log.siyuan.shorthand"
 +            android:taskAffinity="${applicationId}.shorthand"
              android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
-diff --git a/app/src/appdev/res/xml/shortcuts.xml b/app/src/appdev/res/xml/shortcuts.xml
-new file mode 100644
---- /dev/null
-+++ b/app/src/appdev/res/xml/shortcuts.xml
-@@ -0,0 +1,15 @@
-+<?xml version="1.0" encoding="utf-8"?>
-+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
-+    <shortcut
-+        android:enabled="true"
-+        android:icon="@mipmap/shorthand_icon"
-+        android:shortcutId="shorthand"
-+        android:shortcutLongLabel="@string/shortcut_shorthand"
-+        android:shortcutShortLabel="@string/shortcut_shorthand">
-+        <intent
-+            android:action="android.intent.action.VIEW"
-+            android:data="shorthand"
-+            android:targetClass="org.b3log.siyuan.ShortcutActivity"
-+            android:targetPackage="com.appdev.siyuan" />
-+    </shortcut>
-+</shortcuts>
+             android:windowSoftInputMode="adjustResize">
+             <intent-filter>
 diff --git a/flavors.gradle b/flavors.gradle
 index eeaed73..928a831 100644
 --- a/flavors.gradle
 +++ b/flavors.gradle
-@@ -35 +35,9 @@ android {
+@@ -32,6 +32,14 @@ android {
+       resValue "string", "app_name", "SiYuan"
+     }
+ 
 +    // AppDev
 +    appdev profileLqr() >> {
 +      applicationId "com.appdev.siyuan"
@@ -54,3 +48,5 @@ index eeaed73..928a831 100644
 +    }
 +
      // 华为
+     huawei profileLqr() >> {
+       buildConfigField "String", "CHANNEL", '"huawei"'
