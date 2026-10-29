@@ -166,7 +166,120 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
           SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("docker-config/scripts/verify-docker-release.py")
+          source = path.read_text()
+          old = '''        notebook = request(base, "/api/notebook/createNotebook", token, {"name": "Docker OCR smoke"})
+        block = request(base, "/api/filetree/createDocWithMd", token,
+                        {"notebook": notebook["notebook"]["id"], "path": "/Docker smoke", "markdown": "Docker OCR smoke 123"})'''
+          new = '''        notebook = request(base, "/api/notebook/createNotebook", token, {"name": "Docker OCR smoke"})
+        block = None
+        for attempt in range(1, 31):
+            try:
+                block = request(base, "/api/filetree/createDocWithMd", token,
+                                {"notebook": notebook["notebook"]["id"], "path": "/Docker smoke", "markdown": "Docker OCR smoke 123"})
+                break
+            except ValueError as error:
+                if "indexUnavailable" not in str(error) or attempt == 30:
+                    raise
+                print(f"Document index not ready; retrying in 10 seconds (attempt {attempt + 1}/30)", flush=True)
+                time.sleep(10)
+        if block is None:
+            raise RuntimeError("Document index did not become ready")'''
+          if old not in source:
+              raise SystemExit("verification script context not found")
+          path.write_text(source.replace(old, new, 1))
+          PY
           for attempt in $(seq 1 30); do
+            if python3 docker-config/scripts/verify-docker-release.py verify \
+              --image "$IMAGE@$DIGEST" --version "${VERSION#v}" --platform "$PLATFORM" \
+              --source-commit "$SOURCE_COMMIT" --configuration-commit "$DOCKER_CONFIGURATION_COMMIT" \
+              --run-id "$GITHUB_RUN_ID" --report "$RUNNER_TEMP/docker-verification/report.json"; then
+              exit 0
+            fi
+            if [[ "$attempt" -lt 30 ]]; then
+              echo "Verification not ready; retrying in 10 seconds (attempt $((attempt + 1))/30)"
+              sleep 10
+            fi
+          done
+          exit 1
+
+      - name: Upload successful verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-verification-${{ matrix.id }}
+          path: ${{ runner.temp }}/docker-verification/report.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 1
+
+      - name: Preserve verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-diagnostics-${{ github.run_attempt }}-${{ matrix.id }}
+          path: ${{ runner.temp }}/docker-verification
+          if-no-files-found: ignore
+          retention-days: 1
+
+  merge:
+    name: Publish verified multi-platform image
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout official release verification
+        uses: actions/checkout@v4
+        with:
+          repository: siyuan-note/siyuan
+          ref: ${{ env.DOCKER_CONFIGURATION_COMMIT }}
+          sparse-checkout: scripts/verify-docker-release.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Download successful verification reports
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/platform-reports
+          pattern: docker-verification-*
+
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_PWD }}
+
+      - name: Assemble and publish verified version tags
+        shell: bash
+        env:
+          IMAGE: ${{ secrets.DOCKER_HUB_USER }}/siyuan-unlock
+          VERSION: ${{ inputs.version }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+        run: |
+          python3 scripts/verify-docker-release.py assemble \
+            --repository "$IMAGE" --candidate-tag "build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-verified" \
+            --version "${VERSION#v}" --source-commit "$SOURCE_COMMIT" \
+            --configuration-commit "$DOCKER_CONFIGURATION_COMMIT" --run-id "$GITHUB_RUN_ID" \
+            --reports "$RUNNER_TEMP/platform-reports" --report "$RUNNER_TEMP/docker-verification.json"
+          RELEASE_IMAGE=$(jq -er .image "$RUNNER_TEMP/docker-verification.json")
+          python3 scripts/verify-docker-release.py promote \
+            --image "$RELEASE_IMAGE" --version "${VERSION#v}" \
+            --report "$RUNNER_TEMP/docker-verification.json"
+
+      - name: Preserve release verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-release-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/docker-verification.json
+          if-no-files-found: ignore
+          retention-days: 1
+
             if python3 docker-config/scripts/verify-docker-release.py verify \
               --image "$IMAGE@$DIGEST" --version "${VERSION#v}" --platform "$PLATFORM" \
               --source-commit "$SOURCE_COMMIT" --configuration-commit "$DOCKER_CONFIGURATION_COMMIT" \
