@@ -229,10 +229,10 @@ index c9fdf3e..c14934d 100644
                      resetLayout();
                  }
 diff --git a/app/src/index.ts b/app/src/index.ts
-index fda355f..c963b1b 100644
+index 87352fd..ce882b9 100644
 --- a/app/src/index.ts
 +++ b/app/src/index.ts
-@@ -68,6 +68,8 @@ import {ensureUILayout} from "./util/ensureUILayout";
+@@ -70,6 +70,8 @@ import {ensureUILayout} from "./util/ensureUILayout";
  import {applyEntryVisibility} from "./config/entryVisibility/runtime";
  import {removeBlockPanelEditors} from "./block/panelRemoval";
  import {initializeEnglishCommandTranslations} from "./command/english";
@@ -241,20 +241,20 @@ index fda355f..c963b1b 100644
  import {loadLanguages} from "./boot/loadLanguages";
  import {installPluginStorageFetchAppId} from "./util/fetchAppId";
  import {initWindowWithLoading} from "./boot/loading";
-@@ -354,6 +356,8 @@ export class App {
+@@ -359,6 +361,8 @@ export class App {
                          await ensureOnboarding();
                          await setNoteBook();
                          await initWindowWithLoading(() => onGetConfig(response.data.start, this), setTabPosition);
 +                        await openFirstLaunchNotice();
 +                        openChangelog();
-                         onSetaccount();
-                         setTitle("", true);
-                         initMessage();
+                         /// #if !BROWSER
+                         // 加载遮罩移除后再显示主窗口，避免原生窗口按钮出现在启动界面上。
+                         ipcRenderer.send(Constants.SIYUAN_READY_TO_SHOW);
 diff --git a/app/src/mobile/index.ts b/app/src/mobile/index.ts
-index 9f4ab5a..9afe4a6 100644
+index 5666c52..55a8586 100644
 --- a/app/src/mobile/index.ts
 +++ b/app/src/mobile/index.ts
-@@ -79,6 +79,7 @@ import {updateMobileTopBarLayout} from "./util/mobileTopBar";
+@@ -80,6 +80,7 @@ import {updateMobileTopBarLayout} from "./util/mobileTopBar";
  import {bindMobileOrientationChange} from "./util/orientation";
  import {showMobileBars} from "./util/mobileBars";
  import {initializeEnglishCommandTranslations} from "../command/english";
@@ -262,19 +262,19 @@ index 9f4ab5a..9afe4a6 100644
  import {loadLanguages} from "../boot/loadLanguages";
  import {scrollInputIntoView} from "./util/visibleViewport";
  import {installPluginStorageFetchAppId} from "../util/fetchAppId";
-@@ -266,6 +267,7 @@ class App {
-                             await setNoteBook();
-                             await initFramework(this, confResponse.data.start);
-                             initRightMenu(this);
-+                            await openFirstLaunchNotice();
-                             openChangelog();
+@@ -268,6 +269,7 @@ class App {
+                                 initAssets(true);
+                                 await initFramework(this, confResponse.data.start);
+                                 initRightMenu(this);
++                                await openFirstLaunchNotice();
+                                 openChangelog();
+                             });
                              window.siyuan.isReady = true;
-                             finishMobileSystemUris(this);
 diff --git a/kernel/api/router.go b/kernel/api/router.go
-index bc7f244..50ee313 100644
+index ec03221..c281d88 100644
 --- a/kernel/api/router.go
 +++ b/kernel/api/router.go
-@@ -18,6 +18,7 @@ package api
+@@ -6,6 +6,7 @@ package api
  
  import (
  	"github.com/siyuan-note/siyuan/kernel/apicontract"
@@ -282,8 +282,8 @@ index bc7f244..50ee313 100644
  
  	"github.com/gin-gonic/gin"
  )
-@@ -149,6 +150,8 @@ func registerSystemRoutes(ginServer *gin.Engine) {
- 	ginServer.Handle("POST", "/api/system/checkUpdate", contractRouteHandlers(apicontract.SystemCheckUpdate, checkUpdate)...)
+@@ -141,6 +142,8 @@ func registerSystemRoutes(ginServer *gin.Engine) {
+ 	ginServer.Handle("POST", "/api/system/downloadUpdate", contractRouteHandlers(apicontract.SystemDownloadUpdate, downloadUpdate)...)
  	ginServer.Handle("POST", "/api/system/exportLog", contractRouteHandlers(apicontract.SystemExportLog, exportLog)...)
  	ginServer.Handle("POST", "/api/system/getChangelog", contractRouteHandlers(apicontract.SystemGetChangelog, getChangelog)...)
 +	ginServer.Handle("POST", "/api/system/getFirstLaunchNotice", model.CheckAuth, getFirstLaunchNotice)
@@ -292,10 +292,10 @@ index bc7f244..50ee313 100644
  	ginServer.Handle("POST", "/api/system/exportConf", contractRouteHandlers(apicontract.SystemExportConf, exportConf)...)
  	ginServer.Handle("POST", "/api/system/importConf", contractRouteHandlers(apicontract.SystemImportConf, importConf)...)
 diff --git a/kernel/api/system.go b/kernel/api/system.go
-index 3a673f4..56b42b7 100644
+index cd9c58b..4e29704 100644
 --- a/kernel/api/system.go
 +++ b/kernel/api/system.go
-@@ -149,6 +149,21 @@ var getChangelog = contractHandler(apicontract.SystemGetChangelog, func(c *gin.C
+@@ -137,6 +137,21 @@ var getChangelog = contractHandler(apicontract.SystemGetChangelog, func(c *gin.C
  	return
  })
  
