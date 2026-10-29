@@ -170,23 +170,8 @@ jobs:
           from pathlib import Path
           path = Path("docker-config/scripts/verify-docker-release.py")
           source = path.read_text()
-          old = '''        notebook = request(base, "/api/notebook/createNotebook", token, {"name": "Docker OCR smoke"})
-        block = request(base, "/api/filetree/createDocWithMd", token,
-                        {"notebook": notebook["notebook"]["id"], "path": "/Docker smoke", "markdown": "Docker OCR smoke 123"})'''
-          new = '''        notebook = request(base, "/api/notebook/createNotebook", token, {"name": "Docker OCR smoke"})
-        block = None
-        for attempt in range(1, 31):
-            try:
-                block = request(base, "/api/filetree/createDocWithMd", token,
-                                {"notebook": notebook["notebook"]["id"], "path": "/Docker smoke", "markdown": "Docker OCR smoke 123"})
-                break
-            except ValueError as error:
-                if "indexUnavailable" not in str(error) or attempt == 30:
-                    raise
-                print(f"Document index not ready; retrying in 10 seconds (attempt {attempt + 1}/30)", flush=True)
-                time.sleep(10)
-        if block is None:
-            raise RuntimeError("Document index did not become ready")'''
+          old = '        block = request(base, "/api/filetree/createDocWithMd", token,\n                        {"notebook": notebook["notebook"]["id"], "path": "/Docker smoke", "markdown": "Docker OCR smoke 123"})'
+          new = '        block = None\n        for attempt in range(1, 31):\n            try:\n                block = request(base, "/api/filetree/createDocWithMd", token,\n                                {"notebook": notebook["notebook"]["id"], "path": "/Docker smoke", "markdown": "Docker OCR smoke 123"})\n                break\n            except ValueError as error:\n                if "indexUnavailable" not in str(error) or attempt == 30:\n                    raise\n                print(f"Document index not ready; retrying in 10 seconds (attempt {attempt + 1}/30)", flush=True)\n                time.sleep(10)\n        if block is None:\n            raise RuntimeError("Document index did not become ready")'
           if old not in source:
               raise SystemExit("verification script context not found")
           path.write_text(source.replace(old, new, 1))
