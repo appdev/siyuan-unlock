@@ -106,6 +106,8 @@ jobs:
           done
           cp "$GITHUB_WORKSPACE/docker-config/Dockerfile" Dockerfile
           cp "$GITHUB_WORKSPACE/docker-config/.dockerignore" .dockerignore
+          # v3.8.9 requires Go 1.26.10; keep the verified Docker configuration while refreshing its pinned Go image.
+          sed -i 's/sha256:3082400e369fa24d5fc60bca20edab3f6d604e0c5a690ec66b295eff4dd87ade/sha256:9ce231b28998b32e116927c61aa5c406183061d4f3f2d61b292c88e7f6bdf7ca/' Dockerfile
           echo "Source commit: $(git rev-parse HEAD); configuration commit: $DOCKER_CONFIGURATION_COMMIT"
           sha256sum Dockerfile .dockerignore
           git status --short
