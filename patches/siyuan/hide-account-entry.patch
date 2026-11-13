@@ -1,15 +1,16 @@
 diff --git a/app/src/config/tabs/syncTab.ts b/app/src/config/tabs/syncTab.ts
-index 7cebed7..8e5756c 100644
+index 5022abe..517bbd8 100644
 --- a/app/src/config/tabs/syncTab.ts
 +++ b/app/src/config/tabs/syncTab.ts
-@@ -1,6 +1,5 @@
- import {openInputDialog} from "../../dialog/inputDialog";
+@@ -1,7 +1,6 @@
+ import {mobileInputDialog} from "../../dialog/mobileInputDialog";
+ import {mobileConfirmDialog} from "../../dialog/mobileConfirmDialog";
  import type {SettingTabBuilder} from "../setting/builder";
 -import {registerAccountGroup} from "./accountUi";
  import {Constants} from "../../constants";
- import {fetchPost} from "../../util/fetch";
- import {confirmDialog} from "../../dialog/confirmDialog";
-@@ -342,7 +341,6 @@ const mountRepoKey = (root: HTMLElement) => {
+ import {fetchPost, fetchSyncPost} from "../../util/fetch";
+ import {showMessage} from "../../dialog/message";
+@@ -344,7 +343,6 @@ const mountRepoKey = (root: HTMLElement) => {
  };
  
  export const registerSyncTab = (tab: SettingTabBuilder) => {
@@ -18,7 +19,7 @@ index 7cebed7..8e5756c 100644
      registerRepoGroup(tab);
  };
 diff --git a/app/src/layout/topBar.ts b/app/src/layout/topBar.ts
-index 0bedff0..c8ed5a6 100644
+index d8c950a..0d9562f 100644
 --- a/app/src/layout/topBar.ts
 +++ b/app/src/layout/topBar.ts
 @@ -12,7 +12,6 @@ import {initTopBarMenu} from "../menus/topBar";
