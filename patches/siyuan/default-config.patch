@@ -1,23 +1,23 @@
 diff --git a/kernel/conf/appearance.go b/kernel/conf/appearance.go
-index a941a56..018b23a 100644
+index ba9ece8..f9d9ee6 100644
 --- a/kernel/conf/appearance.go
 +++ b/kernel/conf/appearance.go
-@@ -69,8 +69,8 @@ func NewAppearanceForContainer(mobile bool) *Appearance {
- 		Icon:                "litheness",
- 		CodeBlockThemeLight: "github",
- 		CodeBlockThemeDark:  "base16/dracula",
--		Lang:                "en",
--		CloseButtonBehavior: 0,
-+		Lang:                "zh_CN",
-+		CloseButtonBehavior: 1,
- 		HideToolbar:         true,
- 		HideStatusBar:       false,
- 		StatusBar:           util.NewStatusBar(mobile),
+@@ -90,8 +90,8 @@ func NewAppearanceForContainer(mobile bool) *Appearance {
+ 		Icon:                  "litheness",
+ 		CodeBlockThemeLight:   "github",
+ 		CodeBlockThemeDark:    "base16/dracula",
+-		Lang:                  "en",
+-		CloseButtonBehavior:   0,
++		Lang:                  "zh_CN",
++		CloseButtonBehavior:   1,
+ 		HideToolbar:           true,
+ 		HideStatusBar:         false,
+ 		ShowFloatingStatusBar: false,
 diff --git a/kernel/conf/sync.go b/kernel/conf/sync.go
-index 2fdeb79..3156dad 100644
+index 79624ea..278bc07 100644
 --- a/kernel/conf/sync.go
 +++ b/kernel/conf/sync.go
-@@ -39,8 +39,8 @@ func NewSync() *Sync {
+@@ -28,8 +28,8 @@ func NewSync() *Sync {
  		Enabled:             false,
  		Perception:          false,
  		Mode:                1,
