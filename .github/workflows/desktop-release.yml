@@ -116,6 +116,44 @@ jobs:
 
           git status
 
+      - name: Add linux-arm64 OCR runtime recovery
+        if: matrix.config.goos == 'linux' && matrix.config.goarch == 'arm64'
+        shell: bash
+        working-directory: ${{ github.workspace }}/siyuan-note/siyuan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          # v3.8.11's OCR manifest has no runtimeRecovery entry for linux-arm64 while
+          # the onnxruntime 1.24.3 assets are gone (404). Point the recovery at the
+          # matching published package, which ships the same runtime directory.
+          name="siyuan-${VERSION}-linux-arm64.tar.gz"
+          digest=$(gh api "repos/siyuan-note/siyuan/releases/tags/v${VERSION}" --jq ".assets[] | select(.name==\"${name}\") | .digest")
+          export NAME="${name}" DIGEST="${digest}"
+          python3 - <<'PYEOF'
+          import json, os
+          version = os.environ["VERSION"]
+          name = os.environ["NAME"]
+          digest = os.environ["DIGEST"].split(":", 1)[1]
+          manifest = json.load(open("scripts/ocr-assets.json"))
+          entry = manifest["runtime"]["linux-arm64"]
+          manifest.setdefault("runtimeRecovery", {})["linux-arm64"] = {
+              "url": f"https://github.com/siyuan-note/siyuan/releases/download/v{version}/{name}",
+              "sha256": digest,
+              "format": "tar.gz",
+              "path": f"siyuan-{version}-linux-arm64/resources/stage/ocr/runtime/linux-arm64",
+              "runtimeSource": {
+                  "algorithm": "sha256",
+                  "digest": entry["sha256"],
+                  "size": entry["size"],
+                  "library": entry["library"],
+              },
+          }
+          json.dump(manifest, open("scripts/ocr-assets.json", "w"), indent=2, ensure_ascii=False)
+          print("OCR recovery added:", name, digest)
+          PYEOF
+
       - name: Set up Cross Compilation Toolchains for Linux
         if: contains( matrix.config.goos, 'linux')
         run: |
