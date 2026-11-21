@@ -1,16 +1,16 @@
 diff --git a/app/src/config/tabs/syncTab.ts b/app/src/config/tabs/syncTab.ts
-index 5022abe..517bbd8 100644
+index e6d182e..a18df16 100644
 --- a/app/src/config/tabs/syncTab.ts
 +++ b/app/src/config/tabs/syncTab.ts
 @@ -1,7 +1,6 @@
- import {mobileInputDialog} from "../../dialog/mobileInputDialog";
- import {mobileConfirmDialog} from "../../dialog/mobileConfirmDialog";
+ import {openInputDialog} from "../../dialog/inputDialog";
+ import {confirmDialog} from "../../dialog/confirmDialog";
  import type {SettingTabBuilder} from "../setting/builder";
 -import {registerAccountGroup} from "./accountUi";
  import {Constants} from "../../constants";
  import {fetchPost, fetchSyncPost} from "../../util/fetch";
  import {showMessage} from "../../dialog/message";
-@@ -344,7 +343,6 @@ const mountRepoKey = (root: HTMLElement) => {
+@@ -360,7 +359,6 @@ const mountRepoKey = (root: HTMLElement) => {
  };
  
  export const registerSyncTab = (tab: SettingTabBuilder) => {

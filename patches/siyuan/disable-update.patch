@@ -1,8 +1,8 @@
 diff --git a/kernel/conf/system.go b/kernel/conf/system.go
-index c1f30b5..24eca99 100644
+index 83bc953..85b0630 100644
 --- a/kernel/conf/system.go
 +++ b/kernel/conf/system.go
-@@ -73,7 +73,7 @@ type Onboarding struct {
+@@ -61,7 +61,7 @@ type Onboarding struct {
  func NewSystem() *System {
  	return &System{
  		NetworkProxy:       &NetworkProxy{},
@@ -12,10 +12,10 @@ index c1f30b5..24eca99 100644
  	}
  }
 diff --git a/kernel/model/updater.go b/kernel/model/updater.go
-index 449ad20..024ec22 100644
+index 3b4cda5..4e1b25b 100644
 --- a/kernel/model/updater.go
 +++ b/kernel/model/updater.go
-@@ -31,6 +31,7 @@ import (
+@@ -20,6 +20,7 @@ import (
  	"github.com/88250/gulu"
  	"github.com/imroc/req/v3"
  	"github.com/siyuan-note/logging"
@@ -23,7 +23,7 @@ index 449ad20..024ec22 100644
  	"github.com/siyuan-note/siyuan/kernel/util"
  	"golang.org/x/mod/semver"
  )
-@@ -301,6 +302,12 @@ var skipInstallPkgPlatformCached = -1
+@@ -367,6 +368,12 @@ var skipInstallPkgPlatformCached = -1
  
  func skipNewVerInstallPkg() bool {
  	confSystemSnapshot := Conf.LoadSystem()
@@ -37,10 +37,10 @@ index 449ad20..024ec22 100644
  	if skipInstallPkgPlatformCached == -1 {
  		skipInstallPkgPlatformCached = 0
 diff --git a/kernel/model/updater_release.go b/kernel/model/updater_release.go
-index 3a9fd93..535e449 100644
+index d4b9cce..244681e 100644
 --- a/kernel/model/updater_release.go
 +++ b/kernel/model/updater_release.go
-@@ -39,8 +39,8 @@ import (
+@@ -29,8 +29,8 @@ import (
  )
  
  const (
@@ -51,13 +51,23 @@ index 3a9fd93..535e449 100644
  	githubAPIReleaseCacheSeconds = int64(6 * 60 * 60)
  	maxChecksumManifestSize      = int64(1024 * 1024)
  )
-@@ -81,9 +81,6 @@ var (
+@@ -72,16 +72,10 @@ var (
  
  func getUpdateRelease(force bool) (*updateRelease, error) {
  	channel := Conf.System.Load().UpdateChannel
+-	var release *updateRelease
+-	var err error
 -	if conf.UpdateChannelStable == channel {
--		return getStableUpdateRelease(force)
--	}
- 	if !isValidUpdateChannel(channel) {
- 		return nil, errors.New("update channel is invalid")
+-		release, err = getStableUpdateRelease(force)
+-	} else {
+-		if !isValidUpdateChannel(channel) {
+-			return nil, errors.New("update channel is invalid")
+-		}
+-		release, err = getGitHubUpdateRelease(channel, force)
++	if !isValidUpdateChannel(channel) {
++		return nil, errors.New("update channel is invalid")
+ 	}
++	release, err := getGitHubUpdateRelease(channel, force)
+ 	if err == nil {
+ 		rememberUpdateReleaseURL(release)
  	}
