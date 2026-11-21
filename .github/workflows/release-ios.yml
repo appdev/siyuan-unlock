@@ -63,6 +63,12 @@ jobs:
           # Keep iOS 15 support: @available is illegal on lazy stored properties.
           git apply "${{ github.workspace }}/siyuan-note/patches/siyuan-ios/text-menu-availability.patch"
 
+          # microsoft/onnxruntime-swift-package-manager was removed on 2026-11-17 and
+          # download.onnxruntime.ai no longer serves the pod archives. Use our re-hosted
+          # mirror (same MIT content, byte-identical archives, same 1.24.2 tag).
+          sed -i '' 's#https://github.com/microsoft/onnxruntime-swift-package-manager#https://github.com/appdev/onnxruntime-swift-package-manager#g' siyuan-ios.xcodeproj/project.pbxproj
+          rm -f siyuan-ios.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
           # https://github.com/siyuan-note/siyuan-ios/commit/d72cd11a6d78df88b56a2850f0f46c2b905a5433 
           # ASSETCATALOG_COMPILER_APPICON_NAME = logo;
           # 但代码里只有 AppIcon.appiconset，先复制一份看看后续会不会修复

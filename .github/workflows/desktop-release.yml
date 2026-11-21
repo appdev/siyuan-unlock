@@ -128,9 +128,10 @@ jobs:
           # v3.8.11's OCR manifest has no runtimeRecovery entry for linux-arm64 while
           # the onnxruntime 1.24.3 assets are gone (404). Point the recovery at the
           # matching published package, which ships the same runtime directory.
-          name="siyuan-${VERSION}-linux-arm64.tar.gz"
-          digest=$(gh api "repos/siyuan-note/siyuan/releases/tags/v${VERSION}" --jq ".assets[] | select(.name==\"${name}\") | .digest")
-          export NAME="${name}" DIGEST="${digest}"
+          version="${VERSION#v}"
+          name="siyuan-${version}-linux-arm64.tar.gz"
+          digest=$(gh api "repos/siyuan-note/siyuan/releases/tags/v${version}" --jq ".assets[] | select(.name==\"${name}\") | .digest")
+          export VERSION="${version}" NAME="${name}" DIGEST="${digest}"
           python3 - <<'PYEOF'
           import json, os
           version = os.environ["VERSION"]
