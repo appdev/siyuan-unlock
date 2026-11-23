@@ -209,7 +209,7 @@ index 0000000..fecf173
 +    }
 +};
 diff --git a/app/src/boot/onGetConfig.ts b/app/src/boot/onGetConfig.ts
-index 5b2b9da..3f5c0fd 100644
+index 5698e02..61198a0 100644
 --- a/app/src/boot/onGetConfig.ts
 +++ b/app/src/boot/onGetConfig.ts
 @@ -25,7 +25,6 @@ import {showMessage} from "../dialog/message";
@@ -229,10 +229,10 @@ index 5b2b9da..3f5c0fd 100644
                      resetLayout();
                  }
 diff --git a/app/src/index.ts b/app/src/index.ts
-index e284918..fa713a9 100644
+index 6ab76f6..a693743 100644
 --- a/app/src/index.ts
 +++ b/app/src/index.ts
-@@ -72,6 +72,8 @@ import {ensureUILayout} from "./util/ensureUILayout";
+@@ -74,6 +74,8 @@ import {ensureUILayout} from "./util/ensureUILayout";
  import {applyEntryVisibility} from "./config/entryVisibility/runtime";
  import {removeBlockPanelEditors} from "./block/panelRemoval";
  import {initializeEnglishCommandTranslations} from "./command/english";
@@ -241,20 +241,28 @@ index e284918..fa713a9 100644
  import {loadLanguages} from "./boot/loadLanguages";
  import {installPluginStorageFetchAppId} from "./util/fetchAppId";
  import {initWindowWithLoading} from "./boot/loading";
-@@ -374,6 +376,8 @@ export class App {
+@@ -378,6 +380,7 @@ export class App {
                          await ensureOnboarding();
                          await setNoteBook();
                          await initWindowWithLoading(() => onGetConfig(response.data.start, this), setTabPosition);
-+                        await openFirstLaunchNotice();
 +                        openChangelog();
                          /// #if !BROWSER
                          // 加载遮罩移除后再显示主窗口，避免原生窗口按钮出现在启动界面上。
                          ipcRenderer.send(Constants.SIYUAN_READY_TO_SHOW);
+@@ -397,6 +400,8 @@ export class App {
+                         bootSync();
+                         exitAfterSettingsReset();
+                         completeStartup();
++                        // 首启声明不能阻塞启动：主窗口就绪后再弹出，避免窗口/遮罩未显示时等待点击。
++                        void openFirstLaunchNotice();
+                         fetchPost("/api/setting/getCloudUser", {});
+                     }), undefined, startupRequestFailed);
+                 }), reportStartupError);
 diff --git a/app/src/mobile/index.ts b/app/src/mobile/index.ts
-index 5666c52..55a8586 100644
+index a4b7e66..36572e4 100644
 --- a/app/src/mobile/index.ts
 +++ b/app/src/mobile/index.ts
-@@ -80,6 +80,7 @@ import {updateMobileTopBarLayout} from "./util/mobileTopBar";
+@@ -82,6 +82,7 @@ import {updateMobileTopBarLayout} from "./util/mobileTopBar";
  import {bindMobileOrientationChange} from "./util/orientation";
  import {showMobileBars} from "./util/mobileBars";
  import {initializeEnglishCommandTranslations} from "../command/english";
@@ -262,16 +270,17 @@ index 5666c52..55a8586 100644
  import {loadLanguages} from "../boot/loadLanguages";
  import {scrollInputIntoView} from "./util/visibleViewport";
  import {installPluginStorageFetchAppId} from "../util/fetchAppId";
-@@ -268,6 +269,7 @@ class App {
-                                 initAssets(true);
-                                 await initFramework(this, confResponse.data.start);
-                                 initRightMenu(this);
-+                                await openFirstLaunchNotice();
-                                 openChangelog();
-                             });
-                             window.siyuan.isReady = true;
+@@ -279,6 +280,8 @@ class App {
+                             mainWs.flushMainMessages();
+                             bootSync();
+                             completeStartup();
++                            // 首启声明不能阻塞启动：原生启动遮罩会盖住主页面，等界面就绪后再弹出。
++                            void openFirstLaunchNotice();
+                             fetchPost("/api/setting/getCloudUser", {});
+                         }), undefined, startupRequestFailed);
+                     }), undefined, startupRequestFailed);
 diff --git a/kernel/api/router.go b/kernel/api/router.go
-index d86028e..a2fd25d 100644
+index feed2d7..0ad3b46 100644
 --- a/kernel/api/router.go
 +++ b/kernel/api/router.go
 @@ -6,6 +6,7 @@ package api
@@ -292,7 +301,7 @@ index d86028e..a2fd25d 100644
  	ginServer.Handle("POST", "/api/system/exportConf", contractRouteHandlers(apicontract.SystemExportConf, exportConf)...)
  	ginServer.Handle("POST", "/api/system/importConf", contractRouteHandlers(apicontract.SystemImportConf, importConf)...)
 diff --git a/kernel/api/system.go b/kernel/api/system.go
-index e395aa9..e7f433e 100644
+index 3f2cb65..d063476 100644
 --- a/kernel/api/system.go
 +++ b/kernel/api/system.go
 @@ -146,6 +146,21 @@ func loadChangelog(ctx context.Context, force bool, version string) (ret apicont
