@@ -121,6 +121,11 @@ jobs:
         with:
           node-version: 24
 
+      - name: Apply QingYu v2 storage
+        shell: bash
+        working-directory: ${{ github.workspace }}/siyuan-note
+        run: bash scripts/apply-qingyu-storage.sh siyuan
+
       - name: Verify account-free sync
         shell: bash
         working-directory: ${{ github.workspace }}/siyuan-note

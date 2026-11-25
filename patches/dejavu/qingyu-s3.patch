@@ -1,0 +1,271 @@
+diff --git a/cloud/s3.go b/cloud/s3.go
+index cf1ea30..aae1b8d 100644
+--- a/cloud/s3.go
++++ b/cloud/s3.go
+@@ -53,10 +53,16 @@ type S3 struct {
+ 	HTTPClient *http.Client
+ 	service    *as3.Client // 用于缓存 S3 客户端
+ 	mux        sync.Mutex  // 用于保护 service 字段的并发访问
++	prefix     string
++	options    func(*as3.Options)
+ }
+ 
+ func NewS3(baseCloud *BaseCloud, httpClient *http.Client) *S3 {
+-	return &S3{BaseCloud: baseCloud, HTTPClient: httpClient}
++	return &S3{BaseCloud: baseCloud, HTTPClient: httpClient, prefix: "repo"}
++}
++
++func NewScopedS3(base *BaseCloud, client *http.Client, prefix string, options func(*as3.Options)) *S3 {
++	return &S3{BaseCloud: base, HTTPClient: client, prefix: prefix, options: options}
+ }
+ 
+ func (s3 *S3) GetRepos() (repos []*Repo, size int64, err error) {
+@@ -89,7 +95,7 @@ func (s3 *S3) UploadObject(filePath string, overwrite bool) (length int64, err e
+ 		return
+ 	}
+ 	defer file.Close()
+-	key := path.Join("repo", filePath)
++	key := path.Join(s3.prefix, filePath)
+ 	_, err = svc.PutObject(ctx, &as3.PutObjectInput{
+ 		Bucket:       aws.String(s3.Conf.S3.Bucket),
+ 		Key:          aws.String(key),
+@@ -110,7 +116,7 @@ func (s3 *S3) UploadBytes(filePath string, data []byte, overwrite bool) (length
+ 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(s3.S3.Timeout)*time.Second)
+ 	defer cancelFn()
+ 
+-	key := path.Join("repo", filePath)
++	key := path.Join(s3.prefix, filePath)
+ 	_, err = svc.PutObject(ctx, &as3.PutObjectInput{
+ 		Bucket:       aws.String(s3.Conf.S3.Bucket),
+ 		Key:          aws.String(key),
+@@ -129,7 +135,7 @@ func (s3 *S3) DownloadObject(filePath string) (data []byte, err error) {
+ 	svc := s3.getService()
+ 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(s3.S3.Timeout)*time.Second)
+ 	defer cancelFn()
+-	key := path.Join("repo", filePath)
++	key := path.Join(s3.prefix, filePath)
+ 	input := &as3.GetObjectInput{
+ 		Bucket:               aws.String(s3.Conf.S3.Bucket),
+ 		Key:                  aws.String(key),
+@@ -137,7 +143,7 @@ func (s3 *S3) DownloadObject(filePath string) (data []byte, err error) {
+ 	}
+ 	resp, err := svc.GetObject(ctx, input)
+ 	if nil != err {
+-		if s3.isErrNotFound(err) {
++		if s3.objectMissing(ctx, key, err) {
+ 			err = ErrCloudObjectNotFound
+ 		}
+ 		return
+@@ -153,7 +159,7 @@ func (s3 *S3) DownloadObject(filePath string) (data []byte, err error) {
+ }
+ 
+ func (s3 *S3) RemoveObject(key string) (err error) {
+-	key = path.Join("repo", key)
++	key = path.Join(s3.prefix, key)
+ 	svc := s3.getService()
+ 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(s3.S3.Timeout)*time.Second)
+ 	defer cancelFn()
+@@ -257,7 +263,7 @@ func (s3 *S3) GetRefsFiles() (fileIDs []string, refs []*Ref, err error) {
+ 
+ func (s3 *S3) GetChunks(checkChunkIDs []string) (chunkIDs []string, err error) {
+ 	var keys []string
+-	repoObjects := path.Join("repo", "objects")
++	repoObjects := path.Join(s3.prefix, "objects")
+ 	for _, chunk := range checkChunkIDs {
+ 		key := path.Join(repoObjects, chunk[:2], chunk[2:])
+ 		keys = append(keys, key)
+@@ -312,7 +318,7 @@ func (s3 *S3) ListObjects(pathPrefix string) (ret map[string]*entity.ObjectInfo,
+ 	svc := s3.getService()
+ 
+ 	endWithSlash := strings.HasSuffix(pathPrefix, "/")
+-	pathPrefix = path.Join("repo", pathPrefix)
++	pathPrefix = path.Join(s3.prefix, pathPrefix)
+ 	if endWithSlash {
+ 		pathPrefix += "/"
+ 	}
+@@ -320,7 +326,7 @@ func (s3 *S3) ListObjects(pathPrefix string) (ret map[string]*entity.ObjectInfo,
+ 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(s3.S3.Timeout)*time.Second)
+ 	defer cancelFn()
+ 
+-	entries, err := listS3Objects(ctx, svc, &as3.ListObjectsInput{
++	entries, err := s3.listObjects(ctx, svc, &as3.ListObjectsInput{
+ 		Bucket:  &s3.Conf.S3.Bucket,
+ 		Prefix:  &pathPrefix,
+ 		MaxKeys: &limit,
+@@ -354,7 +360,7 @@ func (s3 *S3) ListObjects(pathPrefix string) (ret map[string]*entity.ObjectInfo,
+ }
+ 
+ func (s3 *S3) repoIndex(id string) (ret *entity.Index, err error) {
+-	indexPath := path.Join("repo", "indexes", id)
++	indexPath := path.Join(s3.prefix, "indexes", id)
+ 	info, err := s3.statFile(indexPath)
+ 	if nil != err {
+ 		if s3.isErrNotFound(err) {
+@@ -386,9 +392,9 @@ func (s3 *S3) listRepoRefs(refPrefix string) (ret []*Ref, err error) {
+ 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(s3.S3.Timeout)*time.Second)
+ 	defer cancelFn()
+ 
+-	prefix := path.Join("repo", "refs", refPrefix) + "/"
++	prefix := path.Join(s3.prefix, "refs", refPrefix) + "/"
+ 	limit := int32(32)
+-	entries, err := listS3Objects(ctx, svc, &as3.ListObjectsInput{
++	entries, err := s3.listObjects(ctx, svc, &as3.ListObjectsInput{
+ 		Bucket:  &s3.Conf.S3.Bucket,
+ 		Prefix:  &prefix,
+ 		MaxKeys: &limit,
+@@ -403,7 +409,7 @@ func (s3 *S3) listRepoRefs(refPrefix string) (ret []*Ref, err error) {
+ 			continue
+ 		}
+ 
+-		filePath := strings.TrimPrefix(*entry.Key, "repo/")
++		filePath := strings.TrimPrefix(*entry.Key, s3.prefix+"/")
+ 		data, getErr := s3.DownloadObject(filePath)
+ 		if nil != getErr {
+ 			err = getErr
+@@ -411,7 +417,7 @@ func (s3 *S3) listRepoRefs(refPrefix string) (ret []*Ref, err error) {
+ 		}
+ 
+ 		id := string(data)
+-		info, statErr := s3.statFile(path.Join("repo", "indexes", id))
++		info, statErr := s3.statFile(path.Join(s3.prefix, "indexes", id))
+ 		if nil != statErr {
+ 			err = statErr
+ 			return
+@@ -437,6 +443,37 @@ type listObjectsAPIClient interface {
+ 	ListObjects(context.Context, *as3.ListObjectsInput, ...func(*as3.Options)) (*as3.ListObjectsOutput, error)
+ }
+ 
++func (s3 *S3) listObjects(ctx context.Context, svc *as3.Client, input *as3.ListObjectsInput) (ret []as3Types.Object, err error) {
++	if s3.options == nil {
++		return listS3Objects(ctx, svc, input)
++	}
++	pageInput := &as3.ListObjectsV2Input{
++		Bucket: input.Bucket, Prefix: input.Prefix, MaxKeys: input.MaxKeys,
++	}
++	seen := map[string]bool{}
++	for {
++		page, err := svc.ListObjectsV2(ctx, pageInput)
++		if err != nil {
++			return nil, err
++		}
++		for _, entry := range page.Contents {
++			if entry.Key == nil || !strings.HasPrefix(*entry.Key, aws.ToString(input.Prefix)) {
++				return nil, errors.New("S3 object outside requested prefix")
++			}
++		}
++		ret = append(ret, page.Contents...)
++		if !aws.ToBool(page.IsTruncated) {
++			return ret, nil
++		}
++		token := aws.ToString(page.NextContinuationToken)
++		if token == "" || seen[token] {
++			return nil, errors.New("S3 pagination did not advance")
++		}
++		seen[token] = true
++		pageInput.ContinuationToken = page.NextContinuationToken
++	}
++}
++
+ func listS3Objects(ctx context.Context, svc listObjectsAPIClient, input *as3.ListObjectsInput) (ret []as3Types.Object, err error) {
+ 	ret = []as3Types.Object{}
+ 	marker := input.Marker
+@@ -511,6 +548,9 @@ func (s3 *S3) statFile(key string) (info *objectInfo, err error) {
+ 		Key:    &key,
+ 	})
+ 	if nil != err {
++		if s3.options != nil && s3.objectMissing(ctx, key, err) {
++			err = &as3Types.NotFound{}
++		}
+ 		return
+ 	}
+ 
+@@ -544,10 +584,17 @@ func (s3 *S3) getNotFound(keys []string) (ret []string, err error) {
+ 	}
+ 
+ 	waitGroup := &sync.WaitGroup{}
++	var resultMu sync.Mutex
+ 	p, _ := ants.NewPoolWithFunc(poolSize, func(arg interface{}) {
+ 		defer waitGroup.Done()
+ 		key := arg.(string)
+ 		info, statErr := s3.statFile(key)
++		resultMu.Lock()
++		defer resultMu.Unlock()
++		if s3.options != nil && statErr != nil && !s3.isErrNotFound(statErr) {
++			err = statErr
++			return
++		}
+ 		if nil == info || nil != statErr {
+ 			ret = append(ret, key)
+ 		}
+@@ -555,10 +602,11 @@ func (s3 *S3) getNotFound(keys []string) (ret []string, err error) {
+ 
+ 	for _, key := range keys {
+ 		waitGroup.Add(1)
+-		err = p.Invoke(key)
+-		if nil != err {
+-			logging.LogErrorf("invoke failed: %s", err)
+-			return
++		if invokeErr := p.Invoke(key); invokeErr != nil {
++			waitGroup.Done()
++			waitGroup.Wait()
++			p.Release()
++			return nil, invokeErr
+ 		}
+ 	}
+ 	waitGroup.Wait()
+@@ -603,6 +651,9 @@ func (s3 *S3) getService() *as3.Client {
+ 			// logging.LogDebugf("applied S3 compatibility fix for non-AWS endpoint: %s", s3.Conf.S3.Endpoint)
+ 		}
+ 		// --- END: S3 Compatibility Fix ---
++		if s3.options != nil {
++			s3.options(o)
++		}
+ 	})
+ 	return s3.service
+ }
+@@ -623,6 +674,21 @@ func containsStr(str string, strs []string) bool {
+ 	return false
+ }
+ 
++func (s3 *S3) objectMissing(ctx context.Context, key string, err error) bool {
++	if s3.isErrNotFound(err) {
++		return true
++	}
++	var apiErr smithy.APIError
++	if s3.options == nil || !errors.As(err, &apiErr) ||
++		(apiErr.ErrorCode() != "AccessDenied" && apiErr.ErrorCode() != "Forbidden") {
++		return false
++	}
++	page, err := s3.getService().ListObjectsV2(ctx, &as3.ListObjectsV2Input{
++		Bucket: &s3.Conf.S3.Bucket, Prefix: &key, MaxKeys: aws.Int32(1),
++	})
++	return err == nil && !aws.ToBool(page.IsTruncated) && len(page.Contents) == 0
++}
++
+ func (s3 *S3) isErrNotFound(err error) bool {
+ 	if nil == err {
+ 		return false
+diff --git a/sync_manual.go b/sync_manual.go
+index 738e998..4305826 100644
+--- a/sync_manual.go
++++ b/sync_manual.go
+@@ -38,12 +38,14 @@ func (repo *Repo) SyncDownload(context map[string]interface{}) (mergeResult *Mer
+ 		return
+ 	}
+ 
+-	// 锁定云端，防止其他设备并发上传数据
+-	err = repo.tryLockCloud(repo.DeviceID, context)
+-	if nil != err {
+-		return
++	// Read-only providers can download committed snapshots without writing a lock.
++	if readonly, ok := repo.cloud.(interface{ ReadOnly() bool }); !ok || !readonly.ReadOnly() {
++		err = repo.tryLockCloud(repo.DeviceID, context)
++		if nil != err {
++			return
++		}
++		defer repo.unlockCloud(context)
+ 	}
+-	defer repo.unlockCloud(context)
+ 
+ 	mergeResult = &MergeResult{Time: time.Now()}
+ 	trafficStat = &TrafficStat{m: &sync.Mutex{}}

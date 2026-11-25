@@ -112,7 +112,6 @@ jobs:
           git apply "${workspace}/siyuan-note/patches/siyuan/default-config.patch"
           git apply "${workspace}/siyuan-note/patches/siyuan/mock-vip-user.patch"
           git apply "${workspace}/siyuan-note/patches/siyuan/hide-account-entry.patch"
-          git apply "${workspace}/siyuan-note/patches/siyuan/first-launch-notice.patch"
 
           git status
 
@@ -168,6 +167,11 @@ jobs:
       - name: Install Node pnpm
         run: npm install -g ${{ github.event.inputs.packageManager }}
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
+
+      - name: Apply QingYu v2 storage
+        shell: bash
+        working-directory: ${{ github.workspace }}/siyuan-note
+        run: bash scripts/apply-qingyu-storage.sh siyuan
 
       - name: Verify account-free sync
         shell: bash
