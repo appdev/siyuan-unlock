@@ -1,0 +1,2430 @@
+diff --git a/app/src/config/tabs/qingyu.ts b/app/src/config/tabs/qingyu.ts
+new file mode 100644
+index 0000000..99f1ebe
+--- /dev/null
++++ b/app/src/config/tabs/qingyu.ts
+@@ -0,0 +1,116 @@
++import {fetchSyncPost} from "../../util/fetch";
++
++export const QINGYU_PROVIDER = 5;
++
++export const loadQingYuAccount = () => fetchSyncPost("/api/sync/getQingYuAccount", undefined, undefined, false);
++
++export const mountQingYuAccount = (panel: Element, root: Element) => {
++    if (panel.querySelector("[data-qingyu-account]")) {
++        return;
++    }
++    const zh = (window.siyuan.config.appearance.lang || "").startsWith("zh");
++    const text = {
++        email: zh ? "邮箱" : "Email",
++        password: zh ? "密码" : "Password",
++        login: zh ? "登录" : "Sign in",
++        logout: zh ? "退出轻羽" : "Sign out",
++        remember: zh ? "在此设备记住登录" : "Remember sign-in on this device",
++        failure: zh ? "无法连接轻羽，请检查网络后重试。" : "Could not connect to QingYu. Try again.",
++        notSaved: zh ? "会话未保存，重启后需要重新登录。" : "Sign in again after restarting.",
++        expired: zh ? "当前套餐无上传权限，可手动下载云端数据。" : "Your plan allows downloads only.",
++        binding: zh ? "轻羽账号或云仓库已变更，请核对当前工作空间的同步来源。" :
++            "The QingYu account or repository changed. Verify this workspace’s sync source.",
++        signup: zh ? "注册账号" : "Create account",
++        recovery: zh ? "找回密码" : "Reset password",
++        usage: zh ? "存储用量" : "Storage used",
++    };
++    panel.innerHTML = `
++<div data-qingyu-account class="config-account--auth">
++    <form class="fn__none" style="display: grid; gap: 16px;">
++        <label class="b3-form__icon">
++            <svg class="b3-form__icon-icon" aria-hidden="true"><use xlink:href="#iconAccount"></use></svg>
++            <input class="b3-text-field b3-form__icon-input fn__block" name="username" type="email" autocomplete="username" placeholder="${text.email}" aria-label="${text.email}" required>
++        </label>
++        <label class="b3-form__icon">
++            <svg class="b3-form__icon-icon" aria-hidden="true"><use xlink:href="#iconLock"></use></svg>
++            <input class="b3-text-field b3-form__icon-input fn__block" name="password" type="password" autocomplete="current-password" placeholder="${text.password}" aria-label="${text.password}" required>
++        </label>
++        <label class="ft__smaller ft__on-surface fn__flex" style="align-items: center; gap: 8px;">
++            <input name="remember" type="checkbox">${text.remember}
++        </label>
++        <button type="submit" class="b3-button fn__block">${text.login}</button>
++    </form>
++    <div data-signed-in class="fn__none">
++        <span data-name></span>
++        <button type="button" class="b3-button b3-button--outline">${text.logout}</button>
++        <div data-usage class="b3-label__text"></div>
++    </div>
++    <div class="b3-label__text" role="status"></div>
++    <div class="fn__flex" style="justify-content: center; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px;">
++        <a class="b3-button b3-button--cancel" target="_blank" rel="noopener noreferrer" href="https://qynotes.com/forget/app-customers">${text.recovery}</a>
++        <a class="b3-button b3-button--cancel" target="_blank" rel="noopener noreferrer" href="https://qynotes.com/signup/app-customers">${text.signup}</a>
++    </div>
++</div>`;
++    const form = panel.querySelector("form")!;
++    const signedIn = panel.querySelector("[data-signed-in]")!;
++    const status = panel.querySelector("[role=status]")!;
++    const button = form.querySelector("button")!;
++    const logout = signedIn.querySelector("button")!;
++    const disabled = window.siyuan.config.readonly;
++    let pending = false;
++    let current: import("../../types/api").QingYuStatus | undefined;
++    const run = async (send: () => ReturnType<typeof loadQingYuAccount>) => {
++        if (pending || disabled) {
++            return;
++        }
++        pending = button.disabled = logout.disabled = true;
++        try {
++            const response = await send();
++            if (!form.isConnected) {
++                return;
++            }
++            if (response.data && "signedIn" in response.data) {
++                current = response.data;
++            }
++            const data = current;
++            form.classList.toggle("fn__none", !!data?.signedIn);
++            signedIn.classList.toggle("fn__none", !data?.signedIn);
++            signedIn.querySelector("[data-name]")!.textContent = data?.name ?? "";
++            const size = (bytes: number) => `${(bytes / (1024 * 1024)).toLocaleString(undefined, {maximumFractionDigits: 1})} MiB`;
++            signedIn.querySelector("[data-usage]")!.textContent = data && data.usedBytes >= 0 ?
++                `${text.usage} ${size(data.usedBytes)} / ${size(data.quotaBytes)}` : "";
++            status.textContent = response.code !== 0 ?
++                (response.msg === "account_changed" || response.msg === "storage_config_changed" ? text.binding : response.msg || text.failure) :
++                response.msg || (data?.signedIn && !data.canUpload ? text.expired : data?.signedIn && !data.remembered ? text.notSaved : "");
++            if (typeof data?.enabled === "boolean") {
++                window.siyuan.config.sync.enabled = data.enabled;
++                const toggle = root.querySelector<HTMLInputElement>('[id="sync.enabled"]');
++                if (toggle) {
++                    toggle.checked = data.enabled;
++                    toggle.disabled = !data.signedIn;
++                }
++            }
++        } catch {
++            status.textContent = text.failure;
++            form.classList.remove("fn__none");
++        } finally {
++            pending = button.disabled = logout.disabled = false;
++        }
++    };
++    form.addEventListener("submit", (event) => {
++        event.preventDefault();
++        if (pending) {
++            return;
++        }
++        const input = new FormData(form);
++        form.querySelector<HTMLInputElement>('[name="password"]')!.value = "";
++        void run(() => fetchSyncPost("/api/sync/loginQingYu", {
++            username: String(input.get("username") ?? ""), password: String(input.get("password") ?? ""),
++            remember: input.has("remember"),
++        }, undefined, false));
++    });
++    logout.addEventListener("click", () => {
++        void run(() => fetchSyncPost("/api/sync/logoutQingYu", undefined, undefined, false));
++    });
++    void run(loadQingYuAccount);
++};
+diff --git a/app/src/config/tabs/syncRuntime.ts b/app/src/config/tabs/syncRuntime.ts
+index 2bedc5c..6849837 100644
+--- a/app/src/config/tabs/syncRuntime.ts
++++ b/app/src/config/tabs/syncRuntime.ts
+@@ -5,6 +5,7 @@ import {escapeHtml} from "../../util/escape";
+ import {processSync} from "../../dialog/processSystem";
+ import {progressLoading} from "../../dialog/progress";
+ import {updateAccountPanelVisibility} from "./accountUi";
++import {QINGYU_PROVIDER} from "./qingyu";
+ import {hideMessage, showMessage} from "../../dialog/message";
+ import {refreshSyncCloudDirBlock} from "../../sync/syncGuide";
+ import {
+@@ -28,8 +29,8 @@ export const mountSyncProvider = (root: ParentNode) => {
+     });
+ };
+ 
+-const setSyncProvider = async (provider: Config.ISync["provider"]) => {
+-    if (pendingSyncProvider !== undefined || provider === window.siyuan.config.sync.provider) {
++const setSyncProvider = async (provider: Config.ISync["provider"], skipConfirmation = false) => {
++    if (window.siyuan.config.readonly || pendingSyncProvider !== undefined || provider === window.siyuan.config.sync.provider) {
+         mountSyncProvider(document);
+         return;
+     }
+@@ -37,7 +38,7 @@ const setSyncProvider = async (provider: Config.ISync["provider"]) => {
+     mountSyncProvider(document);
+     let started = false;
+     try {
+-        const confirmed = await new Promise<boolean>((resolve) => {
++        const confirmed = skipConfirmation || await new Promise<boolean>((resolve) => {
+             confirmDialog({
+                 title: window.siyuan.languages.syncProvider,
+                 text: window.siyuan.languages.syncProviderChangeConfirm,
+@@ -53,6 +54,10 @@ const setSyncProvider = async (provider: Config.ISync["provider"]) => {
+         progressLoading({code: 1, msg: window.siyuan.languages._kernel[398]});
+         const response = await fetchSyncPost("/api/sync/setSyncProvider", {provider, completeAssets: true});
+         if (response.code === 0) {
++            if (provider === QINGYU_PROVIDER || window.siyuan.config.sync.provider === QINGYU_PROVIDER) {
++                window.siyuan.config.sync.enabled = false;
++                processSync();
++            }
+             window.siyuan.config.sync.provider = provider;
+             if (syncTabElement) {
+                 refreshSyncCloudSpaceGroup(syncTabElement);
+@@ -70,6 +75,8 @@ const setSyncProvider = async (provider: Config.ISync["provider"]) => {
+     }
+ };
+ 
++export const switchToQingYu = () => setSyncProvider(QINGYU_PROVIDER, true);
++
+ /** 切换资源下载模式时同步控件状态，并阻止重复提交 */
+ export const mountSyncAssetDownloadMode = (root: ParentNode) => {
+     root.querySelectorAll<HTMLSelectElement>('[id="sync.assetDownloadMode"]').forEach((element) => {
+diff --git a/app/src/config/tabs/syncTab.ts b/app/src/config/tabs/syncTab.ts
+index a18df16..b0523ce 100644
+--- a/app/src/config/tabs/syncTab.ts
++++ b/app/src/config/tabs/syncTab.ts
+@@ -10,6 +10,7 @@ import {bindSyncCloudListEvent, refreshSyncCloudDirBlock, renderSyncCloudList, s
+ import {genConfigItemMainHtml, genConfigItemName} from "../render/fragments";
+ import {getLANSyncSearchAvailability, getSyncProviderConfigKeywords, getSyncProviderConfigRowKeywords} from "./syncUi";
+ import {mountLANSyncStatus, mountSyncAssetDownloadMode, mountSyncProvider} from "./syncRuntime";
++import {QINGYU_PROVIDER} from "./qingyu";
+ import {openHistory} from "../../history/history";
+ import {canPurgeRepo} from "../../history/repoPurge";
+ import {ensureLute} from "../../protyle/util/lute";
+@@ -73,7 +74,7 @@ const registerSyncGroup = (tab: SettingTabBuilder) => {
+         desc: window.siyuan.languages.syncProviderTip,
+         afterMount: mountSyncProvider,
+         options: [
+-            {value: 0, label: "SiYuan"},
++            {value: QINGYU_PROVIDER, label: "轻羽 QingYu"},
+             {value: 2, label: "S3"},
+             {value: 3, label: "WebDAV"},
+             ...(["std", "docker"].includes(window.siyuan.config.system.container) ? [{value: 4, label: window.siyuan.languages.localFileSystem}] : []),
+diff --git a/app/src/config/tabs/syncUi.ts b/app/src/config/tabs/syncUi.ts
+index 20a3ba8..eb31cb0 100644
+--- a/app/src/config/tabs/syncUi.ts
++++ b/app/src/config/tabs/syncUi.ts
+@@ -13,6 +13,8 @@ import {Dialog} from "../../dialog";
+ import {escapeHtmlTextAndAttr} from "../../util/escape";
+ import {isMobile} from "../../util/functions";
+ import {canPurgeRepo} from "../../history/repoPurge";
++import {mountQingYuAccount, QINGYU_PROVIDER} from "./qingyu";
++import {switchToQingYu} from "./syncRuntime";
+ import {refreshSyncCloudDirBlock} from "../../sync/syncGuide";
+ 
+ /** 按当前配置刷新同步 Tab 可见性与动态面板（供 syncRuntime 调用） */
+@@ -182,10 +184,6 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
+ 
+         getConfig: () => window.siyuan.config.sync.s3,
+         genIntro: () => `<div class="b3-label b3-label--inner">
+-    ${window.siyuan.languages.syncThirdPartyProviderS3Intro}
+-    <div class="fn__hr"></div>
+-    <em>${window.siyuan.languages.proFeature}</em>
+-    <div class="fn__hr"></div>
+     ${window.siyuan.languages.syncThirdPartyProviderTip}
+ </div>`,
+         genUnpaidIntro: genThirdPartyUnpaidIntro,
+@@ -280,7 +278,8 @@ const buildProviderConfigKeywords = (): string[] => {
+         window.siyuan.languages._kernel[214].replaceAll("${accountServer}", accountServer),
+         window.siyuan.languages.mobileNotSupport,
+         // S3 / WebDAV / 本地第三方
+-        window.siyuan.languages.syncThirdPartyProviderS3Intro,
++        "轻羽云",
++        "QingYu Cloud",
+         window.siyuan.languages.syncThirdPartyProviderWebDAVIntro,
+         window.siyuan.languages.syncThirdPartyProviderLocalIntro,
+         window.siyuan.languages.proFeature,
+@@ -340,7 +339,8 @@ const renderProviderConfig = (root: Element) => {
+     }
+     const rowElement = root.querySelector("#syncProviderConfigRow");
+ 
+-    const def = SYNC_PROVIDER_DEFS[window.siyuan.config.sync.provider];
++    const provider = window.siyuan.config.sync.provider;
++    const def = SYNC_PROVIDER_DEFS[provider];
+     let introHtml = "";
+     let rowHtml = "";
+     if (def) {
+@@ -352,7 +352,23 @@ const renderProviderConfig = (root: Element) => {
+         }
+     }
+ 
+-    providerConfigElement.innerHTML = introHtml;
++    if (provider === QINGYU_PROVIDER) {
++        mountQingYuAccount(providerConfigElement, root);
++    } else {
++        if (provider === 2) {
++            const zh = window.siyuan.config.appearance?.lang?.startsWith("zh");
++            const description = zh
++                ? "轻羽云提供兼容 S3 的云同步，新账号可免费试用 90 天。"
++                : "QingYu Cloud offers S3-compatible sync. New accounts get a free 90-day trial.";
++            const action = zh ? "切换到轻羽云" : "Switch to QingYu Cloud";
++            introHtml = `<div class="b3-label b3-label--inner">
++    ${description}
++    <button type="button" class="b3-button b3-button--text" data-switch-to-qingyu${window.siyuan.config.readonly ? " disabled" : ""}>${action}</button>
++</div>${introHtml}`;
++        }
++        providerConfigElement.innerHTML = introHtml;
++        providerConfigElement.querySelector("[data-switch-to-qingyu]")?.addEventListener("click", switchToQingYu);
++    }
+     if (rowElement) {
+         rowElement.innerHTML = rowHtml;
+         rowElement.classList.toggle("fn__none", !rowHtml);
+diff --git a/app/src/sync/syncGuide.ts b/app/src/sync/syncGuide.ts
+index 361ffeb..5961e8c 100644
+--- a/app/src/sync/syncGuide.ts
++++ b/app/src/sync/syncGuide.ts
+@@ -17,6 +17,7 @@ import {Constants} from "../constants";
+ import {getCloudURL} from "../config/util/about";
+ import {sanitizeKernelHTML} from "../util/hostCapabilities";
+ import {escapeHtml} from "../util/escape";
++import {loadQingYuAccount, QINGYU_PROVIDER} from "../config/tabs/qingyu";
+ 
+ const pendingCloudLists = new WeakSet<Element>();
+ const cloudListRequests = new WeakMap<Element, object>();
+@@ -133,6 +134,16 @@ export const renderSyncCloudList = (cloudListElement: Element, reload = false, c
+ <button class="b3-button b3-button--outline" data-type="retryCloud">${window.siyuan.languages.retry}</button>`;
+         updateReady(false);
+     };
++    if (provider === QINGYU_PROVIDER) {
++        cloudListElement.textContent = "轻羽 QingYu";
++        updateReady(false);
++        void loadQingYuAccount().then(response => {
++            if (isCurrent()) updateReady(response.code === 0 && !!response.data?.signedIn);
++        }).catch(() => {
++            if (isCurrent()) updateReady(false);
++        });
++        return;
++    }
+     if (provider === 2) {
+         // S3 使用配置的存储桶，不依赖列出所有存储桶的权限；实际访问错误由同步请求报告。
+         const s3 = window.siyuan.config.sync.s3;
+diff --git a/app/src/types/api/index.d.ts b/app/src/types/api/index.d.ts
+index 00625d6..156e290 100644
+--- a/app/src/types/api/index.d.ts
++++ b/app/src/types/api/index.d.ts
+@@ -1878,6 +1878,10 @@ export type PublishedBlockInfo = { "publishAccessRequired": true; "rootID": stri
+ 
+ export type PutFileRequestInput = { "app"?: string; "file"?: Blob; "isDir"?: string; "modTime"?: string; "path"?: string; };
+ 
++export type QingYuLoginRequestInput = { "password": string; "remember"?: boolean; "username": string; };
++
++export type QingYuStatus = { "canUpload": boolean; "enabled": boolean; "name": string; "quotaBytes": number; "remembered": boolean; "signedIn": boolean; "usedBytes": number; };
++
+ export type ReadDirectoryRequestInput = { "path": string; };
+ 
+ export type RecentDoc = { "closedAt"?: number; "icon"?: string; "openAt"?: number; "rootID": string; "title"?: string; "viewedAt"?: number; };
+@@ -8446,6 +8450,13 @@ export interface APIPOSTRoutes {
+         /** 服务器路由要求；资源权限与笔记本租约仍由内核校验 */
+         authorization?: readonly ["authenticated"];
+     };
++    "/api/sync/getQingYuAccount": {
++        request: EmptyRequestInput;
++        response: { "code": 0; "data": QingYuStatus; "msg": string; } | { "code": -1; "data": { "closeTimeout": number; } | null; "msg": string; };
++        body: "none";
++        /** 服务器路由要求；资源权限与笔记本租约仍由内核校验 */
++        authorization?: readonly ["authenticated","admin","writable"];
++    };
+     /**
+      * 查询当前同步任务及单调递增版本，空任务表示当前没有同步任务。
+      * 普通后台同步不阻断编辑；准备落盘、应用改动和恢复索引期间 blocking 为 true。
+@@ -8527,6 +8538,20 @@ export interface APIPOSTRoutes {
+         /** 服务器路由要求；资源权限与笔记本租约仍由内核校验 */
+         authorization?: readonly ["authenticated","admin"];
+     };
++    "/api/sync/loginQingYu": {
++        request: QingYuLoginRequestInput;
++        response: { "code": 0; "data": QingYuStatus; "msg": string; } | { "code": -1; "data": { "closeTimeout": number; } | null; "msg": string; };
++        body: "json";
++        /** 服务器路由要求；资源权限与笔记本租约仍由内核校验 */
++        authorization?: readonly ["authenticated","admin","writable"];
++    };
++    "/api/sync/logoutQingYu": {
++        request: EmptyRequestInput;
++        response: { "code": 0; "data": QingYuStatus; "msg": string; } | { "code": -1; "data": { "closeTimeout": number; } | null; "msg": string; };
++        body: "none";
++        /** 服务器路由要求；资源权限与笔记本租约仍由内核校验 */
++        authorization?: readonly ["authenticated","admin","writable"];
++    };
+     "/api/sync/performBootSync": {
+         request: EmptyRequestInput;
+         response: { "code": 0; "data": null; "msg": string; } | { "code": -1 | 1; "data": { "closeTimeout": number; } | null; "msg": string; };
+diff --git a/kernel/api/qingyu.go b/kernel/api/qingyu.go
+new file mode 100644
+index 0000000..cc362e9
+--- /dev/null
++++ b/kernel/api/qingyu.go
+@@ -0,0 +1,40 @@
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++package api
++
++import (
++	"net/http"
++
++	"github.com/gin-gonic/gin"
++	"github.com/siyuan-note/siyuan/kernel/apicontract"
++	"github.com/siyuan-note/siyuan/kernel/model"
++)
++
++var getQingYuAccount = contractHandler(apicontract.GetQingYuAccount, func(c *gin.Context, _ apicontract.EmptyRequest) apicontract.Response[apicontract.QingYuStatus] {
++	status, err := model.QingYuAccount(c.Request.Context())
++	return qingyuAccountResponse(status, err)
++})
++
++var loginQingYu = contractHandler(apicontract.LoginQingYu, func(c *gin.Context, input apicontract.QingYuLoginRequest) apicontract.Response[apicontract.QingYuStatus] {
++	status, err := model.LoginQingYu(c.Request.Context(), input.Username, input.Password, input.Remember)
++	return qingyuAccountResponse(status, err)
++}, func(c *gin.Context) *apicontract.Response[apicontract.QingYuStatus] {
++	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
++	return nil
++})
++
++var logoutQingYu = contractHandler(apicontract.LogoutQingYu, func(c *gin.Context, _ apicontract.EmptyRequest) apicontract.Response[apicontract.QingYuStatus] {
++	err := model.LogoutQingYu(c.Request.Context())
++	status, _ := model.QingYuAccount(c.Request.Context())
++	if err != nil && !status.SignedIn {
++		return apicontract.SuccessWithMessage(apicontract.QingYuStatus(status), err.Error())
++	}
++	return qingyuAccountResponse(status, err)
++})
++
++func qingyuAccountResponse(status model.QingYuStatus, err error) apicontract.Response[apicontract.QingYuStatus] {
++	if err != nil {
++		return apicontract.Failure[apicontract.QingYuStatus](-1, err.Error())
++	}
++	return apicontract.Success(apicontract.QingYuStatus(status))
++}
+diff --git a/kernel/api/router.go b/kernel/api/router.go
+index f0dbc0f..979f284 100644
+--- a/kernel/api/router.go
++++ b/kernel/api/router.go
+@@ -554,6 +554,9 @@ func registerSyncRoutes(ginServer *gin.Engine) {
+ 	ginServer.Handle("POST", "/api/sync/setSyncGenerateConflictDoc", contractRouteHandlers(apicontract.SetSyncGenerateConflictDoc, setSyncGenerateConflictDoc)...)
+ 	ginServer.Handle("POST", "/api/sync/setSyncMode", contractRouteHandlers(apicontract.SetSyncMode, setSyncMode)...)
+ 	ginServer.Handle("POST", "/api/sync/setSyncProvider", contractRouteHandlers(apicontract.SetSyncProvider, setSyncProvider)...)
++	ginServer.Handle("POST", "/api/sync/getQingYuAccount", contractRouteHandlers(apicontract.GetQingYuAccount, getQingYuAccount)...)
++	ginServer.Handle("POST", "/api/sync/loginQingYu", contractRouteHandlers(apicontract.LoginQingYu, loginQingYu)...)
++	ginServer.Handle("POST", "/api/sync/logoutQingYu", contractRouteHandlers(apicontract.LogoutQingYu, logoutQingYu)...)
+ 	ginServer.Handle("POST", "/api/sync/setSyncProviderS3", contractRouteHandlers(apicontract.SetSyncProviderS3, setSyncProviderS3)...)
+ 	ginServer.Handle("POST", "/api/sync/setSyncProviderWebDAV", contractRouteHandlers(apicontract.SetSyncProviderWebDAV, setSyncProviderWebDAV)...)
+ 	ginServer.Handle("POST", "/api/sync/setSyncProviderLocal", contractRouteHandlers(apicontract.SetSyncProviderLocal, setSyncProviderLocal)...)
+diff --git a/kernel/apicontract/contracts.go b/kernel/apicontract/contracts.go
+index 2dec751..59a6f3d 100644
+--- a/kernel/apicontract/contracts.go
++++ b/kernel/apicontract/contracts.go
+@@ -1025,6 +1025,10 @@ var SetSyncMode = define[SyncModeRequest, Null]("setSyncMode", "/api/sync/setSyn
+ // 确认后的操作通过全局进度遮罩显示检查与补齐阶段，成功或失败均关闭遮罩。
+ var SetSyncProvider = define[SyncProviderRequest, Null]("setSyncProvider", "/api/sync/setSyncProvider", AuthenticatedAccess|AdminAccess|WritableAccess, JSONBody, ResponseOptions{Setting: SettingWrite{Namespace: "sync"}}, "POST")
+ 
++var GetQingYuAccount = define[EmptyRequest, QingYuStatus]("getQingYuAccount", "/api/sync/getQingYuAccount", AuthenticatedAccess|AdminAccess|WritableAccess, NoBody, ResponseOptions{}, "POST")
++var LoginQingYu = define[QingYuLoginRequest, QingYuStatus]("loginQingYu", "/api/sync/loginQingYu", AuthenticatedAccess|AdminAccess|WritableAccess, JSONBody, ResponseOptions{}, "POST")
++var LogoutQingYu = define[EmptyRequest, QingYuStatus]("logoutQingYu", "/api/sync/logoutQingYu", AuthenticatedAccess|AdminAccess|WritableAccess, NoBody, ResponseOptions{}, "POST")
++
+ // SetSyncProviderS3 保存同步配置；省略协议时含点域名使用 HTTPS，IP 和单标签主机使用 HTTP，显式协议保持不变。
+ var SetSyncProviderS3 = define[SetSyncS3Request, SyncS3Data]("setSyncProviderS3", "/api/sync/setSyncProviderS3", AuthenticatedAccess|AdminAccess|WritableAccess, JSONBody, ResponseOptions{Setting: SettingWrite{Namespace: "sync"}}, "POST")
+ 
+diff --git a/kernel/apicontract/qingyu.go b/kernel/apicontract/qingyu.go
+new file mode 100644
+index 0000000..6ee9836
+--- /dev/null
++++ b/kernel/apicontract/qingyu.go
+@@ -0,0 +1,19 @@
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++package apicontract
++
++type QingYuLoginRequest struct {
++	Username string `json:"username"`
++	Password string `json:"password"`
++	Remember bool   `json:"remember" api:"optional"`
++}
++
++type QingYuStatus struct {
++	SignedIn   bool   `json:"signedIn"`
++	Name       string `json:"name"`
++	CanUpload  bool   `json:"canUpload"`
++	Remembered bool   `json:"remembered"`
++	Enabled    bool   `json:"enabled"`
++	UsedBytes  int64  `json:"usedBytes"`
++	QuotaBytes int64  `json:"quotaBytes"`
++}
+diff --git a/kernel/apicontract/schema.json b/kernel/apicontract/schema.json
+index dc235a0..6883d0f 100644
+--- a/kernel/apicontract/schema.json
++++ b/kernel/apicontract/schema.json
+@@ -40003,6 +40003,61 @@
+       },
+       "additionalProperties": false
+     },
++    "QingYuLoginRequestInput": {
++      "type": "object",
++      "properties": {
++        "password": {
++          "type": "string"
++        },
++        "remember": {
++          "type": "boolean"
++        },
++        "username": {
++          "type": "string"
++        }
++      },
++      "required": [
++        "password",
++        "username"
++      ],
++      "additionalProperties": false
++    },
++    "QingYuStatus": {
++      "type": "object",
++      "properties": {
++        "canUpload": {
++          "type": "boolean"
++        },
++        "enabled": {
++          "type": "boolean"
++        },
++        "name": {
++          "type": "string"
++        },
++        "quotaBytes": {
++          "type": "integer"
++        },
++        "remembered": {
++          "type": "boolean"
++        },
++        "signedIn": {
++          "type": "boolean"
++        },
++        "usedBytes": {
++          "type": "integer"
++        }
++      },
++      "required": [
++        "canUpload",
++        "enabled",
++        "name",
++        "quotaBytes",
++        "remembered",
++        "signedIn",
++        "usedBytes"
++      ],
++      "additionalProperties": false
++    },
+     "ReadDirectoryRequestInput": {
+       "type": "object",
+       "properties": {
+@@ -182990,6 +183045,86 @@
+         ]
+       }
+     },
++    {
++      "method": "POST",
++      "path": "/api/sync/getQingYuAccount",
++      "handler": "getQingYuAccount",
++      "authorization": [
++        "authenticated",
++        "admin",
++        "writable"
++      ],
++      "body": "none",
++      "request": {
++        "$ref": "#/$defs/EmptyRequestInput"
++      },
++      "response": {
++        "anyOf": [
++          {
++            "type": "object",
++            "properties": {
++              "code": {
++                "type": "integer",
++                "enum": [
++                  0
++                ]
++              },
++              "data": {
++                "$ref": "#/$defs/QingYuStatus"
++              },
++              "msg": {
++                "type": "string"
++              }
++            },
++            "required": [
++              "code",
++              "msg",
++              "data"
++            ],
++            "additionalProperties": false
++          },
++          {
++            "type": "object",
++            "properties": {
++              "code": {
++                "type": "integer",
++                "enum": [
++                  -1
++                ]
++              },
++              "data": {
++                "anyOf": [
++                  {
++                    "type": "object",
++                    "properties": {
++                      "closeTimeout": {
++                        "type": "number"
++                      }
++                    },
++                    "required": [
++                      "closeTimeout"
++                    ],
++                    "additionalProperties": false
++                  },
++                  {
++                    "type": "null"
++                  }
++                ]
++              },
++              "msg": {
++                "type": "string"
++              }
++            },
++            "required": [
++              "code",
++              "msg",
++              "data"
++            ],
++            "additionalProperties": true
++          }
++        ]
++      }
++    },
+     {
+       "method": "POST",
+       "path": "/api/sync/getSyncCheckout",
+@@ -183631,6 +183766,166 @@
+         ]
+       }
+     },
++    {
++      "method": "POST",
++      "path": "/api/sync/loginQingYu",
++      "handler": "loginQingYu",
++      "authorization": [
++        "authenticated",
++        "admin",
++        "writable"
++      ],
++      "body": "json",
++      "request": {
++        "$ref": "#/$defs/QingYuLoginRequestInput"
++      },
++      "response": {
++        "anyOf": [
++          {
++            "type": "object",
++            "properties": {
++              "code": {
++                "type": "integer",
++                "enum": [
++                  0
++                ]
++              },
++              "data": {
++                "$ref": "#/$defs/QingYuStatus"
++              },
++              "msg": {
++                "type": "string"
++              }
++            },
++            "required": [
++              "code",
++              "msg",
++              "data"
++            ],
++            "additionalProperties": false
++          },
++          {
++            "type": "object",
++            "properties": {
++              "code": {
++                "type": "integer",
++                "enum": [
++                  -1
++                ]
++              },
++              "data": {
++                "anyOf": [
++                  {
++                    "type": "object",
++                    "properties": {
++                      "closeTimeout": {
++                        "type": "number"
++                      }
++                    },
++                    "required": [
++                      "closeTimeout"
++                    ],
++                    "additionalProperties": false
++                  },
++                  {
++                    "type": "null"
++                  }
++                ]
++              },
++              "msg": {
++                "type": "string"
++              }
++            },
++            "required": [
++              "code",
++              "msg",
++              "data"
++            ],
++            "additionalProperties": true
++          }
++        ]
++      }
++    },
++    {
++      "method": "POST",
++      "path": "/api/sync/logoutQingYu",
++      "handler": "logoutQingYu",
++      "authorization": [
++        "authenticated",
++        "admin",
++        "writable"
++      ],
++      "body": "none",
++      "request": {
++        "$ref": "#/$defs/EmptyRequestInput"
++      },
++      "response": {
++        "anyOf": [
++          {
++            "type": "object",
++            "properties": {
++              "code": {
++                "type": "integer",
++                "enum": [
++                  0
++                ]
++              },
++              "data": {
++                "$ref": "#/$defs/QingYuStatus"
++              },
++              "msg": {
++                "type": "string"
++              }
++            },
++            "required": [
++              "code",
++              "msg",
++              "data"
++            ],
++            "additionalProperties": false
++          },
++          {
++            "type": "object",
++            "properties": {
++              "code": {
++                "type": "integer",
++                "enum": [
++                  -1
++                ]
++              },
++              "data": {
++                "anyOf": [
++                  {
++                    "type": "object",
++                    "properties": {
++                      "closeTimeout": {
++                        "type": "number"
++                      }
++                    },
++                    "required": [
++                      "closeTimeout"
++                    ],
++                    "additionalProperties": false
++                  },
++                  {
++                    "type": "null"
++                  }
++                ]
++              },
++              "msg": {
++                "type": "string"
++              }
++            },
++            "required": [
++              "code",
++              "msg",
++              "data"
++            ],
++            "additionalProperties": true
++          }
++        ]
++      }
++    },
+     {
+       "method": "POST",
+       "path": "/api/sync/performBootSync",
+diff --git a/kernel/conf/sync.go b/kernel/conf/sync.go
+index f826939..bee5222 100644
+--- a/kernel/conf/sync.go
++++ b/kernel/conf/sync.go
+@@ -19,10 +19,11 @@ type Sync struct {
+ 	GenerateConflictDoc bool     `json:"generateConflictDoc"` // 云端同步冲突时是否生成冲突文档
+ 	AssetDownloadMode   int      `json:"assetDownloadMode"`   // 当前设备的资源下载模式，0：全部下载，1：按需下载
+ 	Provider            int      `json:"provider"`            // 云端存储服务提供者
+-	S3                  *S3      `json:"s3"`                  // S3 对象存储服务配置
+-	WebDAV              *WebDAV  `json:"webdav"`              // WebDAV 服务配置
+-	Local               *Local   `json:"local"`               // 本地文件系统服务配置
+-	LAN                 *LANSync `json:"lan"`                 // 局域网同步加速配置
++	QingYuBinding       string   `json:"qingyuBinding,omitempty"`
++	S3                  *S3      `json:"s3"`     // S3 对象存储服务配置
++	WebDAV              *WebDAV  `json:"webdav"` // WebDAV 服务配置
++	Local               *Local   `json:"local"`  // 本地文件系统服务配置
++	LAN                 *LANSync `json:"lan"`    // 局域网同步加速配置
+ }
+ 
+ func NewSync() *Sync {
+@@ -75,6 +76,7 @@ const (
+ 	ProviderS3     = 2 // ProviderS3 为 S3 协议对象存储提供的云端存储服务
+ 	ProviderWebDAV = 3 // ProviderWebDAV 为 WebDAV 协议提供的云端存储服务
+ 	ProviderLocal  = 4 // ProviderLocal 为本地文件系统提供的存储服务
++	ProviderQingYu = 5
+ )
+ 
+ func ProviderToStr(provider int) string {
+@@ -87,6 +89,8 @@ func ProviderToStr(provider int) string {
+ 		return "WebDAV"
+ 	case ProviderLocal:
+ 		return "Local File System"
++	case ProviderQingYu:
++		return "QingYu"
+ 	}
+ 	return "Unknown"
+ }
+diff --git a/kernel/go.mod b/kernel/go.mod
+index 7aa3c54..b19102b 100644
+--- a/kernel/go.mod
++++ b/kernel/go.mod
+@@ -108,13 +108,16 @@ require github.com/88250/lute v1.7.9-0.20261123131142-a654af9ca125
+ require (
+ 	github.com/alecthomas/chroma/v2 v2.27.0 // indirect
+ 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
++	github.com/danieljoos/wincred v1.2.3 // indirect
+ 	github.com/dlclark/regexp2/v2 v2.6.0 // indirect
+ 	github.com/fatih/color v1.19.0 // indirect
++	github.com/godbus/dbus/v5 v5.2.2 // indirect
+ 	github.com/mattn/go-colorable v0.1.15 // indirect
+ 	github.com/olekukonko/cat v0.0.0-20250911104152-50322a0618f6 // indirect
+ 	github.com/olekukonko/errors v1.3.0 // indirect
+ 	github.com/olekukonko/ll v0.1.8 // indirect
+ 	github.com/tphakala/simd v1.11.0 // indirect
++	github.com/zalando/go-keyring v0.2.8 // indirect
+ 	go.mongodb.org/mongo-driver/v2 v2.8.0 // indirect
+ 	gopkg.in/yaml.v3 v3.0.1 // indirect
+ )
+diff --git a/kernel/go.sum b/kernel/go.sum
+index eb3c08f..17b0302 100644
+--- a/kernel/go.sum
++++ b/kernel/go.sum
+@@ -124,6 +124,8 @@ github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be/go.mod
+ github.com/coreos/go-oidc/v3 v3.20.0 h1:EtE0WIBHk03N+DqGkY4+UONzzZHk7amKt6IyNd7OsZE=
+ github.com/coreos/go-oidc/v3 v3.20.0/go.mod h1:DYCf24+ncYi+XkIH97GY1+dqoRlbaSI26KVTCI9SrY4=
+ github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
++github.com/danieljoos/wincred v1.2.3 h1:v7dZC2x32Ut3nEfRH+vhoZGvN72+dQ/snVXo/vMFLdQ=
++github.com/danieljoos/wincred v1.2.3/go.mod h1:6qqX0WNrS4RzPZ1tnroDzq9kY3fu1KwE7MRLQK4X0bs=
+ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+@@ -220,6 +222,8 @@ github.com/goccy/go-json v0.10.6 h1:p8HrPJzOakx/mn/bQtjgNjdTcN+/S6FcG2CTtQOrHVU=
+ github.com/goccy/go-json v0.10.6/go.mod h1:oq7eo15ShAhp70Anwd5lgX2pLfOS3QCiwU/PULtXL6M=
+ github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=
+ github.com/goccy/go-yaml v1.19.2/go.mod h1:XBurs7gK8ATbW4ZPGKgcbrY1Br56PdM69F7LkFRi1kA=
++github.com/godbus/dbus/v5 v5.2.2 h1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=
++github.com/godbus/dbus/v5 v5.2.2/go.mod h1:3AAv2+hPq5rdnr5txxxRwiGjPXamgoIHgz9FPBfOp3c=
+ github.com/gofrs/flock v0.13.2 h1:9o62TArG4T0f8L46kSf8sLtNUGvJEfiCK9md7/ilko0=
+ github.com/gofrs/flock v0.13.2/go.mod h1:OEjpF6MC2Plt1fLXTTgXwnZohWbs/Alxf2i1qTne/Vg=
+ github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
+@@ -534,6 +538,8 @@ github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT0
+ github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
+ github.com/yusufpapurcu/wmi v1.2.4 h1:zFUKzehAFReQwLys1b/iSMl+JQGSCSjtVqQn9bBrPo0=
+ github.com/yusufpapurcu/wmi v1.2.4/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
++github.com/zalando/go-keyring v0.2.8 h1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=
++github.com/zalando/go-keyring v0.2.8/go.mod h1:tsMo+VpRq5NGyKfxoBVjCuMrG47yj8cmakZDO5QGii0=
+ go.mongodb.org/mongo-driver/v2 v2.8.0 h1:CxWDGQYY8QQwNjAl/aq2sfWakdnWZynnqJ9F4DhHbP8=
+ go.mongodb.org/mongo-driver/v2 v2.8.0/go.mod h1:yOI9kBsufol30iFsl1slpdq1I0eHPzybRWdyYUs8K/0=
+ go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
+diff --git a/kernel/model/asset_download.go b/kernel/model/asset_download.go
+index 0f7fb00..8ba5ff7 100644
+--- a/kernel/model/asset_download.go
++++ b/kernel/model/asset_download.go
+@@ -43,6 +43,8 @@ func assetDownloadScope(provider int, c *cloud.Conf, key []byte) string {
+ 	switch provider {
+ 	case conf.ProviderSiYuan:
+ 		identity = append(identity, c.Server, c.UserID)
++	case conf.ProviderQingYu:
++		identity = append(identity, c.UserID)
+ 	case conf.ProviderS3:
+ 		if c.S3 != nil {
+ 			identity = append(identity, c.S3.Endpoint, c.S3.Bucket)
+@@ -99,7 +101,8 @@ func validateAssetDownloadSourceScope(scope string) error {
+ func checkAssetDownloadAccess() error {
+ 	confSyncSnapshot := Conf.LoadSync()
+ 
+-	if confSyncSnapshot == nil || !confSyncSnapshot.Enabled || Conf.GetUser() == nil {
++	if confSyncSnapshot == nil || !confSyncSnapshot.Enabled ||
++		(confSyncSnapshot.Provider != conf.ProviderQingYu && Conf.GetUser() == nil) {
+ 		return errors.New(Conf.Language(376))
+ 	}
+ 	switch confSyncSnapshot.Provider {
+@@ -339,6 +342,12 @@ func ensureCompleteSyncAssets(onIncomplete func()) error {
+ 	if err = checkAssetDownloadAccess(); err != nil {
+ 		return err
+ 	}
++	if Conf.LoadSync().Provider == conf.ProviderQingYu {
++		repo, err = newCloudRepositoryWithAssetSourceLocked()
++		if err != nil {
++			return err
++		}
++	}
+ 	handleCloudError := cloudRepoErrorHandler()
+ 	if err = repo.EnsureAllSnapshotChunks(newSyncContext()); err != nil {
+ 		handleCloudError(err)
+diff --git a/kernel/model/lan_sync.go b/kernel/model/lan_sync.go
+index 32dfa7f..4466d8c 100644
+--- a/kernel/model/lan_sync.go
++++ b/kernel/model/lan_sync.go
+@@ -145,6 +145,8 @@ func lanSyncScope() string {
+ 		if nil != confSyncSnapshot.Local {
+ 			return fmt.Sprintf("%s:%s", base, confSyncSnapshot.Local.Endpoint)
+ 		}
++	case conf.ProviderQingYu:
++		return fmt.Sprintf("v1:%d:%s", conf.ProviderQingYu, confSyncSnapshot.QingYuBinding)
+ 	}
+ 	return base
+ }
+diff --git a/kernel/model/qingyu.go b/kernel/model/qingyu.go
+new file mode 100644
+index 0000000..9cc3927
+--- /dev/null
++++ b/kernel/model/qingyu.go
+@@ -0,0 +1,179 @@
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++package model
++
++import (
++	"context"
++	"crypto/sha256"
++	"encoding/json"
++	"fmt"
++	"strings"
++	"sync"
++	"sync/atomic"
++
++	"github.com/siyuan-note/dejavu/cloud"
++	"github.com/siyuan-note/siyuan/kernel/conf"
++	"github.com/siyuan-note/siyuan/kernel/qingyustorage"
++	"github.com/siyuan-note/siyuan/kernel/util"
++	"github.com/zalando/go-keyring"
++)
++
++const qingyuKeyringService = "SiYuan QingYu session"
++
++var qingyuSession struct {
++	mu         sync.Mutex
++	client     *qingyustorage.Client
++	remembered *atomic.Bool
++}
++
++type QingYuStatus struct {
++	SignedIn   bool   `json:"signedIn"`
++	Name       string `json:"name"`
++	CanUpload  bool   `json:"canUpload"`
++	Remembered bool   `json:"remembered"`
++	Enabled    bool   `json:"enabled"`
++	UsedBytes  int64  `json:"usedBytes"`
++	QuotaBytes int64  `json:"quotaBytes"`
++}
++
++func qingyuKeyringAccount() string {
++	return fmt.Sprintf("%x", sha256.Sum256([]byte(util.WorkspaceDir+"\x00"+qingyustorage.Origin)))
++}
++
++func qingyuTokensCallback(account string, remembered *atomic.Bool) func(qingyustorage.Tokens) {
++	return func(tokens qingyustorage.Tokens) {
++		if tokens.RefreshToken == "" {
++			_ = keyring.Delete(qingyuKeyringService, account)
++			remembered.Store(false)
++			return
++		}
++		tokens.AccessToken = ""
++		data, err := json.Marshal(tokens)
++		remembered.Store(err == nil && keyring.Set(qingyuKeyringService, account, string(data)) == nil)
++	}
++}
++
++func qingyuClientLocked() *qingyustorage.Client {
++	if qingyuSession.client == nil {
++		account := qingyuKeyringAccount()
++		var tokens qingyustorage.Tokens
++		remembered := &atomic.Bool{}
++		if data, err := keyring.Get(qingyuKeyringService, account); err == nil && json.Unmarshal([]byte(data), &tokens) == nil {
++			remembered.Store(tokens.RefreshToken != "")
++		}
++		qingyuSession.client = qingyustorage.New(qingyustorage.Origin, nil, tokens, qingyuTokensCallback(account, remembered))
++		qingyuSession.remembered = remembered
++	}
++	return qingyuSession.client
++}
++
++func checkedQingYuStatus(ctx context.Context, client *qingyustorage.Client) (qingyustorage.Status, error) {
++	status, err := client.Probe(ctx)
++	if err != nil {
++		return status, err
++	}
++	if binding := Conf.LoadSync().QingYuBinding; binding == "" || binding != status.Binding() {
++		return qingyustorage.Status{}, qingyustorage.Error("account_changed")
++	}
++	return status, nil
++}
++
++func QingYuAccount(ctx context.Context) (QingYuStatus, error) {
++	qingyuSession.mu.Lock()
++	defer qingyuSession.mu.Unlock()
++	client := qingyuClientLocked()
++	if !client.SignedIn() {
++		return QingYuStatus{}, nil
++	}
++	status, err := checkedQingYuStatus(ctx, client)
++	if err != nil {
++		return QingYuStatus{}, err
++	}
++	return qingyuPublicStatus(ctx, client, status), nil
++}
++
++func LoginQingYu(ctx context.Context, username, password string, remember bool) (QingYuStatus, error) {
++	if strings.TrimSpace(username) == "" || password == "" || len(username) > 254 || len(password) > 4096 {
++		return QingYuStatus{}, qingyustorage.Error("invalid_request")
++	}
++	unlock := lockAssetSourceChange()
++	defer unlock()
++	qingyuSession.mu.Lock()
++	defer qingyuSession.mu.Unlock()
++	if Conf.LoadSync().Provider != conf.ProviderQingYu {
++		return QingYuStatus{}, qingyustorage.ErrChanged
++	}
++	candidate := qingyustorage.New(qingyustorage.Origin, nil, qingyustorage.Tokens{}, nil)
++	if err := candidate.Login(ctx, strings.TrimSpace(username), password); err != nil {
++		return QingYuStatus{}, err
++	}
++	status, err := candidate.Probe(ctx)
++	if err != nil {
++		_ = candidate.Logout(ctx)
++		return QingYuStatus{}, err
++	}
++	binding := status.Binding()
++	if previous := Conf.LoadSync().QingYuBinding; previous != "" && previous != binding {
++		_ = candidate.Logout(ctx)
++		return QingYuStatus{}, qingyustorage.Error("account_changed")
++	}
++	if qingyuSession.client != nil {
++		_ = qingyuSession.client.Logout(ctx)
++	}
++	account := qingyuKeyringAccount()
++	remembered := &atomic.Bool{}
++	if remember {
++		candidate.Remember(qingyuTokensCallback(account, remembered))
++	} else {
++		_ = keyring.Delete(qingyuKeyringService, account)
++	}
++	qingyuSession.client, qingyuSession.remembered = candidate, remembered
++	UpdateSyncConf(func(sync *conf.Sync) { sync.QingYuBinding = binding })
++	return qingyuPublicStatus(ctx, candidate, status), nil
++}
++
++func qingyuPublicStatus(ctx context.Context, client *qingyustorage.Client, status qingyustorage.Status) QingYuStatus {
++	used, err := client.Usage(ctx)
++	if err != nil {
++		used = -1
++	}
++	return QingYuStatus{SignedIn: client.SignedIn(), Name: status.Name, CanUpload: status.CanUpload,
++		Remembered: qingyuSession.remembered.Load(), Enabled: Conf.LoadSync().Enabled, UsedBytes: used, QuotaBytes: status.Quota}
++}
++
++func LogoutQingYu(ctx context.Context) error {
++	unlock := lockAssetSourceChange()
++	defer unlock()
++	if Conf.LoadSync().Provider == conf.ProviderQingYu {
++		if err := requireCompleteAssetDownloads(); err != nil {
++			return err
++		}
++		UpdateSyncConf(func(sync *conf.Sync) { sync.Enabled = false })
++	}
++	qingyuSession.mu.Lock()
++	defer qingyuSession.mu.Unlock()
++	client := qingyuClientLocked()
++	if !client.SignedIn() {
++		return nil
++	}
++	err := client.Logout(ctx)
++	qingyuSession.client = qingyustorage.New(qingyustorage.Origin, nil, qingyustorage.Tokens{}, nil)
++	return err
++}
++
++func qingyuCloud(config *cloud.Conf, refresh bool) (cloud.Cloud, error) {
++	qingyuSession.mu.Lock()
++	defer qingyuSession.mu.Unlock()
++	client := qingyuClientLocked()
++	if !refresh {
++		if cached, err := client.CachedStore(config); err == nil {
++			return cached, nil
++		}
++		return &cloud.BaseCloud{Conf: config}, nil
++	}
++	status, err := checkedQingYuStatus(context.Background(), client)
++	if err != nil {
++		return nil, err
++	}
++	return client.Store(config, status)
++}
+diff --git a/kernel/model/repository.go b/kernel/model/repository.go
+index 79b4837..919b5af 100644
+--- a/kernel/model/repository.go
++++ b/kernel/model/repository.go
+@@ -3248,11 +3248,15 @@ func newCloudRepositoryWithAssetSourceLocked() (*dejavu.Repo, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	return newRepositoryWithAssetSourceLocked()
++	return newRepositoryForSource(true)
+ }
+ 
+ // newRepositoryWithAssetSourceLocked 由已持有来源锁的调用方创建仓库，避免读写锁递归等待。
+ func newRepositoryWithAssetSourceLocked() (ret *dejavu.Repo, err error) {
++	return newRepositoryForSource(false)
++}
++
++func newRepositoryForSource(accessCloud bool) (ret *dejavu.Repo, err error) {
+ 	confRepoSnapshot := Conf.LoadRepo()
+ 
+ 	confSyncSnapshot := Conf.LoadSync()
+@@ -3288,6 +3292,11 @@ func newRepositoryWithAssetSourceLocked() (ret *dejavu.Repo, err error) {
+ 		cloudRepo = cloud.NewWebDAV(&cloud.BaseCloud{Conf: cloudConf}, webdavClient)
+ 	case conf.ProviderLocal:
+ 		cloudRepo = cloud.NewLocal(&cloud.BaseCloud{Conf: cloudConf})
++	case conf.ProviderQingYu:
++		cloudRepo, err = qingyuCloud(cloudConf, accessCloud)
++		if err != nil {
++			return nil, err
++		}
+ 	default:
+ 		err = fmt.Errorf("unknown cloud provider [%d]", confSyncSnapshot.Provider)
+ 		return
+@@ -3577,6 +3586,9 @@ func buildCloudConf() (ret *cloud.Conf, err error) {
+ 	switch sync.Provider {
+ 	case conf.ProviderSiYuan:
+ 		ret.Endpoint = util.GetCloudSyncServer()
++	case conf.ProviderQingYu:
++		ret.Dir = "main"
++		ret.UserID = sync.QingYuBinding
+ 	case conf.ProviderS3:
+ 		ret.S3 = &cloud.ConfS3{
+ 			Endpoint:       sync.S3.Endpoint,
+diff --git a/kernel/model/sync.go b/kernel/model/sync.go
+index 9189e5a..9f0aa85 100644
+--- a/kernel/model/sync.go
++++ b/kernel/model/sync.go
+@@ -476 +476 @@
+-	if nil == Conf.GetUser() {
++	if conf.ProviderQingYu != confSyncReadSnapshot.Provider && nil == Conf.GetUser() {
+@@ -722,7 +722,12 @@ func SetSyncProvider(provider int, completeAssets bool) (err error) {
+ 			return
+ 		}
+ 	}
+-	UpdateSyncConf(func(s *conf.Sync) { s.Provider = provider })
++	UpdateSyncConf(func(s *conf.Sync) {
++		if s.Provider != provider && (s.Provider == conf.ProviderQingYu || provider == conf.ProviderQingYu) {
++			s.Enabled = false
++		}
++		s.Provider = provider
++	})
+ 	refreshLANSyncManager()
+ 	return
+ }
+diff --git a/kernel/qingyustorage/client.go b/kernel/qingyustorage/client.go
+new file mode 100644
+index 0000000..9aa231a
+--- /dev/null
++++ b/kernel/qingyustorage/client.go
+@@ -0,0 +1,389 @@
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++package qingyustorage
++
++import (
++	"bytes"
++	"context"
++	"crypto/sha256"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"net/url"
++	"regexp"
++	"strconv"
++	"strings"
++	"sync"
++	"time"
++)
++
++const Origin = "https://api.qynotes.com"
++
++type Error string
++
++func (e Error) Error() string { return string(e) }
++
++const (
++	ErrSignedOut = Error("signed_out")
++	ErrChanged   = Error("storage_config_changed")
++	ErrInvalid   = Error("invalid_response")
++	ErrExpired   = Error("storage_expired")
++)
++
++var prefixPattern = regexp.MustCompile(`^users/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/$`)
++
++type Config struct {
++	ProtocolVersion     int
++	Endpoint            string
++	Bucket              string
++	Region              string
++	Prefix              string
++	Repository          string
++	Provider            string
++	SiyuanNamespace     string
++	ConfigVersion       int64
++	ForcePathStyle      bool
++	ConcurrentReqs      int
++	ReadOnly            bool
++	UploadMode          string
++	DeleteMode          string
++	CredentialType      string
++	AccessKeyID         string
++	SecretAccessKey     string
++	SessionToken        string
++	CredentialsExpireAt time.Time
++}
++
++func (c Config) validate() error {
++	endpoint, err := url.Parse(c.Endpoint)
++	if err != nil || endpoint.Scheme != "https" || endpoint.Hostname() == "" ||
++		endpoint.User != nil || endpoint.RawQuery != "" || endpoint.ForceQuery || endpoint.Fragment != "" ||
++		strings.ContainsAny(c.Endpoint, "\\#\r\n") || c.ProtocolVersion != 2 ||
++		c.SiyuanNamespace != "siyuan-v2/" || !prefixPattern.MatchString(c.Prefix) ||
++		c.ConfigVersion < 1 || c.ConfigVersion > 1<<53-1 ||
++		(c.Provider != "tos" && c.Provider != "s3") || !c.ReadOnly ||
++		c.UploadMode != "presigned" || c.DeleteMode != "server" ||
++		(c.CredentialType != "" && c.CredentialType != "sts") ||
++		!visible(c.Bucket) || !visible(c.Region) || !visible(c.Repository) ||
++		!visible(c.AccessKeyID) || !visible(c.SecretAccessKey) || !visible(c.SessionToken) {
++		return ErrInvalid
++	}
++	if time.Until(c.CredentialsExpireAt) < 2*time.Minute {
++		return Error("storage_credentials_expiring")
++	}
++	return nil
++}
++
++func visible(s string) bool {
++	return s != "" && !strings.ContainsFunc(s, func(r rune) bool { return r < 33 || r > 126 })
++}
++
++func (c Config) sameSource(b Config) bool {
++	return c.Prefix == b.Prefix && c.Repository == b.Repository && c.ConfigVersion == b.ConfigVersion &&
++		c.Provider == b.Provider && c.Endpoint == b.Endpoint && c.Bucket == b.Bucket &&
++		c.Region == b.Region && c.ForcePathStyle == b.ForcePathStyle && c.SiyuanNamespace == b.SiyuanNamespace
++}
++
++type Tokens struct {
++	AccessToken      string
++	RefreshToken     string
++	SessionExpiresAt int64
++}
++
++func (t Tokens) valid() bool {
++	return visible(t.RefreshToken) && t.SessionExpiresAt > time.Now().Unix()
++}
++
++type Status struct {
++	AccountID  string
++	Name       string
++	Repository string
++	Prefix     string
++	CanUpload  bool
++	Quota      int64
++}
++
++func (s Status) Binding() string {
++	identity, _ := json.Marshal([]string{s.AccountID, s.Repository, s.Prefix})
++	return fmt.Sprintf("%x", sha256.Sum256(identity))
++}
++
++type Client struct {
++	origin     string
++	http       *http.Client
++	mu         sync.Mutex
++	tokens     Tokens
++	config     Config
++	checkedAt  time.Time
++	status     Status
++	life       context.Context
++	cancel     context.CancelFunc
++	rejected   string
++	cooldown   map[string]cooldown
++	saveTokens func(Tokens)
++}
++
++type cooldown struct {
++	until time.Time
++	err   error
++}
++
++func New(origin string, transport http.RoundTripper, tokens Tokens, saveTokens func(Tokens)) *Client {
++	life, cancel := context.WithCancel(context.Background())
++	return &Client{origin: origin, http: &http.Client{Transport: transport, Timeout: 20 * time.Second,
++		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
++		tokens: tokens, life: life, cancel: cancel, cooldown: map[string]cooldown{}, saveTokens: saveTokens}
++}
++
++func (c *Client) Login(ctx context.Context, email, password string) error {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	var tokens Tokens
++	err := c.call(ctx, "login", "", map[string]string{"username": email, "password": password}, &tokens)
++	if err != nil {
++		return err
++	}
++	if !tokens.valid() || !visible(tokens.AccessToken) {
++		return ErrInvalid
++	}
++	c.tokens = tokens
++	c.persist()
++	return nil
++}
++
++func (c *Client) Logout(ctx context.Context) error {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	c.cancel()
++	err := c.authorized(ctx, "logout", struct{}{}, nil)
++	c.tokens, c.status, c.config = Tokens{}, Status{}, Config{}
++	c.persist()
++	return err
++}
++
++func (c *Client) persist() {
++	if c.saveTokens != nil {
++		c.saveTokens(c.tokens)
++	}
++}
++
++func (c *Client) Remember(save func(Tokens)) {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	c.saveTokens = save
++	c.persist()
++}
++
++func (c *Client) SignedIn() bool {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	return c.tokens.valid()
++}
++
++func (c *Client) Probe(ctx context.Context) (Status, error) {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	var user struct{ ID, Name, Email string }
++	if err := c.authorized(ctx, "me", nil, &user); err != nil {
++		return Status{}, err
++	}
++	if !visible(user.ID) {
++		return Status{}, ErrInvalid
++	}
++	var plan struct {
++		Active     bool
++		QuotaBytes int64
++	}
++	if err := c.authorized(ctx, "subscription", nil, &plan); err != nil {
++		return Status{}, err
++	}
++	if c.status.AccountID != "" && user.ID != c.status.AccountID {
++		c.invalidate()
++		return Status{}, Error("account_changed")
++	}
++	if err := c.refreshConfig(ctx, true); err != nil {
++		return Status{}, err
++	}
++	name := user.Email
++	if name == "" {
++		name = user.Name
++	}
++	canUpload := plan.Active && plan.QuotaBytes > 0
++	if c.status.AccountID != "" && canUpload != c.status.CanUpload {
++		c.cancel()
++		c.life, c.cancel = context.WithCancel(context.Background())
++	}
++	c.status = Status{AccountID: user.ID, Name: name, Repository: c.config.Repository,
++		Prefix: c.config.Prefix, CanUpload: canUpload, Quota: max(0, plan.QuotaBytes)}
++	return c.status, nil
++}
++
++func (c *Client) Usage(ctx context.Context) (int64, error) {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	var usage struct{ UsedBytes int64 }
++	err := c.authorized(ctx, "usage", nil, &usage)
++	return usage.UsedBytes, err
++}
++
++func (c *Client) invalidate() {
++	c.cancel()
++	c.life, c.cancel = context.WithCancel(context.Background())
++	c.config = Config{}
++	c.rejected = ""
++}
++
++func (c *Client) refreshConfig(ctx context.Context, checkBinding bool) error {
++	if c.rejected == "" && time.Until(c.config.CredentialsExpireAt) >= 2*time.Minute &&
++		(!checkBinding || time.Since(c.checkedAt) < 10*time.Second) {
++		return nil
++	}
++	request := map[string]string{}
++	if c.rejected != "" {
++		request["rejectedKey"] = c.rejected
++	}
++	var config Config
++	if err := c.authorized(ctx, "storage-config", request, &config); err != nil {
++		return err
++	}
++	if err := config.validate(); err != nil {
++		return err
++	}
++	if c.config.ConfigVersion != 0 && !c.config.sameSource(config) {
++		c.invalidate()
++		return ErrChanged
++	}
++	c.config, c.rejected, c.checkedAt = config, "", time.Now()
++	return nil
++}
++
++func (c *Client) authorized(ctx context.Context, action string, input, output any) error {
++	if !c.tokens.valid() {
++		c.invalidate()
++		return ErrSignedOut
++	}
++	var err error = Error("invalid_token")
++	if c.tokens.AccessToken != "" {
++		err = c.call(ctx, action, c.tokens.AccessToken, input, output)
++	}
++	if err == Error("invalid_token") {
++		var fresh Tokens
++		err = c.call(ctx, "refresh", "", map[string]string{"refreshToken": c.tokens.RefreshToken}, &fresh)
++		if err == nil {
++			if !fresh.valid() || !visible(fresh.AccessToken) || fresh.SessionExpiresAt != c.tokens.SessionExpiresAt {
++				return ErrInvalid
++			}
++			c.tokens = fresh
++			c.persist()
++			err = c.call(ctx, action, c.tokens.AccessToken, input, output)
++		}
++	}
++	switch err {
++	case Error("invalid_token"), Error("invalid_refresh_token"), ErrSignedOut, Error("session_expiring"):
++		c.invalidate()
++		c.tokens = Tokens{}
++		c.persist()
++	case ErrChanged, Error("storage_busy"), Error("account_changed"):
++		c.invalidate()
++	}
++	return err
++}
++
++func (c *Client) call(ctx context.Context, action, token string, input, output any) error {
++	if wait := c.cooldown[action]; time.Now().Before(wait.until) {
++		return wait.err
++	}
++	method, body := http.MethodGet, io.Reader(nil)
++	if input != nil {
++		data, err := json.Marshal(input)
++		if err != nil {
++			return ErrInvalid
++		}
++		method, body = http.MethodPost, bytes.NewReader(data)
++	}
++	request, err := http.NewRequestWithContext(ctx, method, c.origin+"/api/client/v1/"+action, body)
++	if err != nil {
++		return ErrInvalid
++	}
++	if input != nil {
++		request.Header.Set("Content-Type", "application/json")
++	}
++	if token != "" {
++		request.Header.Set("Authorization", "Bearer "+token)
++	}
++	response, err := c.http.Do(request)
++	if err != nil {
++		return Error("network")
++	}
++	defer response.Body.Close()
++	limit := int64(256 << 10)
++	if action == "upload-authorize" {
++		limit = 1 << 20
++	}
++	if response.StatusCode == 429 || response.StatusCode >= 500 {
++		code, delay := Error("temporarily_unavailable"), 5*time.Second
++		if response.StatusCode == 429 {
++			code, delay = Error("rate_limited"), time.Minute
++		}
++		now := time.Now()
++		if value := response.Header.Get("Retry-After"); value != "" {
++			if seconds, err := strconv.ParseInt(value, 10, 32); err == nil && seconds >= 0 {
++				delay = time.Duration(seconds) * time.Second
++			} else if date, err := http.ParseTime(value); err == nil && date.After(now) {
++				delay = date.Sub(now)
++			}
++		}
++		c.cooldown[action] = cooldown{now.Add(delay), code}
++		return code
++	}
++	data, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
++	var result struct {
++		Status string
++		Code   string
++		Data   json.RawMessage
++	}
++	if err != nil || int64(len(data)) > limit || json.Unmarshal(data, &result) != nil {
++		return ErrInvalid
++	}
++	if response.StatusCode != 200 || result.Status != "ok" || result.Code != "ok" {
++		return errorCode(response.StatusCode, result.Status, result.Code)
++	}
++	if output != nil && (len(result.Data) == 0 || json.Unmarshal(result.Data, output) != nil) {
++		return ErrInvalid
++	}
++	return nil
++}
++
++func errorCode(status int, envelope, code string) error {
++	if envelope == "error" {
++		switch status {
++		case 400:
++			if code == "invalid_request" {
++				return Error(code)
++			}
++		case 401:
++			switch code {
++			case "login_failed", "invalid_token", "invalid_refresh_token", "session_expiring":
++				return Error(code)
++			}
++		case 403:
++			switch code {
++			case "storage_expired", "email_unverified", "subscription_required":
++				return Error(code)
++			}
++		case 409:
++			switch code {
++			case "storage_config_changed", "storage_busy", "quota_exceeded":
++				return Error(code)
++			}
++		}
++	}
++	return ErrInvalid
++}
++
++func IsSignedOut(err error) bool {
++	return errors.Is(err, ErrSignedOut) || errors.Is(err, Error("session_expiring")) ||
++		errors.Is(err, Error("invalid_token")) || errors.Is(err, Error("invalid_refresh_token"))
++}
+diff --git a/kernel/qingyustorage/cloud.go b/kernel/qingyustorage/cloud.go
+new file mode 100644
+index 0000000..adc21dc
+--- /dev/null
++++ b/kernel/qingyustorage/cloud.go
+@@ -0,0 +1,533 @@
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++package qingyustorage
++
++import (
++	"bytes"
++	"context"
++	"crypto/md5"
++	"encoding/base64"
++	"encoding/json"
++	"encoding/xml"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"net/url"
++	"os"
++	"path"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"sync"
++	"time"
++
++	"github.com/aws/aws-sdk-go-v2/aws"
++	"github.com/aws/aws-sdk-go-v2/aws/retry"
++	"github.com/aws/aws-sdk-go-v2/service/s3"
++	"github.com/siyuan-note/dejavu"
++	"github.com/siyuan-note/dejavu/cloud"
++)
++
++const maxObject = 64 << 20
++
++type Store struct {
++	*cloud.S3
++	client  *Client
++	config  Config
++	status  Status
++	life    context.Context
++	reader  *s3.Client
++	put     *http.Client
++	batchMu sync.Mutex
++	batch   *grantBatch
++}
++
++func (c *Client) Store(conf *cloud.Conf, expected Status) (cloud.Cloud, error) {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	return c.store(conf, expected)
++}
++
++func (c *Client) CachedStore(conf *cloud.Conf) (cloud.Cloud, error) {
++	c.mu.Lock()
++	defer c.mu.Unlock()
++	if conf.UserID == "" || conf.UserID != c.status.Binding() {
++		return nil, ErrChanged
++	}
++	return c.store(conf, c.status)
++}
++
++func (c *Client) store(conf *cloud.Conf, expected Status) (cloud.Cloud, error) {
++	if !c.tokens.valid() {
++		return nil, ErrSignedOut
++	}
++	if c.config.ConfigVersion == 0 || c.status.AccountID != expected.AccountID ||
++		c.status.Repository != expected.Repository || c.status.Prefix != expected.Prefix {
++		return nil, ErrChanged
++	}
++	store := &Store{client: c, config: c.config, status: c.status, life: c.life,
++		put: &http.Client{Transport: c.http.Transport, Timeout: 300 * time.Second, CheckRedirect: c.http.CheckRedirect}}
++	conf.S3 = &cloud.ConfS3{Endpoint: c.config.Endpoint, Bucket: c.config.Bucket,
++		Region: c.config.Region, PathStyle: c.config.ForcePathStyle, Timeout: 60,
++		ConcurrentReqs: max(1, min(8, c.config.ConcurrentReqs))}
++	if c.config.ConcurrentReqs == 0 {
++		conf.S3.ConcurrentReqs = 2
++	}
++	conf.AvailableSize = c.status.Quota
++	if !c.status.CanUpload {
++		conf.AvailableSize = 1<<63 - 1
++	}
++	reader := &http.Client{Transport: readTransport{store}, Timeout: time.Minute, CheckRedirect: c.http.CheckRedirect}
++	options := func(o *s3.Options) {
++		o.HTTPClient, o.Credentials = reader, store
++		o.Region, o.UsePathStyle = store.config.Region, store.config.ForcePathStyle
++		o.BaseEndpoint = aws.String(store.config.Endpoint)
++		o.Retryer = retry.AddWithErrorCodes(retry.NewStandard(func(o *retry.StandardOptions) {
++			o.MaxAttempts = 2
++		}), "ExpiredToken", "InvalidToken", "InvalidAccessKeyId", "InvalidSecurityToken", "SecurityTokenExpired")
++	}
++	store.reader = s3.New(s3.Options{}, options)
++	store.S3 = cloud.NewScopedS3(&cloud.BaseCloud{Conf: conf}, reader, c.config.Prefix+c.config.SiyuanNamespace, options)
++	return store, nil
++}
++
++func (s *Store) Retrieve(ctx context.Context) (aws.Credentials, error) {
++	s.client.mu.Lock()
++	defer s.client.mu.Unlock()
++	if s.life.Err() != nil {
++		return aws.Credentials{}, ErrChanged
++	}
++	if err := s.client.refreshConfig(ctx, false); err != nil {
++		return aws.Credentials{}, err
++	}
++	if s.life.Err() != nil || !s.config.sameSource(s.client.config) {
++		return aws.Credentials{}, ErrChanged
++	}
++	c := s.client.config
++	return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey,
++		SessionToken: c.SessionToken, Source: "QingYu read-only STS", CanExpire: true, Expires: c.CredentialsExpireAt}, nil
++}
++
++func (s *Store) ReadOnly() bool { return !s.status.CanUpload }
++
++func (s *Store) GetRepos() ([]*cloud.Repo, int64, error) {
++	return []*cloud.Repo{{Name: s.Conf.Dir}}, 0, s.life.Err()
++}
++
++type readTransport struct{ store *Store }
++
++func (t readTransport) RoundTrip(request *http.Request) (*http.Response, error) {
++	s := t.store
++	if s.life.Err() != nil {
++		return nil, ErrChanged
++	}
++	if request.Method != http.MethodGet && request.Method != http.MethodHead {
++		return nil, ErrInvalid
++	}
++	ctx, cancel := context.WithCancel(request.Context())
++	stop := context.AfterFunc(s.life, cancel)
++	cleanup := func() { stop(); cancel() }
++	transport := s.client.http.Transport
++	if transport == nil {
++		transport = http.DefaultTransport
++	}
++	response, err := transport.RoundTrip(request.WithContext(ctx))
++	if err != nil {
++		cleanup()
++		return nil, Error("network")
++	}
++	if response.StatusCode < 400 {
++		if response.ContentLength > maxObject {
++			response.Body.Close()
++			cleanup()
++			return nil, Error("storage_object_too_large")
++		}
++		response.Body = &readBody{ReadCloser: response.Body, close: cleanup, remaining: maxObject}
++		return response, nil
++	}
++	defer cleanup()
++	var body struct {
++		Code string `xml:"Code"`
++	}
++	data, _ := io.ReadAll(io.LimitReader(response.Body, 16<<10))
++	response.Body.Close()
++	_ = xml.Unmarshal(data, &body)
++	if body.Code == "" {
++		body.Code = response.Header.Get("X-Amz-Error-Code")
++	}
++	if body.Code == "" {
++		body.Code = response.Header.Get("X-Tos-Error-Code")
++	}
++	if response.StatusCode == 400 || response.StatusCode == 401 || response.StatusCode == 403 {
++		switch body.Code {
++		case "ExpiredToken", "InvalidToken", "InvalidAccessKeyId", "InvalidSecurityToken", "SecurityTokenExpired":
++			s.client.mu.Lock()
++			if request.Header.Get("X-Amz-Security-Token") == s.client.config.SessionToken {
++				s.client.rejected = s.client.config.AccessKeyID
++			}
++			s.client.mu.Unlock()
++		}
++	}
++	if !errorName(body.Code) {
++		body.Code = ""
++	}
++	safeBody := "<Error><Code>" + body.Code + "</Code></Error>"
++	response.Body = io.NopCloser(strings.NewReader(safeBody))
++	response.ContentLength = int64(len(safeBody))
++	return response, nil
++}
++
++type readBody struct {
++	io.ReadCloser
++	close     func()
++	remaining int
++}
++
++func (r *readBody) Read(buffer []byte) (int, error) {
++	n, err := r.ReadCloser.Read(buffer[:min(len(buffer), r.remaining+1)])
++	if n > r.remaining {
++		return 0, Error("storage_object_too_large")
++	}
++	r.remaining -= n
++	return n, err
++}
++
++func (r *readBody) Close() error {
++	defer r.close()
++	return r.ReadCloser.Close()
++}
++
++func errorName(code string) bool {
++	switch code {
++	case "ExpiredToken", "InvalidToken", "InvalidAccessKeyId", "InvalidSecurityToken",
++		"SecurityTokenExpired", "AccessDenied", "Forbidden", "NoSuchKey", "NotFound", "NoSuchBucket",
++		"SignatureDoesNotMatch", "RequestTimeTooSkewed", "SlowDown", "InternalError", "ServiceUnavailable":
++		return true
++	}
++	return false
++}
++
++type uploadObject struct {
++	Key         string `json:"key"`
++	Size        int    `json:"size"`
++	MD5         string `json:"md5"`
++	IfMatch     string `json:"ifMatch,omitempty"`
++	IfNoneMatch string `json:"ifNoneMatch,omitempty"`
++}
++
++type uploadGrant struct {
++	ID        string
++	Key       string
++	URL       string
++	ExpiresAt time.Time
++	Headers   map[string]string
++}
++
++func (s *Store) objectKey(relative string) (string, error) {
++	if relative == "" || path.Clean(relative) != relative || strings.HasPrefix(relative, "/") ||
++		!filepath.IsLocal(filepath.FromSlash(relative)) || strings.ContainsAny(relative, "%\\\x00\r\n") {
++		return "", ErrInvalid
++	}
++	return s.config.Prefix + s.config.SiyuanNamespace + relative, nil
++}
++
++func (s *Store) UploadObject(relative string, overwrite bool) (int64, error) {
++	if _, err := s.objectKey(relative); err != nil {
++		return 0, err
++	}
++	file, err := os.Open(filepath.Join(s.Conf.RepoPath, filepath.FromSlash(relative)))
++	if err != nil {
++		return 0, err
++	}
++	defer file.Close()
++	data, err := io.ReadAll(io.LimitReader(file, maxObject+1))
++	if err != nil {
++		return 0, err
++	}
++	return s.UploadBytes(relative, data, overwrite)
++}
++
++func (s *Store) UploadBytes(relative string, data []byte, overwrite bool) (int64, error) {
++	if !s.status.CanUpload {
++		return 0, ErrExpired
++	}
++	if len(data) > maxObject {
++		return 0, Error("storage_object_too_large")
++	}
++	key, err := s.objectKey(relative)
++	if err != nil {
++		return 0, err
++	}
++	digest := md5.Sum(data)
++	object := uploadObject{Key: key, Size: len(data), MD5: base64.StdEncoding.EncodeToString(digest[:])}
++	if relative == "lock-sync" {
++		if err := s.lockCondition(&object, data); err != nil {
++			return 0, err
++		}
++	} else if !overwrite {
++		object.IfNoneMatch = "*"
++	}
++	for attempt := 0; attempt < 2; attempt++ {
++		grant, err := s.authorize(object)
++		if err != nil {
++			return 0, err
++		}
++		err = s.upload(grant, data)
++		if err == nil {
++			return int64(len(data)), nil
++		}
++		if err == Error("storage_conflict") && !overwrite && relative != "lock-sync" {
++			if _, headErr := s.head(key); headErr == nil {
++				return 0, nil
++			}
++		}
++		if err == Error("storage_conflict") && relative == "lock-sync" {
++			return 0, dejavu.ErrCloudLocked
++		}
++		if err != Error("storage_upload_expired") || attempt > 0 {
++			return 0, err
++		}
++	}
++	return 0, Error("storage_upload_expired")
++}
++
++func (s *Store) lockCondition(object *uploadObject, data []byte) error {
++	var desired, current struct {
++		DeviceID string
++		Time     int64
++	}
++	if json.Unmarshal(data, &desired) != nil || desired.DeviceID == "" {
++		return ErrInvalid
++	}
++	ctx, cancel := context.WithTimeout(s.life, 20*time.Second)
++	defer cancel()
++	output, err := s.reader.GetObject(ctx, &s3.GetObjectInput{Bucket: &s.config.Bucket, Key: &object.Key})
++	if err != nil {
++		if _, missing := s.S3.DownloadObject("lock-sync"); errors.Is(missing, cloud.ErrCloudObjectNotFound) {
++			object.IfNoneMatch = "*"
++			return nil
++		}
++		return err
++	}
++	defer output.Body.Close()
++	body, err := io.ReadAll(io.LimitReader(output.Body, 4097))
++	if err != nil || len(body) > 4096 || json.Unmarshal(body, &current) != nil ||
++		current.DeviceID == "" || current.Time <= 0 || aws.ToString(output.ETag) == "" {
++		return ErrInvalid
++	}
++	if current.DeviceID != desired.DeviceID && time.Since(time.UnixMilli(current.Time)) < 65*time.Second {
++		return dejavu.ErrCloudLocked
++	}
++	object.IfMatch = aws.ToString(output.ETag)
++	return nil
++}
++
++func (s *Store) head(key string) (*s3.HeadObjectOutput, error) {
++	ctx, cancel := context.WithTimeout(s.life, 20*time.Second)
++	defer cancel()
++	return s.reader.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &s.config.Bucket, Key: &key})
++}
++
++type grantResult struct {
++	grant uploadGrant
++	err   error
++}
++
++type grantBatch struct {
++	objects []uploadObject
++	replies map[string]chan grantResult
++}
++
++func (s *Store) authorize(object uploadObject) (uploadGrant, error) {
++	if strings.HasSuffix(object.Key, "/lock-sync") {
++		grants, err := s.authorizeBatch([]uploadObject{object})
++		return grants[object.Key], err
++	}
++	reply := make(chan grantResult, 1)
++	s.batchMu.Lock()
++	batch := s.batch
++	if batch == nil || len(batch.objects) == 100 || batch.replies[object.Key] != nil {
++		batch = &grantBatch{replies: map[string]chan grantResult{}}
++		s.batch = batch
++		time.AfterFunc(20*time.Millisecond, func() { s.submitGrantBatch(batch) })
++	}
++	batch.objects = append(batch.objects, object)
++	batch.replies[object.Key] = reply
++	s.batchMu.Unlock()
++	select {
++	case result := <-reply:
++		return result.grant, result.err
++	case <-s.life.Done():
++		return uploadGrant{}, ErrChanged
++	}
++}
++
++func (s *Store) submitGrantBatch(batch *grantBatch) {
++	s.batchMu.Lock()
++	if s.batch == batch {
++		s.batch = nil
++	}
++	s.batchMu.Unlock()
++	grants, err := s.authorizeBatch(batch.objects)
++	for key, reply := range batch.replies {
++		reply <- grantResult{grants[key], err}
++	}
++}
++
++func (s *Store) authorizeBatch(objects []uploadObject) (map[string]uploadGrant, error) {
++	input := struct {
++		ConfigVersion int64          `json:"configVersion"`
++		Objects       []uploadObject `json:"objects"`
++	}{s.config.ConfigVersion, objects}
++	var result struct {
++		ConfigVersion int64
++		Grants        []uploadGrant
++	}
++	err := s.request("upload-authorize", input, &result)
++	if err == Error("rate_limited") {
++		s.client.mu.Lock()
++		wait := time.Until(s.client.cooldown["upload-authorize"].until)
++		s.client.mu.Unlock()
++		if wait <= time.Minute {
++			select {
++			case <-s.life.Done():
++				return nil, ErrChanged
++			case <-time.After(max(0, wait)):
++				err = s.request("upload-authorize", input, &result)
++			}
++		}
++	}
++	if err != nil {
++		return nil, err
++	}
++	if result.ConfigVersion != s.config.ConfigVersion || len(result.Grants) != len(objects) {
++		return nil, ErrInvalid
++	}
++	wanted := make(map[string]uploadObject, len(objects))
++	for _, object := range objects {
++		wanted[object.Key] = object
++	}
++	grants := make(map[string]uploadGrant, len(objects))
++	ids := make(map[string]bool, len(objects))
++	for _, grant := range result.Grants {
++		object, exists := wanted[grant.Key]
++		if !exists || ids[grant.ID] || grants[grant.Key].ID != "" || !s.validGrant(grant, object) {
++			return nil, ErrInvalid
++		}
++		ids[grant.ID], grants[grant.Key] = true, grant
++	}
++	return grants, nil
++}
++
++func (s *Store) validGrant(grant uploadGrant, object uploadObject) bool {
++	dest, err := url.Parse(grant.URL)
++	if err != nil || dest.Scheme != "https" || dest.RawQuery == "" || dest.User != nil ||
++		dest.Fragment != "" || strings.ContainsAny(grant.URL, "\\#\r\n") || grant.Key != object.Key ||
++		!visible(grant.ID) || grant.ExpiresAt.IsZero() || time.Until(grant.ExpiresAt) > 5*time.Minute+time.Second {
++		return false
++	}
++	endpoint, _ := url.Parse(s.config.Endpoint)
++	host := endpoint.Host
++	key := object.Key
++	if s.config.ForcePathStyle {
++		key = s.config.Bucket + "/" + key
++	} else {
++		host = s.config.Bucket + "." + host
++	}
++	if !strings.EqualFold(host, dest.Host) || dest.Path != strings.TrimRight(endpoint.Path, "/")+"/"+key {
++		return false
++	}
++	headers := map[string]string{"content-length": strconv.Itoa(object.Size), "content-md5": object.MD5,
++		"content-type": "application/octet-stream"}
++	if object.IfMatch != "" {
++		headers["if-match"] = object.IfMatch
++	}
++	if object.IfNoneMatch != "" {
++		headers["if-none-match"] = object.IfNoneMatch
++	}
++	if len(headers) != len(grant.Headers) {
++		return false
++	}
++	for name, expected := range headers {
++		if grant.Headers[name] != expected {
++			return false
++		}
++	}
++	return true
++}
++
++func (s *Store) upload(grant uploadGrant, data []byte) error {
++	if !grant.ExpiresAt.After(time.Now()) {
++		return Error("storage_upload_expired")
++	}
++	if s.life.Err() != nil {
++		return ErrChanged
++	}
++	request, err := http.NewRequestWithContext(s.life, http.MethodPut, grant.URL, bytes.NewReader(data))
++	if err != nil {
++		return ErrInvalid
++	}
++	for name, value := range grant.Headers {
++		request.Header.Set(name, value)
++	}
++	response, err := s.put.Do(request)
++	if err != nil {
++		for _, pause := range []time.Duration{0, 400 * time.Millisecond, 1200 * time.Millisecond} {
++			select {
++			case <-s.life.Done():
++				return ErrChanged
++			case <-time.After(pause):
++				if s.complete(grant.ID) {
++					return nil
++				}
++			}
++		}
++		return Error("response_lost")
++	}
++	defer response.Body.Close()
++	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
++	switch status := response.StatusCode; {
++	case status >= 200 && status < 300:
++		go s.complete(grant.ID)
++		return nil
++	case status == 409 || status == 412:
++		return Error("storage_conflict")
++	case status == 403 && !grant.ExpiresAt.After(time.Now()):
++		return Error("storage_upload_expired")
++	case status == 429:
++		return Error("rate_limited")
++	case status >= 500:
++		return Error("temporarily_unavailable")
++	}
++	return Error("storage_upload_failed")
++}
++
++func (s *Store) complete(id string) bool {
++	var out struct{ Results []struct{ ID, State string } }
++	err := s.request("upload-complete", map[string]any{
++		"configVersion": s.config.ConfigVersion, "grantIds": []string{id},
++	}, &out)
++	return err == nil && len(out.Results) == 1 && out.Results[0].ID == id && out.Results[0].State == "completed"
++}
++
++func (s *Store) RemoveObject(relative string) error {
++	key, err := s.objectKey(relative)
++	if err != nil {
++		return err
++	}
++	return s.request("objects-delete", map[string]any{"configVersion": s.config.ConfigVersion, "keys": []string{key}}, nil)
++}
++
++func (s *Store) request(action string, input, output any) error {
++	s.client.mu.Lock()
++	defer s.client.mu.Unlock()
++	if s.life.Err() != nil || !s.config.sameSource(s.client.config) {
++		return ErrChanged
++	}
++	ctx, cancel := context.WithTimeout(s.life, 20*time.Second)
++	defer cancel()
++	return s.client.authorized(ctx, action, input, output)
++}
++
++func (s *Store) String() string { return fmt.Sprintf("QingYu v%d", s.config.ProtocolVersion) }
+diff --git a/kernel/qingyustorage/cloud_test.go b/kernel/qingyustorage/cloud_test.go
+new file mode 100644
+index 0000000..8881f38
+--- /dev/null
++++ b/kernel/qingyustorage/cloud_test.go
+@@ -0,0 +1,340 @@
++// SPDX-License-Identifier: AGPL-3.0-or-later
++
++package qingyustorage
++
++import (
++	"bytes"
++	"context"
++	"crypto/md5"
++	"encoding/hex"
++	"encoding/json"
++	"encoding/xml"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"sync"
++	"testing"
++	"time"
++
++	"github.com/siyuan-note/dejavu"
++	"github.com/siyuan-note/dejavu/cloud"
++)
++
++func TestQingYuDejaVuRoundTrip(t *testing.T) {
++	ctx := context.Background()
++	const prefix = "users/12345678-1234-1234-1234-123456789abc/"
++	const bucket = "notes"
++	var server *httptest.Server
++	var mu sync.Mutex
++	objects := map[string][]byte{}
++	grants := map[string]uploadObject{}
++	var configRequests, rejectedRequests, deletes, reads, configVersion int
++	configVersion = 1
++	rejectFirst := true
++	deadline := time.Now().Add(time.Hour).Unix()
++	reply := func(w http.ResponseWriter, data any) {
++		_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "code": "ok", "data": data})
++	}
++	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		mu.Lock()
++		defer mu.Unlock()
++		if action, ok := strings.CutPrefix(r.URL.Path, "/api/client/v1/"); ok {
++			if action != "login" && action != "refresh" && r.Header.Get("Authorization") != "Bearer access" {
++				t.Error("missing account bearer")
++				http.Error(w, "", 401)
++				return
++			}
++			switch action {
++			case "login", "refresh":
++				reply(w, Tokens{AccessToken: "access", RefreshToken: "refresh", SessionExpiresAt: deadline})
++			case "me":
++				reply(w, map[string]string{"id": "id", "email": "client@example.test"})
++			case "subscription":
++				reply(w, map[string]any{"active": true, "quotaBytes": 1 << 30})
++			case "storage-config":
++				configRequests++
++				var body map[string]string
++				_ = json.NewDecoder(r.Body).Decode(&body)
++				if body["rejectedKey"] != "" {
++					rejectedRequests++
++				}
++				reply(w, Config{ProtocolVersion: 2, Endpoint: server.URL, Bucket: bucket, Region: "test",
++					Prefix: prefix, Repository: "repo", Provider: "s3", SiyuanNamespace: "siyuan-v2/",
++					ConfigVersion: int64(configVersion), ForcePathStyle: true, ConcurrentReqs: 2,
++					ReadOnly: true, UploadMode: "presigned", DeleteMode: "server", AccessKeyID: "id",
++					SecretAccessKey: "secret", SessionToken: "token", CredentialsExpireAt: time.Now().Add(15 * time.Minute)})
++			case "upload-authorize":
++				var body struct {
++					ConfigVersion int64
++					Objects       []uploadObject
++				}
++				_ = json.NewDecoder(r.Body).Decode(&body)
++				response := []uploadGrant{}
++				for _, object := range body.Objects {
++					if !strings.HasPrefix(object.Key, prefix+"siyuan-v2/") {
++						t.Error("grant outside SiYuan repository")
++					}
++					id := strconv.Itoa(len(grants) + 1)
++					grants[id] = object
++					headers := map[string]string{"content-length": strconv.Itoa(object.Size), "content-md5": object.MD5, "content-type": "application/octet-stream"}
++					if object.IfMatch != "" {
++						headers["if-match"] = object.IfMatch
++					}
++					if object.IfNoneMatch != "" {
++						headers["if-none-match"] = object.IfNoneMatch
++					}
++					response = append(response, uploadGrant{ID: id, Key: object.Key, URL: server.URL + "/" + bucket + "/" + object.Key + "?grant=" + id,
++						ExpiresAt: time.Now().Add(time.Minute), Headers: headers})
++				}
++				reply(w, map[string]any{"configVersion": body.ConfigVersion, "grants": response})
++			case "upload-complete":
++				var body struct{ GrantIDs []string }
++				_ = json.NewDecoder(r.Body).Decode(&body)
++				reply(w, map[string]any{"results": []map[string]string{{"id": body.GrantIDs[0], "state": "completed"}}})
++			case "objects-delete":
++				var body struct{ Keys []string }
++				_ = json.NewDecoder(r.Body).Decode(&body)
++				for _, key := range body.Keys {
++					delete(objects, key)
++					deletes++
++				}
++				reply(w, struct{}{})
++			case "logout":
++				reply(w, struct{}{})
++			default:
++				t.Errorf("unexpected account API %s", action)
++				http.NotFound(w, r)
++			}
++			return
++		}
++		key := strings.TrimPrefix(r.URL.Path, "/"+bucket+"/")
++		if r.Method == http.MethodPut {
++			id := r.URL.Query().Get("grant")
++			object := grants[id]
++			data, _ := io.ReadAll(r.Body)
++			if id == "" || object.Key != key || object.Size != len(data) || object.MD5 != r.Header.Get("Content-MD5") || r.Header.Get("Authorization") != "" {
++				t.Error("write did not use its presigned grant")
++				http.Error(w, "", 400)
++				return
++			}
++			current, ok := objects[key]
++			if (ok && object.IfNoneMatch == "*") || (object.IfMatch != "" && testETag(current) != object.IfMatch) {
++				w.WriteHeader(412)
++				return
++			}
++			objects[key] = data
++			w.WriteHeader(200)
++			return
++		}
++		if (r.Method != http.MethodGet && r.Method != http.MethodHead) || r.Header.Get("X-Amz-Security-Token") != "token" ||
++			!strings.HasPrefix(r.Header.Get("Authorization"), "AWS4-HMAC-SHA256 ") {
++			t.Error("object read was not signed with STS")
++			http.Error(w, "", 400)
++			return
++		}
++		reads++
++		if rejectFirst {
++			rejectFirst = false
++			w.WriteHeader(403)
++			_, _ = io.WriteString(w, "<Error><Code>ExpiredToken</Code><Message>redacted</Message></Error>")
++			return
++		}
++		if query := r.URL.Query(); query.Get("list-type") == "2" {
++			_, _ = io.WriteString(w, "<ListBucketResult><IsTruncated>false</IsTruncated>")
++			for name, data := range objects {
++				if strings.HasPrefix(name, query.Get("prefix")) {
++					_, _ = fmt.Fprintf(w, "<Contents><Key>")
++					_ = xml.EscapeText(w, []byte(name))
++					_, _ = fmt.Fprintf(w, "</Key><Size>%d</Size></Contents>", len(data))
++				}
++			}
++			_, _ = io.WriteString(w, "</ListBucketResult>")
++			return
++		}
++		data, ok := objects[key]
++		if !ok {
++			w.WriteHeader(403)
++			_, _ = io.WriteString(w, "<Error><Code>AccessDenied</Code></Error>")
++			return
++		}
++		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
++		w.Header().Set("ETag", testETag(data))
++		if r.Method == http.MethodGet {
++			_, _ = w.Write(data)
++		}
++	}))
++	defer server.Close()
++
++	const note = "siyuan test content"
++	key := bytes.Repeat([]byte{1}, 32)
++	newRepo := func(device string) (*dejavu.Repo, *Store) {
++		t.Helper()
++		c := New(server.URL, server.Client().Transport, Tokens{}, nil)
++		if err := c.Login(ctx, device+"@example.test", "fixture-password"); err != nil {
++			t.Fatal(err)
++		}
++		status, err := c.Probe(ctx)
++		if err != nil {
++			t.Fatal(err)
++		}
++		backend, err := c.Store(&cloud.Conf{Dir: "main"}, status)
++		if err != nil {
++			t.Fatal(err)
++		}
++		workspace := t.TempDir()
++		repo, err := dejavu.NewRepo(filepath.Join(workspace, "data"), filepath.Join(workspace, "repo"),
++			filepath.Join(workspace, "history"), filepath.Join(workspace, "temp"), device, device, "test", key, nil, backend)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := os.MkdirAll(repo.DataPath, 0755); err != nil {
++			t.Fatal(err)
++		}
++		return repo, backend.(*Store)
++	}
++	first, firstStore := newRepo("first")
++	defer firstStore.client.Logout(ctx)
++	if err := os.WriteFile(filepath.Join(first.DataPath, "note.txt"), []byte(note), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := first.Index("first", true, nil); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := first.SyncUpload(map[string]any{}); err != nil {
++		t.Fatal(err)
++	}
++	second, secondStore := newRepo("second")
++	defer secondStore.client.Logout(ctx)
++	if err := os.WriteFile(filepath.Join(second.DataPath, "seed.txt"), []byte("seed"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := second.Index("second", true, nil); err != nil {
++		t.Fatal(err)
++	}
++	if _, _, err := second.SyncDownload(map[string]any{}); err != nil {
++		t.Fatal(err)
++	}
++	got, err := os.ReadFile(filepath.Join(second.DataPath, "note.txt"))
++	if err != nil || string(got) != note {
++		t.Fatalf("note round trip: %q, %v", got, err)
++	}
++	mu.Lock()
++	if deletes == 0 || configRequests < 3 || rejectedRequests != 1 || reads == 0 {
++		t.Errorf("expected deletion, STS refresh and reads; got %d, %d, %d, %d", deletes, configRequests, rejectedRequests, reads)
++	}
++	configVersion++
++	mu.Unlock()
++	firstStore.client.mu.Lock()
++	firstStore.client.rejected = "id"
++	firstStore.client.mu.Unlock()
++	if _, err := firstStore.Retrieve(ctx); !errors.Is(err, ErrChanged) {
++		t.Fatalf("expected old storage generation to stop: %v", err)
++	}
++}
++
++func testETag(data []byte) string {
++	digest := md5.Sum(data)
++	return "\"" + hex.EncodeToString(digest[:]) + "\""
++}
++
++func TestQingYuAgainstRustServer(t *testing.T) {
++	origin := os.Getenv("SIYUAN_QINGYU_FIXTURE_ORIGIN")
++	if origin == "" {
++		t.Skip("requires the local Rust server fixture")
++	}
++	if !strings.HasPrefix(origin, "http://127.0.0.1:") {
++		t.Fatal("fixture origin must be loopback")
++	}
++	ctx := context.Background()
++	key := bytes.Repeat([]byte{21}, 32)
++	setup := func(device string) *dejavu.Repo {
++		t.Helper()
++		client := New(origin, loopbackFixtureTransport{}, Tokens{}, nil)
++		if err := client.Login(ctx, "bridge@example.com", "samplepassword"); err != nil {
++			t.Fatal(err)
++		}
++		t.Cleanup(func() { _ = client.Logout(ctx) })
++		status, err := client.Probe(ctx)
++		if err != nil {
++			t.Fatal(err)
++		}
++		b, err := client.Store(&cloud.Conf{Dir: "main"}, status)
++		if err != nil {
++			t.Fatal(err)
++		}
++		w := t.TempDir()
++		r, err := dejavu.NewRepo(filepath.Join(w, "data"), filepath.Join(w, "repo"), filepath.Join(w, "history"),
++			filepath.Join(w, "temp"), device, device, "fixture", key, nil, b)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := os.MkdirAll(r.DataPath, 0755); err != nil {
++			t.Fatal(err)
++		}
++		return r
++	}
++	forward, back := setup("first"), setup("second")
++	for i, pair := range [][2]*dejavu.Repo{{forward, back}, {back, forward}} {
++		writer, reader := pair[0], pair[1]
++		data := []byte("QingYu local round trip " + strings.Repeat("note", i+1))
++		file := filepath.Join(writer.DataPath, "note.txt")
++		if err := os.WriteFile(file, data, 0600); err != nil {
++			t.Fatal(err)
++		}
++		modified := time.Now().Add(time.Duration(i) * 2 * time.Second)
++		if err := os.Chtimes(file, modified, modified); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := writer.Index("writer", true, nil); err != nil {
++			t.Fatal(err)
++		}
++		if _, err := writer.SyncUpload(map[string]any{}); err != nil {
++			t.Fatal(err)
++		}
++		if i == 0 {
++			if err := os.WriteFile(filepath.Join(reader.DataPath, "seed.txt"), []byte("seed"), 0600); err != nil {
++				t.Fatal(err)
++			}
++		}
++		if _, err := reader.Index("reader", true, nil); err != nil {
++			t.Fatal(err)
++		}
++		if _, _, err := reader.SyncDownload(map[string]any{}); err != nil {
++			t.Fatal(err)
++		}
++		got, err := os.ReadFile(filepath.Join(reader.DataPath, "note.txt"))
++		if err != nil || !bytes.Equal(got, data) {
++			t.Fatalf("round trip %d: %q, %v", i, got, err)
++		}
++	}
++}
++
++// Translate the isolated Rust fixture's HTTP object endpoint only in this test.
++type loopbackFixtureTransport struct{}
++
++func (loopbackFixtureTransport) RoundTrip(request *http.Request) (*http.Response, error) {
++	if request.URL.Hostname() != "127.0.0.1" {
++		return nil, ErrInvalid
++	}
++	request = request.Clone(request.Context())
++	request.URL.Scheme = "http"
++	response, err := http.DefaultTransport.RoundTrip(request)
++	if err != nil || !strings.HasPrefix(request.URL.Path, "/api/client/v1/") {
++		return response, err
++	}
++	body, err := io.ReadAll(response.Body)
++	response.Body.Close()
++	if err != nil {
++		return nil, err
++	}
++	body = bytes.ReplaceAll(body, []byte(`"http://127.0.0.1:`), []byte(`"https://127.0.0.1:`))
++	response.Body = io.NopCloser(bytes.NewReader(body))
++	response.ContentLength = int64(len(body))
++	return response, nil
++}

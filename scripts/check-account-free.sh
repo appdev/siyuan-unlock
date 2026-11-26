@@ -8,6 +8,7 @@ test -f "$upstream/kernel/model/unlock_cloud_account_test.go"
 test -f "$upstream/kernel/api/unlock_cloud_account_test.go"
 node "$scripts/check-account-ui.mjs" "$upstream"
 cd "$upstream/kernel"
+go test ./qingyustorage -count=1
 go test -tags "fts5 sqlcipher" ./model ./api \
-  -run '^(TestUnlock|TestCloudAccount|TestCloudRepoAuthFailure|TestCloudUserRefresh|TestAPIContractSettingErrorsAndAdmission|TestStableUpdateUsesUnlockGitHubRelease|TestFirstLaunchNotice)' \
+  -run '^(TestUnlock|TestCloudAccount|TestCloudRepoAuthFailure|TestCloudUserRefresh|TestAPIContractSettingErrorsAndAdmission|TestStableUpdateUsesUnlockGitHubRelease)' \
   -count=1

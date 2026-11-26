@@ -112,7 +112,6 @@ jobs:
           git apply "${workspace}/siyuan-note/patches/siyuan/default-config.patch"
           git apply "${workspace}/siyuan-note/patches/siyuan/mock-vip-user.patch"
           git apply "${workspace}/siyuan-note/patches/siyuan/hide-account-entry.patch"
-          git apply "${workspace}/siyuan-note/patches/siyuan/first-launch-notice.patch"
 
           git status
 
@@ -125,9 +124,12 @@ jobs:
           VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-          # v3.8.11's OCR manifest has no runtimeRecovery entry for linux-arm64 while
-          # the onnxruntime 1.24.3 assets are gone (404). Point the recovery at the
-          # matching published package, which ships the same runtime directory.
+          # Honor recovery entries from the selected upstream release.
+          if jq -e '.runtimeRecovery["linux-arm64"] != null' scripts/ocr-assets.json >/dev/null; then
+            exit 0
+          fi
+          # Older manifests omit this recovery entry and their runtime asset was
+          # removed. Recover it from the matching official SiYuan release.
           version="${VERSION#v}"
           name="siyuan-${version}-linux-arm64.tar.gz"
           digest=$(gh api "repos/siyuan-note/siyuan/releases/tags/v${version}" --jq ".assets[] | select(.name==\"${name}\") | .digest")
@@ -207,6 +209,11 @@ jobs:
       - name: Install Node pnpm
         run: npm install -g ${{ github.event.inputs.packageManager }}
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
+
+      - name: Apply QingYu v2 storage
+        shell: bash
+        working-directory: ${{ github.workspace }}/siyuan-note
+        run: bash scripts/apply-qingyu-storage.sh siyuan
 
       - name: Verify account-free sync
         shell: bash
