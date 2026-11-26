@@ -60,6 +60,7 @@ jobs:
                 codesign --force --sign - "$component"
               fi
             done
+          codesign --force --sign - "$app/Contents/MacOS/SiYuanQuickLookFonts"
           codesign --force --sign - "$app"
           codesign --verify --deep --strict "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")" = 3.8.12
