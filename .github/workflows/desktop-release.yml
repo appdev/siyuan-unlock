@@ -16,46 +16,6 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - os: ubuntu-22.04
-            kernel_path: "../app/kernel-linux/SiYuan-Kernel"
-            build_mode: "-buildmode=pie"
-            build_args: "-s -w -extldflags -static-pie -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
-            electron_args: "dist-linux"
-            goos: "linux"
-            goarch: "amd64"
-            cc_path: "x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc"
-            suffix: "linux.tar.gz"
-            deb_suffix: "linux.deb"
-          - os: ubuntu-22.04
-            name: ubuntu build linux.AppImage
-            kernel_path: "../app/kernel-linux/SiYuan-Kernel"
-            build_mode: "-buildmode=pie"
-            build_args: "-s -w -extldflags -static-pie -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
-            electron_args: "dist-linux"
-            goos: "linux"
-            goarch: "amd64"
-            cc_path: "x86_64-linux-musl-cross/bin/x86_64-linux-musl-gcc"
-            suffix: "linux.AppImage"
-            deb_suffix: ""
-          - os: ubuntu-22.04
-            kernel_path: "../app/kernel-linux-arm64/SiYuan-Kernel"
-            build_mode: "-buildmode=pie"
-            build_args: "-s -w -extldflags -static-pie -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
-            electron_args: "dist-linux-arm64"
-            goos: "linux"
-            goarch: "arm64"
-            cc_path: "aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
-            suffix: "linux-arm64.tar.gz"
-            deb_suffix: "linux-arm64.deb"
-          - os: macos-latest
-            kernel_path: "../app/kernel-darwin/SiYuan-Kernel"
-            build_mode: ""
-            build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
-            electron_args: "dist-darwin"
-            goos: "darwin"
-            goarch: "amd64"
-            suffix: "mac.dmg"
-            deb_suffix: ""
           - os: macos-latest
             kernel_path: "../app/kernel-darwin-arm64/SiYuan-Kernel"
             build_mode: ""
@@ -63,18 +23,9 @@ jobs:
             electron_args: "dist-darwin-arm64"
             goos: "darwin"
             goarch: "arm64"
+            gobin: ""
+            cc_path: ""
             suffix: "mac-arm64.dmg"
-            deb_suffix: ""
-          - os: windows-latest
-            kernel_path: "../app/kernel/SiYuan-Kernel.exe"
-            build_mode: ""
-            build_args: "-s -w -H=windowsgui -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
-            electron_args: "dist"
-            goos: "windows"
-            gobin: "bin"
-            mingwsys: "MINGW64"
-            goarch: "amd64"
-            suffix: "win.exe"
             deb_suffix: ""
 
     steps:
@@ -283,37 +234,11 @@ jobs:
         run: pnpm run ${{ matrix.config.electron_args }}
         working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
 
-      - uses: joutvhu/get-release@v1
-        id: get_current_release
+      - name: Upload macOS ARM64 test DMG
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ github.event.inputs.version }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Electron App
-        uses: ncipollo/release-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-${{ matrix.config.suffix }}
-          name: siyuan-unlock-${{ github.event.inputs.version }}-${{ matrix.config.suffix }}
-          allowUpdates: true
-          omitBody: true
-          omitName: true
-          tag: ${{ github.event.inputs.version }}
-          replacesArtifacts: true
-
-      - name: Upload .deb packages
-        if: ${{ matrix.config.deb_suffix != '' }}
-        uses: ncipollo/release-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-${{ matrix.config.deb_suffix }}
-          allowUpdates: true
-          omitBody: true
-          omitName: true
-          tag: ${{ github.event.inputs.version }}
-          replacesArtifacts: true
+          name: qingyu-macos-arm64-v3.8.12-test
+          path: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-mac-arm64.dmg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 5
