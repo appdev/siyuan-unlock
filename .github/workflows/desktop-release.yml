@@ -50,10 +50,15 @@ jobs:
           trap 'hdiutil detach "$RUNNER_TEMP/dmg-mount"' EXIT
           apps=("$RUNNER_TEMP/dmg-mount/"*.app)
           test "${#apps[@]}" -eq 1
-          codesign --verify --deep --strict "${apps[0]}"
-          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "${apps[0]}/Contents/Info.plist")" = 3.8.12
-          file "${apps[0]}/Contents/Resources/kernel/SiYuan-Kernel" | grep -F arm64
-          python3 - "${apks[0]}" "${apps[0]}" <<'PY'
+          staging="$RUNNER_TEMP/macos-test"
+          mkdir "$staging"
+          app="$staging/SiYuan.app"
+          ditto "${apps[0]}" "$app"
+          codesign --force --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")" = 3.8.12
+          file "$app/Contents/Resources/kernel/SiYuan-Kernel" | grep -F arm64
+          python3 - "${apks[0]}" "$app" <<'PY'
           import io
           from pathlib import Path
           import sys
@@ -80,7 +85,10 @@ jobs:
           print("Verified QingYu in both packages, Android ARM64 kernel, and macOS OCR runtime.")
           PY
           cp "${apks[0]}" "$RUNNER_TEMP/publish/siyuan-unlock-v3.8.12-qingyu-test-android-arm64-appdev.apk"
-          cp "${dmgs[0]}" "$RUNNER_TEMP/publish/siyuan-unlock-v3.8.12-qingyu-test-mac-arm64.dmg"
+          ln -s /Applications "$staging/Applications"
+          dmg="$RUNNER_TEMP/publish/siyuan-unlock-v3.8.12-qingyu-test-mac-arm64.dmg"
+          hdiutil create -volname 'SiYuan' -srcfolder "$staging" -format UDZO "$dmg"
+          hdiutil verify "$dmg"
 
       - name: Attach two test packages to the release and verify SHA-256
         shell: bash
