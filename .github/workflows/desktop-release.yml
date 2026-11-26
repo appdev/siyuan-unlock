@@ -54,6 +54,12 @@ jobs:
           mkdir "$staging"
           app="$staging/SiYuan.app"
           ditto "${apps[0]}" "$app"
+          find "$app/Contents/Frameworks" "$app/Contents/PlugIns" -depth -type d \( -name '*.app' -o -name '*.appex' -o -name '*.framework' -o -name '*.xpc' \) -print0 |
+            while IFS= read -r -d '' component; do
+              if ! codesign --verify --strict "$component"; then
+                codesign --force --sign - "$component"
+              fi
+            done
           codesign --force --sign - "$app"
           codesign --verify --deep --strict "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")" = 3.8.12
