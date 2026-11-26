@@ -32,8 +32,8 @@ jobs:
             gh run view "$run" --repo "$GITHUB_REPOSITORY" --json status,conclusion,headSha |
               jq -e --arg commit "$BUILD_COMMIT" '.status=="completed" and .conclusion=="success" and .headSha==$commit'
           done
-          gh run download "$ANDROID_RUN" --repo "$GITHUB_REPOSITORY" +            --name qingyu-android-arm64-appdev-v3.8.12-test --dir "$RUNNER_TEMP/android"
-          gh run download "$MACOS_RUN" --repo "$GITHUB_REPOSITORY" +            --name qingyu-macos-arm64-v3.8.12-test --dir "$RUNNER_TEMP/macos"
+          gh run download "$ANDROID_RUN" --repo "$GITHUB_REPOSITORY" --name qingyu-android-arm64-appdev-v3.8.12-test --dir "$RUNNER_TEMP/android"
+          gh run download "$MACOS_RUN" --repo "$GITHUB_REPOSITORY" --name qingyu-macos-arm64-v3.8.12-test --dir "$RUNNER_TEMP/macos"
 
       - name: Verify APK, DMG and bundled QingYu code
         shell: bash
