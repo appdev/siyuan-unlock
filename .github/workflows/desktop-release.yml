@@ -1,244 +1,101 @@
-name: CD For SiYuan Unlock
+name: Publish selected QingYu test packages
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "release version/tag"
         required: true
-      packageManager:
-        description: "pnpm@x.x.x"
-        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
 
 jobs:
-  build:
-    runs-on: ${{ matrix.config.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        config:
-          - os: macos-latest
-            kernel_path: "../app/kernel-darwin-arm64/SiYuan-Kernel"
-            build_mode: ""
-            build_args: "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
-            electron_args: "dist-darwin-arm64"
-            goos: "darwin"
-            goarch: "arm64"
-            gobin: ""
-            cc_path: ""
-            suffix: "mac-arm64.dmg"
-            deb_suffix: ""
-
+  publish:
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OFFICIAL_BUILD_MARKER: ${{ secrets.SIYUAN_UNLOCK_OFFICIAL_BUILD }}
+      VERSION: ${{ inputs.version }}
+      BUILD_COMMIT: 502bf453862091f4a03bd4d5fd3849563ab963d6
+      ANDROID_RUN: '45742137048'
+      MACOS_RUN: '45742137051'
     steps:
-      - name: Verify official repository
-        shell: bash
-        env:
-          OFFICIAL_BUILD_MARKER: ${{ secrets.SIYUAN_UNLOCK_OFFICIAL_BUILD }}
-        run: |
-          if [[ "${GITHUB_REPOSITORY}" != "appdev/siyuan-unlock" || -z "${OFFICIAL_BUILD_MARKER}" ]]; then
-            echo "::error::This release workflow can only run in the official repository."
-            exit 1
-          fi
-
-      - uses: actions/checkout@v4
-        with:
-          path: siyuan-note
-
-      - name: clone origin and apply patches
+      - name: Download the two successful builds
         shell: bash
         run: |
           set -euo pipefail
+          test "$GITHUB_REPOSITORY" = appdev/siyuan-unlock
+          test -n "$OFFICIAL_BUILD_MARKER"
+          test "$VERSION" = v3.8.12
+          for run in "$ANDROID_RUN" "$MACOS_RUN"; do
+            gh run view "$run" --repo "$GITHUB_REPOSITORY" --json status,conclusion,headSha |
+              jq -e --arg commit "$BUILD_COMMIT" '.status=="completed" and .conclusion=="success" and .headSha==$commit'
+          done
+          gh run download "$ANDROID_RUN" --repo "$GITHUB_REPOSITORY" +            --name qingyu-android-arm64-appdev-v3.8.12-test --dir "$RUNNER_TEMP/android"
+          gh run download "$MACOS_RUN" --repo "$GITHUB_REPOSITORY" +            --name qingyu-macos-arm64-v3.8.12-test --dir "$RUNNER_TEMP/macos"
 
-          workspace="${{ github.workspace }}"
-          if [ "${RUNNER_OS}" = "Windows" ]; then
-            workspace="$(cygpath -u "${workspace}")"
-          fi
-
-          mkdir -p "${workspace}/go"
-          cd "${workspace}/siyuan-note/"
-
-          git clone --branch "${{ github.event.inputs.version }}" --depth=1 https://github.com/siyuan-note/siyuan.git
-          cd siyuan
-
-          git apply "${workspace}/siyuan-note/patches/siyuan/disable-update.patch"
-          git apply "${workspace}/siyuan-note/patches/siyuan/default-config.patch"
-          git apply "${workspace}/siyuan-note/patches/siyuan/mock-vip-user.patch"
-          git apply "${workspace}/siyuan-note/patches/siyuan/hide-account-entry.patch"
-
-          git status
-
-      - name: Add linux-arm64 OCR runtime recovery
-        if: matrix.config.goos == 'linux' && matrix.config.goarch == 'arm64'
+      - name: Verify APK, DMG and bundled QingYu code
         shell: bash
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-          # Honor recovery entries from the selected upstream release.
-          if jq -e '.runtimeRecovery["linux-arm64"] != null' scripts/ocr-assets.json >/dev/null; then
-            exit 0
-          fi
-          # Older manifests omit this recovery entry and their runtime asset was
-          # removed. Recover it from the matching official SiYuan release.
-          version="${VERSION#v}"
-          name="siyuan-${version}-linux-arm64.tar.gz"
-          digest=$(gh api "repos/siyuan-note/siyuan/releases/tags/v${version}" --jq ".assets[] | select(.name==\"${name}\") | .digest")
-          export VERSION="${version}" NAME="${name}" DIGEST="${digest}"
-          python3 - <<'PYEOF'
-          import json, os
-          version = os.environ["VERSION"]
-          name = os.environ["NAME"]
-          digest = os.environ["DIGEST"].split(":", 1)[1]
-          manifest = json.load(open("scripts/ocr-assets.json"))
-          entry = manifest["runtime"]["linux-arm64"]
-          manifest.setdefault("runtimeRecovery", {})["linux-arm64"] = {
-              "url": f"https://github.com/siyuan-note/siyuan/releases/download/v{version}/{name}",
-              "sha256": digest,
-              "format": "tar.gz",
-              "path": f"siyuan-{version}-linux-arm64/resources/stage/ocr/runtime/linux-arm64",
-              "runtimeSource": {
-                  "algorithm": "sha256",
-                  "digest": entry["sha256"],
-                  "size": entry["size"],
-                  "library": entry["library"],
-              },
-          }
-          json.dump(manifest, open("scripts/ocr-assets.json", "w"), indent=2, ensure_ascii=False)
-          print("OCR recovery added:", name, digest)
-          PYEOF
+          shopt -s nullglob
+          apks=("$RUNNER_TEMP/android/"*.apk)
+          dmgs=("$RUNNER_TEMP/macos/"*.dmg)
+          test "${#apks[@]}" -eq 1
+          test "${#dmgs[@]}" -eq 1
+          mkdir "$RUNNER_TEMP/dmg-mount" "$RUNNER_TEMP/publish"
+          hdiutil verify "${dmgs[0]}"
+          hdiutil attach -readonly -nobrowse -mountpoint "$RUNNER_TEMP/dmg-mount" "${dmgs[0]}"
+          trap 'hdiutil detach "$RUNNER_TEMP/dmg-mount"' EXIT
+          apps=("$RUNNER_TEMP/dmg-mount/"*.app)
+          test "${#apps[@]}" -eq 1
+          codesign --verify --deep --strict "${apps[0]}"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "${apps[0]}/Contents/Info.plist")" = 3.8.12
+          file "${apps[0]}/Contents/Resources/kernel/SiYuan-Kernel" | grep -F arm64
+          python3 - "${apks[0]}" "${apps[0]}" <<'PY'
+          import io
+          from pathlib import Path
+          import sys
+          import zipfile
 
-      - name: Set up Cross Compilation Toolchains for Linux
-        if: contains( matrix.config.goos, 'linux')
-        run: |
-          sudo mkdir -p /usr/local/musl
-      
-          if [ "${{ matrix.config.goarch }}" = "amd64" ]; then
-            wget https://github.com/appdev/musl-archive/releases/download/latest/x86_64-linux-musl-cross.tgz
-            sudo tar -xzf x86_64-linux-musl-cross.tgz -C /usr/local/musl
-          elif [ "${{ matrix.config.goarch }}" = "arm64" ]; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-            wget https://github.com/appdev/musl-archive/releases/download/latest/aarch64-linux-musl-cross.tgz
-            sudo tar -xzf aarch64-linux-musl-cross.tgz -C /usr/local/musl
-          fi
+          def verify_renderer(names, read, target):
+              scripts = [name for name in names if f"stage/build/{target}/" in name and name.endswith(".js")]
+              for marker in (b"data-switch-to-qingyu", b"/api/sync/loginQingYu"):
+                  assert any(marker in read(name) for name in scripts), (target, marker)
 
-      - name: Set up MingGW
-        uses: msys2/setup-msys2@v2
-        if: contains( matrix.config.goos, 'windows')
-        with:
-          install: p7zip mingw-w64-x86_64-lua
+          apk, app = map(Path, sys.argv[1:])
+          with zipfile.ZipFile(apk) as archive:
+              assert "lib/arm64-v8a/libgojni.so" in archive.namelist()
+              with zipfile.ZipFile(io.BytesIO(archive.read("assets/app.zip"))) as renderer:
+                  verify_renderer(renderer.namelist(), renderer.read, "mobile")
+          resources = app / "Contents/Resources"
+          assert (resources / "stage/ocr/runtime/darwin-arm64/libonnxruntime.dylib").is_file()
+          assert list((resources / "stage/ocr/models").glob("*/det/inference.onnx"))
+          verify_renderer(
+              (str(path.relative_to(resources)) for path in (resources / "stage/build/app").glob("*.js")),
+              lambda name: (resources / name).read_bytes(),
+              "app",
+          )
+          print("Verified QingYu in both packages, Android ARM64 kernel, and macOS OCR runtime.")
+          PY
+          cp "${apks[0]}" "$RUNNER_TEMP/publish/siyuan-unlock-v3.8.12-qingyu-test-android-arm64-appdev.apk"
+          cp "${dmgs[0]}" "$RUNNER_TEMP/publish/siyuan-unlock-v3.8.12-qingyu-test-mac-arm64.dmg"
 
-      - name: Set up TDM-GCC
-        run: msys2 -c "bash siyuan-note/siyuan/scripts/get-tdm-gcc.sh tdm https://github.com/jmeubank/tdm-gcc/releases/download/v10.3.0-tdm-1/tdm-gcc-10.3.0.exe" && echo "CC=${{ github.workspace }}/tdm/bin/gcc.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        if: contains( matrix.config.goarch, '386')
-        working-directory: ${{ github.workspace }}
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: ${{ github.workspace }}/siyuan-note/siyuan/kernel/go.mod
-          cache-dependency-path: "**/*.sum"
-      - run: go version
-
-      - name: Set up goversioninfo
-        run: go get github.com/josephspurrier/goversioninfo/cmd/goversioninfo && go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo
-        if: contains( matrix.config.goos, 'windows')
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
-        env:
-          GO111MODULE: on
-          CGO_ENABLED: 1
-          GOOS: ${{ matrix.config.goos }}
-          GOPATH: ${{ github.workspace }}/go
-          GOARCH: ${{ matrix.config.goarch }}
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Install Node pnpm
-        run: npm install -g ${{ github.event.inputs.packageManager }}
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
-
-      - name: Apply QingYu v2 storage
+      - name: Attach two test packages to the release and verify SHA-256
         shell: bash
-        working-directory: ${{ github.workspace }}/siyuan-note
-        run: bash scripts/apply-qingyu-storage.sh siyuan
-
-      - name: Verify account-free sync
-        shell: bash
-        working-directory: ${{ github.workspace }}/siyuan-note
-        run: bash scripts/check-account-free.sh siyuan
-
-      - name: Install Node Dependencies
-        run: pnpm install --no-frozen-lockfile
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
-
-      - name: Building UI
-        run: pnpm run build
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
-
-      - name: Generate Icon Resource and Properties/Version Info For Windows
-        run: ${{ github.workspace }}\go\${{ matrix.config.gobin }}\goversioninfo -platform-specific=true -icon="resource\icon.ico" -manifest="resource\goversioninfo.exe.manifest"
-        if: contains( matrix.config.goos, 'windows')
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
-
-      - name: Clean Build Directories
-        if: contains( matrix.config.goos, 'linux')
-        run: |
-          rm -rf app/build
-          rm -rf app/kernel-linux
-          rm -rf app/kernel-linux-arm64
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan
-
-      - name: Building Kernel
-        run: go build ${{ matrix.config.build_mode }} --tags "fts5 sqlcipher" -o "${{ matrix.config.kernel_path }}" -v -ldflags "${{ matrix.config.build_args }}"
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
-        env:
-          GO111MODULE: on
-          CGO_ENABLED: 1
-          GOOS: ${{ matrix.config.goos }}
-          GOPATH: ${{ github.workspace }}/go
-          GOARCH: ${{ matrix.config.goarch }}
-          GOPROXY: https://proxy.golang.org,direct
-          CC: ${{ runner.os == 'Linux' && format('/usr/local/musl/{0}', matrix.config.cc_path) || '' }}
-
-      - name: Verify Linux kernel is static PIE
-        if: contains(matrix.config.goos, 'linux')
-        shell: bash
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/kernel
         run: |
           set -euo pipefail
-          kernel_path="${{ matrix.config.kernel_path }}"
-          file "${kernel_path}"
-          build_info="$(go version -m "${kernel_path}")"
-          program_headers="$(readelf -lW "${kernel_path}")"
-          dynamic_section="$(readelf -dW "${kernel_path}" 2>/dev/null || true)"
-          printf '%s\n' "${build_info}"
-          printf '%s\n' "${program_headers}"
-          printf '%s\n' "${dynamic_section}"
-
-          if grep -Fq ' INTERP ' <<<"${program_headers}"; then
-            echo "::error::Linux kernel contains an ELF interpreter"
-            exit 1
-          fi
-          if grep -Fq '(NEEDED)' <<<"${dynamic_section}"; then
-            echo "::error::Linux kernel contains dynamic dependencies"
-            exit 1
-          fi
-          grep -F $'build\t-buildmode=pie' <<<"${build_info}"
-          grep -F -- '-extldflags -static-pie' <<<"${build_info}"
-
-      - name: Building Electron
-        run: pnpm run ${{ matrix.config.electron_args }}
-        working-directory: ${{ github.workspace }}/siyuan-note/siyuan/app
-
-      - name: Upload macOS ARM64 test DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: qingyu-macos-arm64-v3.8.12-test
-          path: ${{ github.workspace }}/siyuan-note/siyuan/app/build/siyuan-*-mac-arm64.dmg
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 5
+          for asset in "$RUNNER_TEMP/publish/"*; do
+            name=$(basename "$asset")
+            hash=$(shasum -a 256 "$asset" | awk '{print $1}')
+            stored=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$VERSION" |
+              jq -r --arg name "$name" '.assets[] | select(.name==$name) | .digest')
+            if [[ -z "$stored" ]]; then
+              gh release upload "$VERSION" "$asset" --repo "$GITHUB_REPOSITORY"
+              stored=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$VERSION" |
+                jq -r --arg name "$name" '.assets[] | select(.name==$name) | .digest')
+            fi
+            test "$stored" = "sha256:$hash"
+            printf 'Verified %s (%s)\n' "$name" "$stored"
+          done
